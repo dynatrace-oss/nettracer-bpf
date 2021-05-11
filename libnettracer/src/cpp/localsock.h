@@ -44,7 +44,10 @@ public:
     }
 
     static inline const char* serverAddress = "127.0.0.2";
-    static inline const int serverPort = 1234;
+    uint16_t getServerPort() const {
+        return serverPort;
+    }
+    void randomizeServerPort();
 
 private:
     bool serverRunning() const {
@@ -56,19 +59,20 @@ private:
 
     std::future<bool> serverThreadReturn;
     SocketFD connection = {nullptr, nullptr};
+    uint16_t serverPort = 1234;
     uint16_t clientPort = 0;
 };
 
 namespace detail {
 
-uint16_t connectSendClose(char msg);
-std::pair<SocketFD, uint16_t> connectSendKeep(int reps);
+uint16_t connectSendClose(char msg, uint16_t port);
+std::pair<SocketFD, uint16_t> connectSendKeep(int reps, uint16_t port);
 
 SocketFD createSocket();
 void setsockoptLinger(int fd);
 void setsockoptNodelay(int fd);
 void setsockoptReuseaddr(int fd);
-sockaddr_in createSocketAddress(int fd);
+sockaddr_in createSocketAddress(int fd, uint16_t port);
 
 void connectSocket(int fd, sockaddr_in* socketAddress);
 void bindListenOnSocket(int fd, sockaddr_in* socketAddress);
