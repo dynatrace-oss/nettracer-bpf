@@ -20,15 +20,15 @@ const char msgContinue = 'c';
 const char msgBreak = 'b';
 const char msgExit = 'x';
 
-bool listenForConnections(std::promise<bool> startPromise) {
+bool listenForConnections(std::promise<bool> startPromise, uint16_t port) {
 	using namespace detail;
 
-	LOG_DEBUG("Starting server");
+	LOG_DEBUG("Starting server on {}:{:d}", LocalSock::serverAddress, port);
 	SocketFD fd{nullptr, nullptr};
 	try {
 		fd = createSocket();
 		setsockoptReuseaddr(*fd);
-		auto socketAddress{createSocketAddress(*fd)};
+		auto socketAddress{createSocketAddress(*fd, port)};
 		bindListenOnSocket(*fd, &socketAddress);
 	}
 	catch (const SocketException& ex) {
@@ -96,7 +96,7 @@ bool LocalSock::startServer() {
 	std::promise<bool> startPromise;
 	auto startSuccessful = startPromise.get_future();
 
-	auto temporaryServerReturn = std::async(std::launch::async, listenForConnections, std::move(startPromise));
+	auto temporaryServerReturn = std::async(std::launch::async, listenForConnections, std::move(startPromise), getServerPort());
 
 	const auto timeout = std::chrono::seconds(10);
 	auto waitStatus = startSuccessful.wait_for(timeout);
@@ -125,7 +125,7 @@ bool LocalSock::stopServer() {
 	}
 
 	try {
-		detail::connectSendClose(msgExit);
+		detail::connectSendClose(msgExit, getServerPort());
 	}
 	catch (const SocketException& ex) {
 		LOG_ERROR(ex.what());
@@ -153,7 +153,7 @@ bool LocalSock::startClient() {
 	}
 
 	try {
-		auto ret{detail::connectSendKeep(377)}; // "random" number of "messages"
+		auto ret{detail::connectSendKeep(377, getServerPort())}; // "random" number of "messages"
 		connection = std::move(ret.first);
 		clientPort = ret.second;
 		return true;
@@ -201,22 +201,27 @@ tcp_info LocalSock::getTCPInfo() {
     return ti;
 }
 
+void LocalSock::randomizeServerPort() {
+	const uint16_t begin{1024}, end{65535};
+	serverPort = begin + rand() % (end - begin + 1);
+}
+
 namespace detail {
 
-uint16_t connectSendClose(char msg) {
+uint16_t connectSendClose(char msg, uint16_t port) {
 	auto fd{createSocket()};
 	setsockoptLinger(*fd);
-	auto socketAddress{createSocketAddress(*fd)};
+	auto socketAddress{createSocketAddress(*fd, port)};
 	connectSocket(*fd, &socketAddress);
 	writeMessage(*fd, msg);
 	// return source port in network order
 	return socketAddress.sin_port;
 }
 
-std::pair<SocketFD, uint16_t> connectSendKeep(int reps) {
+std::pair<SocketFD, uint16_t> connectSendKeep(int reps, uint16_t port) {
 	auto fd{createSocket()};
 	setsockoptNodelay(*fd);
-	auto socketAddress{createSocketAddress(*fd)};
+	auto socketAddress{createSocketAddress(*fd, port)};
 	connectSocket(*fd, &socketAddress);
 	while (reps-- > 0) {
 		writeMessage(*fd, msgContinue);
@@ -260,11 +265,11 @@ void setsockoptReuseaddr(int fd) {
 	}
 }
 
-sockaddr_in createSocketAddress(int fd) {
+sockaddr_in createSocketAddress(int fd, uint16_t port) {
 	sockaddr_in socketAddress;
 	in_addr addr;
 	socketAddress.sin_family = AF_INET;
-	socketAddress.sin_port = htons(LocalSock::serverPort);
+	socketAddress.sin_port = htons(port);
 	if (inet_aton(LocalSock::serverAddress, &addr) == 0) {
 		throw SocketException{fd, fmt::format("inet_aton failed: address={}", LocalSock::serverAddress)};
 	}

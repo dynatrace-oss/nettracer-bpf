@@ -60,6 +60,7 @@ bool guess(int status_fd) {
 
 			std::this_thread::sleep_for(interval);
 			localsock.stop();
+			localsock.randomizeServerPort();
 			if (localsock.start()) {
 				ok = true;
 				break;
@@ -321,7 +322,7 @@ std::optional<field_values> getExpectedValues(LocalSock& localsock, const Client
 	field_values expected;
 	expected.saddr = 0x0100007F;                   // 127.0.0.1
 	expected.daddr = 0x0200007F;                   // 127.0.0.2
-	expected.dport = htons(LocalSock::serverPort);
+	expected.dport = htons(localsock.getServerPort());
 	expected.sport = htons(localsock.getClientPort());
 	expected.netns = own_net_ns();
 	clientsock6.getDAddress(expected.daddr6);
