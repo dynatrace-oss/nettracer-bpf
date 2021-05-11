@@ -2,10 +2,10 @@
 
 #include <spdlog/fwd.h>
 #include <cstdint>
+#include <future>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <utility>
 
 struct sockaddr_in;
@@ -34,6 +34,10 @@ public:
     bool start();
     bool stop();
 
+    bool running() const {
+        return serverRunning() && clientRunning();
+    }
+
     tcp_info getTCPInfo();
     inline uint16_t getClientPort() const {
         return clientPort;
@@ -43,7 +47,14 @@ public:
     static inline const int serverPort = 1234;
 
 private:
-    std::thread serverThread;
+    bool serverRunning() const {
+        return serverThreadReturn.valid();
+    }
+    bool clientRunning() const {
+        return static_cast<bool>(connection);
+    }
+
+    std::future<bool> serverThreadReturn;
     SocketFD connection = {nullptr, nullptr};
     uint16_t clientPort = 0;
 };

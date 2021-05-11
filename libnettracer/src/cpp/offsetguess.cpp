@@ -51,6 +51,26 @@ bool guess(int status_fd) {
 
 	// prepare server ipv4 and client ipv6 on this thread
 	LocalSock localsock;
+	if (!localsock.running()) {
+		const unsigned maxRetries = 2;
+		const auto interval = std::chrono::seconds(3);
+		bool ok = false;
+		for (unsigned i = 0; i < maxRetries; ++i) {
+			logger->warn("LocalSock start failed, retrying in {:d}s...", interval.count());
+
+			std::this_thread::sleep_for(interval);
+			localsock.stop();
+			if (localsock.start()) {
+				ok = true;
+				break;
+			}
+		}
+		if (!ok) {
+			logger->error("LocalSock could not start");
+			return false;
+		}
+	}
+
 	ClientSock6 client6;
 	client6.readLocalInterface();
 	client6.setRemoteServerAndPort();

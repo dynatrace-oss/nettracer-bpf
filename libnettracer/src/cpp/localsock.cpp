@@ -14,10 +14,63 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-static const char msgContinue = 'c';
-static const char msgBreak = 'b';
-static const char msgExit = 'x';
+namespace {
 
+const char msgContinue = 'c';
+const char msgBreak = 'b';
+const char msgExit = 'x';
+
+bool listenForConnections(std::promise<bool> startPromise) {
+	using namespace detail;
+
+	LOG_DEBUG("Starting server");
+	SocketFD fd{nullptr, nullptr};
+	try {
+		fd = createSocket();
+		setsockoptReuseaddr(*fd);
+		auto socketAddress{createSocketAddress(*fd)};
+		bindListenOnSocket(*fd, &socketAddress);
+	}
+	catch (const SocketException& ex) {
+		LOG_ERROR("Server failed to start");
+		LOG_ERROR(ex.what());
+		startPromise.set_value(false);
+		return false;
+	}
+	catch (...) {
+		startPromise.set_exception(std::current_exception());
+		return false;
+	}
+	startPromise.set_value(true);
+
+	while (true) {
+		try {
+			auto fdc{acceptOnSocket(*fd)};
+			char msg{msgContinue};
+			while (msg == msgContinue) {
+				if (read(*fdc, &msg, 1) == -1) {
+					if (errno == EBADF || errno == ECONNRESET) {
+						LOG_WARN("read failed (EBADF or ECONNRESET)");
+						continue;
+					}
+					throw SocketException{*fdc, "read failed"};
+				}
+			}
+
+			if (msg == msgExit) {
+				LOG_DEBUG("Server finished");
+				return true;
+			}
+		}
+		catch (const SocketException& ex) {
+			LOG_ERROR("Server failed to handle an incoming connection");
+			LOG_ERROR(ex.what());
+			return false;
+		}
+	}
+}
+
+}
 SocketException::SocketException(int fd, const std::string& error) :
 	std::runtime_error(fmt::format("Failure for socket with fd={:d}: {}, errno: {:d} ({})", fd, error, errno, strerror(errno))) {}
 
@@ -30,67 +83,44 @@ LocalSock::LocalSock() {
 }
 
 LocalSock::~LocalSock() {
-	if (serverThread.joinable()) {
+	if (serverRunning()) {
 		stop();
 	}
 }
 
 bool LocalSock::startServer() {
-	if (serverThread.joinable()) {
+	if (serverRunning()) {
 		return false;
 	}
 
-	serverThread = std::thread{[this](){
-		using namespace detail;
+	std::promise<bool> startPromise;
+	auto startSuccessful = startPromise.get_future();
 
-		LOG_DEBUG("Starting server");
-		SocketFD fd{nullptr, nullptr};
-		try {
-			fd = createSocket();
-			setsockoptReuseaddr(*fd);
-			auto socketAddress{createSocketAddress(*fd)};
-			bindListenOnSocket(*fd, &socketAddress);
+	auto temporaryServerReturn = std::async(std::launch::async, listenForConnections, std::move(startPromise));
+
+	const auto timeout = std::chrono::seconds(10);
+	auto waitStatus = startSuccessful.wait_for(timeout);
+	if (waitStatus != std::future_status::ready) {
+		LOG_ERROR("Server took too much time to start");
+		return false;
+	}
+
+	try {
+		if (!startSuccessful.get()) {
+			return false;
 		}
-		catch (const SocketException& ex) {
-			LOG_ERROR("Server failed to start");
-			LOG_ERROR(ex.what());
-			exit(-1);
-		}
+	}
+	catch (const std::exception& ex) {
+		LOG_ERROR("Unexpected error occurred during server start: {}", ex.what());
+		return false;
+	}
 
-		while (true) {
-			try {
-				auto fdc{acceptOnSocket(*fd)};
-				char msg{msgContinue};
-				while (msg == msgContinue) {
-					if (read(*fdc, &msg, 1) == -1) {
-						if (errno == EBADF || errno == ECONNRESET) {
-							LOG_WARN("read failed (EBADF or ECONNRESET)");
-							continue;
-						}
-						throw SocketException{*fdc, "read failed"};
-					}
-				}
-
-				if (msg == msgExit) {
-					LOG_DEBUG("Server finished");
-					break;
-				}
-			}
-			catch (const SocketException& ex) {
-				LOG_ERROR("Server failed to handle an incoming connection");
-				LOG_ERROR(ex.what());
-				exit(-1);
-			}
-		}
-
-		return nullptr;
-	}};
-
-	return serverThread.joinable();
+	serverThreadReturn = std::move(temporaryServerReturn);
+	return serverThreadReturn.valid();
 }
 
 bool LocalSock::stopServer() {
-	if (!serverThread.joinable()) {
+	if (!serverRunning()) {
 		return false;
 	}
 
@@ -101,12 +131,24 @@ bool LocalSock::stopServer() {
 		LOG_ERROR(ex.what());
 		return false;
 	}
-	serverThread.join();
+	const auto timeout = std::chrono::seconds(10);
+	auto waitStatus = serverThreadReturn.wait_for(timeout);
+	if (waitStatus != std::future_status::ready) {
+		LOG_ERROR("Server took too much time to stop");
+		return false;
+	}
+
+	try {
+		(void)serverThreadReturn.get();
+	}
+	catch (const std::exception& ex) {
+		LOG_ERROR("Unexpected error occurred during server run time: {}", ex.what());
+	}
 	return true;
 }
 
 bool LocalSock::startClient() {
-	if (connection) {
+	if (clientRunning()) {
 		return false;
 	}
 
@@ -123,7 +165,7 @@ bool LocalSock::startClient() {
 }
 
 bool LocalSock::stopClient() {
-	if (!connection) {
+	if (!clientRunning()) {
 		return false;
 	}
 
@@ -136,12 +178,17 @@ bool LocalSock::start() {
 	if (!startServer()) {
 		return false;
 	}
-	std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	return startClient();
+	bool clientStarted{startClient()};
+	if (!clientStarted) {
+		stopServer();
+	}
+	return clientStarted;
 }
 
 bool LocalSock::stop() {
-	return stopClient() && stopServer();
+	bool clientStopped{stopClient()};
+	bool serverStopped{stopServer()};
+	return clientStopped && serverStopped;
 }
 
 tcp_info LocalSock::getTCPInfo() {
