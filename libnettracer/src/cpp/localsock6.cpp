@@ -38,7 +38,7 @@ bool ClientSock6::setRemoteServerAndPort(const std::string& serverIp, uint16_t t
 	remoteServerInfo = *res;
 	sockaddr_in6* addr = (sockaddr_in6*)(remoteServerInfo.ai_addr);
 
-	LOG_DEBUG("RemoteAddressInfo  addr={:s}",  printIpAddr(addr));
+	LOG_DEBUG("RemoteAddressInfo addr={:s}", printIpAddr(addr));
 	return true;
 }
 
