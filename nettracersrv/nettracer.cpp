@@ -168,7 +168,10 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	guess(status_fd);
+	if (!guess(status_fd)) {
+		LOG_ERROR("Offset guessing failed");
+		return 1;
+	}
 
 	netstat::NetStat netst{exitCtrl, vm.count("incremental"), vm.count("header")};
 	netst.init();
