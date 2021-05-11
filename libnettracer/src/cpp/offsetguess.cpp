@@ -309,7 +309,7 @@ bool guess(int status_fd) {
 			status.offset_rtt >= thresholdTcpSock || status.offset_rtt_var >= thresholdTcpSock
 		) {
 			logger->error("overflow while guessing {:d}, bailing out", status.what);
-			break;
+			return false;
 		}
 	}
 	return true;
