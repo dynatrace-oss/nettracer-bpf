@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <linux/tcp.h>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <string.h>
@@ -19,12 +20,14 @@ namespace {
 const char msgContinue = 'c';
 const char msgBreak = 'b';
 const char msgExit = 'x';
+const auto serverStartStopTimeout = std::chrono::seconds(5);
 
-bool listenForConnections(std::promise<bool> startPromise, uint16_t port) {
+bool setUpServer(std::promise<bool> startPromise, uint16_t port, SocketFD& fd) {
 	using namespace detail;
+	using namespace std::chrono;
 
+	auto startTime{steady_clock::now()};
 	LOG_DEBUG("Starting server on {}:{:d}", LocalSock::serverAddress, port);
-	SocketFD fd{nullptr, nullptr};
 	try {
 		fd = createSocket();
 		setsockoptReuseaddr(*fd);
@@ -41,7 +44,17 @@ bool listenForConnections(std::promise<bool> startPromise, uint16_t port) {
 		startPromise.set_exception(std::current_exception());
 		return false;
 	}
+
 	startPromise.set_value(true);
+	if (duration_cast<seconds>(steady_clock::now() - startTime) >= serverStartStopTimeout) {
+		LOG_ERROR("Server start timeout reached, stopping");
+		return false;
+	}
+	return true;
+}
+
+bool handleConnections(const SocketFD& fd) {
+	using namespace detail;
 
 	while (true) {
 		try {
@@ -67,6 +80,21 @@ bool listenForConnections(std::promise<bool> startPromise, uint16_t port) {
 			LOG_ERROR(ex.what());
 			return false;
 		}
+	}
+}
+
+void listenForConnections(std::promise<bool> startPromise, std::promise<bool> returnPromise, uint16_t port) {
+	try {
+		SocketFD fd{nullptr, nullptr};
+		if (!setUpServer(std::move(startPromise), port, fd)) {
+			returnPromise.set_value_at_thread_exit(false);
+			return;
+		}
+
+		returnPromise.set_value_at_thread_exit(handleConnections(fd));
+	}
+	catch (...) {
+		returnPromise.set_exception_at_thread_exit(std::current_exception());
 	}
 }
 
@@ -96,10 +124,12 @@ bool LocalSock::startServer() {
 	std::promise<bool> startPromise;
 	auto startSuccessful = startPromise.get_future();
 
-	auto temporaryServerReturn = std::async(std::launch::async, listenForConnections, std::move(startPromise), getServerPort());
+	// have to use a detached thread - dtor of future from std::async blocks until state is ready
+	std::promise<bool> returnPromise;
+	auto temporaryServerReturn = returnPromise.get_future();
+	std::thread{listenForConnections, std::move(startPromise), std::move(returnPromise), getServerPort()}.detach();
 
-	const auto timeout = std::chrono::seconds(10);
-	auto waitStatus = startSuccessful.wait_for(timeout);
+	auto waitStatus = startSuccessful.wait_for(serverStartStopTimeout);
 	if (waitStatus != std::future_status::ready) {
 		LOG_ERROR("Server took too much time to start");
 		return false;
@@ -131,8 +161,7 @@ bool LocalSock::stopServer() {
 		LOG_ERROR(ex.what());
 		return false;
 	}
-	const auto timeout = std::chrono::seconds(10);
-	auto waitStatus = serverThreadReturn.wait_for(timeout);
+	auto waitStatus = serverThreadReturn.wait_for(serverStartStopTimeout);
 	if (waitStatus != std::future_status::ready) {
 		LOG_ERROR("Server took too much time to stop");
 		return false;
