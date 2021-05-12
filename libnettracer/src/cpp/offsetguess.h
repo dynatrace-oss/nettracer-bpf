@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <sys/types.h>
 
@@ -24,6 +25,8 @@ class ClientSock6;
 bool guess(int status_fd);
 
 namespace detail {
+
+std::unique_ptr<LocalSock> startLocalSock();
 
 std::optional<field_values> getExpectedValues(LocalSock& localsock, const ClientSock6& clientsock6);
 

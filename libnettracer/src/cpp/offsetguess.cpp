@@ -50,27 +50,11 @@ bool guess(int status_fd) {
 	logger->debug("guess thread pid:{:d}", pid_tgid);
 
 	// prepare server ipv4 and client ipv6 on this thread
-	LocalSock localsock;
-	if (!localsock.running()) {
-		const unsigned maxRetries = 2;
-		const auto interval = std::chrono::seconds(3);
-		bool ok = false;
-		for (unsigned i = 0; i < maxRetries; ++i) {
-			logger->warn("LocalSock start failed, retrying in {:d}s...", interval.count());
-
-			std::this_thread::sleep_for(interval);
-			localsock.stop();
-			localsock.randomizeServerPort();
-			if (localsock.start()) {
-				ok = true;
-				break;
-			}
-		}
-		if (!ok) {
-			logger->error("LocalSock could not start");
-			return false;
-		}
+	auto maybeLocalsock = detail::startLocalSock();
+	if (!maybeLocalsock) {
+		return false;
 	}
+	LocalSock& localsock = *maybeLocalsock;
 
 	ClientSock6 client6;
 	client6.readLocalInterface();
@@ -317,6 +301,31 @@ bool guess(int status_fd) {
 }
 
 namespace detail {
+
+std::unique_ptr<LocalSock> startLocalSock() {
+	auto localsock = std::make_unique<LocalSock>();
+	if (!localsock->running()) {
+		const unsigned maxRetries = 2;
+		const auto interval = std::chrono::seconds(3);
+		bool ok = false;
+		for (unsigned i = 0; i < maxRetries; ++i) {
+			LOG_WARN("LocalSock start failed, retrying in {:d}s...", interval.count());
+
+			std::this_thread::sleep_for(interval);
+			localsock->stop();
+			localsock->randomizeServerPort();
+			if (localsock->start()) {
+				ok = true;
+				break;
+			}
+		}
+		if (!ok) {
+			LOG_ERROR("LocalSock could not start");
+			return {};
+		}
+	}
+	return localsock;
+}
 
 std::optional<field_values> getExpectedValues(LocalSock& localsock, const ClientSock6& clientsock6) {
 	field_values expected;
