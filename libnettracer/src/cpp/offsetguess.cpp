@@ -23,9 +23,8 @@ extern "C" {
 static ino_t own_net_ns() {
 	struct stat statbuf;
 	int ret = stat("/proc/self/ns/net", &statbuf);
-	if (ret != 0) {
-		LOG_ERROR("stat");
-		exit(-1);
+	if (ret) {
+		throw std::runtime_error{"stat failed"};
 	}
 	return statbuf.st_ino;
 }
