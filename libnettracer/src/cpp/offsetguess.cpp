@@ -33,7 +33,16 @@ inline const int thresholdTcpSock = 2500; // Fields outside inet_sock are stored
 }
 
 bool OffsetGuessing::guess(int status_fd) {
-	return makeGuessingAttempt(status_fd);
+	const unsigned maxAttempts = 3;
+	for (unsigned i = 0; i < maxAttempts; ++i) {
+		if (makeGuessingAttempt(status_fd)) {
+			return true;
+		}
+		else {
+			LOG_WARN("Guessing attempt #{:d} failed", i+1);
+		}
+	}
+	return false;
 }
 
 #define GUESS_SIMPLE_FIELD(field, str, next) guessSimpleField(status.field, expected.field, status.offset_##field, status, str, next)
