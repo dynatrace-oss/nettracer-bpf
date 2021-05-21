@@ -2,10 +2,7 @@
 
 #include <cstdint>
 #include <netdb.h>
-#include <netinet/in.h>
 #include <string>
-#include <sys/types.h>
-#include <sys/socket.h>
 
 // client for guessing offsets specific to IPv6
 class ClientSock6 {

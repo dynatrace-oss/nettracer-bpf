@@ -6,7 +6,10 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <fstream>
+#include <netinet/in.h>
 #include <regex>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 
