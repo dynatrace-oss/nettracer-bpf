@@ -1,5 +1,9 @@
 #pragma once
 
+#include "bpf_program/nettracer-bpf.h"
+#include "localsock.h"
+#include "localsock6.h"
+#include <spdlog/fwd.h>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -19,15 +23,30 @@ struct field_values {
 	uint32_t rtt_var;
 };
 
-class LocalSock;
-class ClientSock6;
+class OffsetGuessing {
+public:
+	bool guess(int status_fd);
 
-bool guess(int status_fd);
+private:
+	bool makeGuessingAttempt(int status_fd);
+	std::optional<field_values> getExpectedValues();
+	template<typename T>
+	void guessSimpleField(T& statusValue, const T& expectedValue, uint16_t& offset, guess_status_t& status, const std::string& fieldStr, const guess_field& next);
+	void guessNetns();
+	void guessDAddrIPv6();
+	bool guessRTT(unsigned& currentAttempts, unsigned& currentReps);
+	bool overflowOccurred() const;
+
+	std::shared_ptr<spdlog::logger> logger;
+	std::unique_ptr<LocalSock> localsock;
+	ClientSock6 client6;
+	guess_status_t status;
+	field_values expected;
+};
 
 namespace detail {
 
 std::unique_ptr<LocalSock> startLocalSock();
-
-std::optional<field_values> getExpectedValues(LocalSock& localsock, const ClientSock6& clientsock6);
+ClientSock6 prepareClient6();
 
 }

@@ -168,7 +168,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	if (!guess(status_fd)) {
+	if (!OffsetGuessing{}.guess(status_fd)) {
 		LOG_ERROR("Offset guessing failed");
 		return 1;
 	}
