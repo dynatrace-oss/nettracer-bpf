@@ -1,0 +1,27 @@
+# visual studio & VSCode on Windows only comes with version 6.0.0, so that's what we stick with.
+# https://releases.llvm.org/6.0.0/tools/clang/docs/ClangFormatStyleOptions.html
+
+BasedOnStyle: LLVM
+IndentWidth: 4
+Language: Cpp
+Standard: Cpp11
+TabWidth: 4
+UseTab: ForContinuationAndIndentation
+ColumnLimit: 140
+AccessModifierOffset: -4
+PointerAlignment: Left
+AlwaysBreakTemplateDeclarations: true
+AlignEscapedNewlines: Left
+IndentPPDirectives: AfterHash # v6.0.0 doesn't understand BeforeHash
+AllowShortFunctionsOnASingleLine: None
+ConstructorInitializerIndentWidth: 8
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+BinPackParameters: false
+BinPackArguments: false
+
+ContinuationIndentWidth: 8
+AlignAfterOpenBracket: AlwaysBreak
+# high penalty so rarelly break right after return value
+PenaltyReturnTypeOnItsOwnLine: 200
+...
+

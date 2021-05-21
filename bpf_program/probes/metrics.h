@@ -1,0 +1,175 @@
+#include "bpf_helpers.h"
+#include "log.h"
+#include "maps.h"
+#include "metrics_utilities.h"
+#include "tuples_utilities.h"
+
+#include <linux/bpf.h>
+#include <linux/ptrace.h>
+#include <net/inet_sock.h>
+#include <net/sock.h>
+
+__attribute__((always_inline))
+static int send_metric(struct sock* sk, int32_t bytes_sent) {
+
+	if (bytes_sent < 0) {
+		return 0;
+	}
+
+	struct guess_status_t* status;
+	uint32_t zero = 0;
+	status = bpf_map_lookup_elem(&nettracer_status, &zero);
+	if (status == NULL || status->state != GUESS_STATE_READY) {
+		return 0;
+	}
+
+	if (check_family(sk, AF_INET)) {
+		struct ipv4_tuple_t ipv4_tuple = {};
+		if (!read_ipv4_tuple(&ipv4_tuple, status, sk)) {
+			return 0;
+		}
+
+		maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
+		update_stats(&ipv4_tuple, IPV4, bytes_sent, 0);
+		update_tcp_stats(&ipv4_tuple, IPV4, status, sk);
+	} else if (check_family(sk, AF_INET6)) {
+		struct ipv6_tuple_t ipv6_tuple = {};
+		if (!read_ipv6_tuple(&ipv6_tuple, status, sk)) {
+			return 0;
+		}
+
+		if (is_ipv4_mapped_ipv6_tuple(ipv6_tuple)) {
+			struct ipv4_tuple_t ipv4_tuple = convert_ipv4_mapped_ipv6_tuple_to_ipv4(ipv6_tuple);
+
+			maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
+			update_stats(&ipv4_tuple, IPV4, bytes_sent, 0);
+			update_tcp_stats(&ipv4_tuple, IPV4, status, sk);
+		} else {
+			maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
+			update_stats(&ipv6_tuple, IPV6, bytes_sent, 0);
+			update_tcp_stats(&ipv6_tuple, IPV6, status, sk);
+		}
+	}
+	return 0;
+}
+
+SEC("kprobe/tcp_sendmsg")
+int kprobe__tcp_sendmsg(struct pt_regs *ctx) {
+	struct sock *sk = (struct sock*)PT_REGS_PARM1(ctx);
+	int32_t bytes_sent = (int32_t)PT_REGS_PARM3(ctx);
+
+	return send_metric(sk, bytes_sent);
+}
+
+SEC("kprobe/tcp_sendpage")
+int kprobe__tcp_sendpage(struct pt_regs *ctx) {
+	struct sock *sk = (struct sock*)PT_REGS_PARM1(ctx);
+	int32_t bytes_sent = (int32_t)PT_REGS_PARM4(ctx);
+
+	return send_metric(sk, bytes_sent);
+}
+
+SEC("kprobe/tcp_cleanup_rbuf")
+int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
+	struct sock *sk = (struct sock*)PT_REGS_PARM1(ctx);
+	int32_t bytes_received = (int32_t)PT_REGS_PARM2(ctx);
+
+	if (bytes_received < 0) {
+		return 0;
+	}
+
+	struct guess_status_t *status;
+	uint32_t zero = 0;
+	status = bpf_map_lookup_elem(&nettracer_status, &zero);
+	if (status == NULL || status->state != GUESS_STATE_READY) {
+		return 0;
+	}
+
+	if (check_family(sk, AF_INET)) {
+		struct ipv4_tuple_t ipv4_tuple = {};
+		if (!read_ipv4_tuple(&ipv4_tuple, status, sk)) {
+			return 0;
+		}
+
+		maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
+		update_stats(&ipv4_tuple, IPV4, 0, bytes_received);
+		update_tcp_stats(&ipv4_tuple, IPV4, status, sk);
+	}
+	else if (check_family(sk, AF_INET6)) {
+		struct ipv6_tuple_t ipv6_tuple = {};
+		if (!read_ipv6_tuple(&ipv6_tuple, status, sk)) {
+			return 0;
+		}
+
+		if (is_ipv4_mapped_ipv6_tuple(ipv6_tuple)) {
+			struct ipv4_tuple_t ipv4_tuple = convert_ipv4_mapped_ipv6_tuple_to_ipv4(ipv6_tuple);
+
+			maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
+			update_stats(&ipv4_tuple, IPV4, 0, bytes_received);
+			update_tcp_stats(&ipv4_tuple, IPV4, status, sk);
+		}
+		else {
+			maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
+			update_stats(&ipv6_tuple, IPV6, 0, bytes_received);
+			update_tcp_stats(&ipv6_tuple, IPV6, status, sk);
+		}
+	}
+	return 0;
+}
+
+SEC("kprobe/tcp_retransmit_skb")
+int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
+	struct sock *sk = (struct sock*)PT_REGS_PARM1(ctx);
+
+	struct guess_status_t *status;
+	uint32_t zero = 0;
+	status = bpf_map_lookup_elem(&nettracer_status, &zero);
+	if (status == NULL || status->state != GUESS_STATE_READY) {
+		return 0;
+	}
+
+	if (check_family(sk, AF_INET)) {
+		struct ipv4_tuple_t ipv4_tuple = {};
+		if (!read_ipv4_tuple(&ipv4_tuple, status, sk)) {
+			return 0;
+		}
+
+		struct tcp_stats_t empty = { 0 };
+		maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
+		bpf_map_update_elem(&tcp_stats_ipv4, &ipv4_tuple, &empty, BPF_NOEXIST);
+		struct tcp_stats_t* stats = bpf_map_lookup_elem(&tcp_stats_ipv4, &ipv4_tuple);
+
+		if (stats == NULL) {
+			return 0;
+		}
+
+		__sync_add_and_fetch(&stats->retransmissions, 1);
+	}
+	else if (check_family(sk, AF_INET6)) {
+		struct ipv6_tuple_t ipv6_tuple = {};
+		if (!read_ipv6_tuple(&ipv6_tuple, status, sk)) {
+			return 0;
+		}
+
+		struct tcp_stats_t empty = { 0 };
+		struct tcp_stats_t *stats = NULL;
+
+		if (is_ipv4_mapped_ipv6_tuple(ipv6_tuple)) {
+			struct ipv4_tuple_t ipv4_tuple = convert_ipv4_mapped_ipv6_tuple_to_ipv4(ipv6_tuple);
+			maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
+			bpf_map_update_elem(&tcp_stats_ipv4, &ipv4_tuple, &empty, BPF_NOEXIST);
+			stats = bpf_map_lookup_elem(&tcp_stats_ipv4, &ipv4_tuple);
+		}
+		else {
+			maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
+			bpf_map_update_elem(&tcp_stats_ipv6, &ipv6_tuple, &empty, BPF_NOEXIST);
+			stats = bpf_map_lookup_elem(&tcp_stats_ipv6, &ipv6_tuple);
+		}
+		if (stats == NULL) {
+			return 0;
+		}
+
+		__sync_add_and_fetch(&stats->retransmissions, 1);
+	}
+	return 0;
+}

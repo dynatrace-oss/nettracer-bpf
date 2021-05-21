@@ -1,0 +1,13 @@
+NetTracer was inspired by weaveworks' tcptracer-bpf tool, also under Apache 2.0 license.
+The following files are based on the source available at their repository:
+
+- bpf_program/probes/connections.h
+- bpf_program/bpf_helpers.h
+- bpf_program/maps.h
+- bpf_program/nettracer-bpf.h
+- bpf_program/offset_guessing.h
+- bpf_program/tuples_utilities.h
+- libnettracer/src/cpp/offsetguess.cpp
+- libnettracer/src/cpp/offsetguess.h
+
+tcptracer-bpf is available here: https://github.com/weaveworks/tcptracer-bpf

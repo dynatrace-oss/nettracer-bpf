@@ -1,0 +1,10 @@
+.idea/
+.vs/
+.vscode/
+.vagrant/
+build/
+*.o
+*.log
+*.a
+*.so
+*.so.*
