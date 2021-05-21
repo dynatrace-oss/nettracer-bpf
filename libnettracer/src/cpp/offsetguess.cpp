@@ -180,7 +180,12 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 		}
 		if (overflowOccurred()) {
 			logger->error("overflow while guessing {:d}, bailing out", status.what);
-			return true;
+			if (status.what == GUESS_FIELD_RTT) {
+				// allow failure for RTT
+				status.offset_rtt = status.offset_rtt_var = 0;
+				return true;
+			}
+			return false;
 		}
 	}
 	return true;
