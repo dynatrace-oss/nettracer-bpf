@@ -2,8 +2,8 @@ FROM ubuntu:18.04
 
 ARG KERNEL_VERSION=4.15.0-101-generic
 ENV KERNEL_VERSION=$KERNEL_VERSION
-RUN apt update -y && \
-	apt install -y \
+RUN apt update -qq -o=Dpkg::Use-Pty=0 -y && \
+	apt install -o=Dpkg::Use-Pty=0 -y \
 	# for the new clang
 	wget lsb-release gpg software-properties-common \
 	# for preparing dependencies
@@ -17,7 +17,7 @@ RUN wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - 10
 
 ARG FMT_VERSION=7.0.3
 ENV FMT_VERSION=$FMT_VERSION
-RUN mkdir build && sudo chown -R 2000:2000 build
+RUN mkdir build && chown -R 2000:2000 build
 RUN git clone --depth 1 --branch $FMT_VERSION https://github.com/fmtlib/fmt.git && \
 	cd fmt && cd build && \
 	cmake -DFMT_TEST=OFF .. && make -j && make install
