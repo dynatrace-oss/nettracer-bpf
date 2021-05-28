@@ -32,7 +32,7 @@ COPY . .
 ARG BUILD_TYPE=Release
 
 RUN export PATH=$(dirname `find / -iname clang -type f`):$PATH && \
-	mkdir -p build && \
+	mkdir -p build && chown -R 2000:2000 build && \
 	cd build && \
 	cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. \
 		-DCMAKE_INSTALL_PREFIX=./install \
