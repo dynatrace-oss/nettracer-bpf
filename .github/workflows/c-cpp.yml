@@ -15,13 +15,5 @@ jobs:
     - uses: actions/checkout@v2
     - name: make
       run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
-    - name: make build-project
-      run: make build-project
-    - name: make test-project
-      run: make test-project
     - name: run nettracer
       run: ./nettracersrv
