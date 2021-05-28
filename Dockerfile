@@ -17,8 +17,9 @@ RUN wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - 10
 
 ARG FMT_VERSION=7.0.3
 ENV FMT_VERSION=$FMT_VERSION
+RUN mkdir build && sudo chown -R 2000:2000 build
 RUN git clone --depth 1 --branch $FMT_VERSION https://github.com/fmtlib/fmt.git && \
-	cd fmt && mkdir build && cd build && \
+	cd fmt && cd build && \
 	cmake -DFMT_TEST=OFF .. && make -j && make install
 ARG SPDLOG_VERSION=1.8.1
 ENV SPDLOG_VERSION=$SPDLOG_VERSION
