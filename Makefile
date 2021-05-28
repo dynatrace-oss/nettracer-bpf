@@ -22,7 +22,7 @@ build-project-docker:
 		-v $(shell pwd):/opt/mount:z \
 		$(IMAGE_NAME) \
 		cp -r /nettracer/build /opt/mount
-	$(DOCKER_SUDO) chown -R 2000:2000 build
+# $(DOCKER_SUDO) chown -R 2000:2000 build
 
 test-project-docker:
 	$(DOCKER_SUDO) docker run --rm \
