@@ -15,5 +15,3 @@ jobs:
     - uses: actions/checkout@v2
     - name: make
       run: make
-    - name: run nettracer
-      run: ./nettracersrv
