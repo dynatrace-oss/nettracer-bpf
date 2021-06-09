@@ -33,5 +33,5 @@ jobs:
         with:
           push: true
           tags: |
-            docker.pkg.github.com/augustasv/nettracer-bpf tracer:${{ github.job }}
-            docker.pkg.github.com/augustasv/nettracer-bpf tracer:${{ github.job }}
+            docker.pkg.github.com/augustasv/nettracer-bpf tracer:1
+            docker.pkg.github.com/augustasv/nettracer-bpf tracer:1
