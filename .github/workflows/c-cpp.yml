@@ -24,6 +24,10 @@ jobs:
     steps:
       - name: GitHub Environment Variables Action
         uses: FranzDiebold/github-env-vars-action@v2
+      - name: Print environment variables
+        run: |
+          echo "CI_REPOSITORY_OWNER=$CI_REPOSITORY_OWNER"
+          echo "CI_REPOSITORY_NAME=$CI_REPOSITORY_NAME"
       - id: prep
         if: "startsWith(github.ref, 'refs/tags/v')"
         run: |
