@@ -28,30 +28,16 @@ jobs:
         run: |
           echo "CI_REPOSITORY_OWNER=$CI_REPOSITORY_OWNER"
           echo "CI_REPOSITORY_NAME=$CI_REPOSITORY_NAME"
-      - id: prep
-        if: "startsWith(github.ref, 'refs/tags/v')"
-        run: |
-          echo ::set-output name=tags::ghcr.io/dis//dis:${GITHUB_REF#refs/tags/v}
-      - uses: docker/setup-qemu-action@master
-        if: "startsWith(github.ref, 'refs/tags/v')"
-        with:
-          platforms: all
-      - id: buildx
-        uses: docker/setup-buildx-action@master
-        with:
-          install: true
-      - uses: docker/login-action@v1
-        if: "startsWith(github.ref, 'refs/tags/v')"
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }} # - must be in GitHub Secrets!
-      - uses: docker/build-push-action@v2
-        if: "startsWith(github.ref, 'refs/tags/v')"
-        with:
-          builder: docker
-          context: .
-          file: ./docker/image/app/Dockerfile
-          tags: ${{ steps.prep.outputs.tags }}
-          push: ${{ github.event_name != 'pull_request' }}
-          platforms: linux/amd64,linux/arm64,linux/386
+      - name: Log in to GitHub Docker Registry
+          uses: docker/login-action@v1
+          with:
+            registry: docker.pkg.github.com
+            username: ${{ github.actor }}
+            password: ${{ secrets.CR_PAT }}
+      - name: Build container image
+          uses: docker/build-push-action@v2
+          with:
+            push: true
+            tags: |
+              docker.pkg.github.com/${{ github.repository }}/octo-image:${{ github.sha }}
+              docker.pkg.github.com/${{ github.repository }}/octo-image:${{ github.ref }}
