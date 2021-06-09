@@ -33,5 +33,5 @@ jobs:
         with:
           push: true
           tags: |
-            docker.pkg.github.com/augustasv/nettracer-bpf tracer:latest
-            docker.pkg.github.com/augustasv/nettracer-bpf tracer:latest
+            ghcr.io/augustasv/nettracer-bpf tracer:latest
+            ghcr.io/augustasv/nettracer-bpf tracer:latest
