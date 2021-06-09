@@ -38,5 +38,5 @@ jobs:
         with:
           push: true
           tags: |
-            docker.pkg.github.com/${{ env.IMAGE_REPOSITORY }}/tracer:${{ github.sha }}
-            docker.pkg.github.com/${{ env.IMAGE_REPOSITORY }}/tracer:${{ github.ref }}
+            docker.pkg.github.com/augustasv/nettracer-bpf tracer:${{ github.sha }}
+            docker.pkg.github.com/augustasv/nettracer-bpf tracer:${{ github.ref }}
