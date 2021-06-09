@@ -29,11 +29,11 @@ jobs:
           echo "CI_REPOSITORY_OWNER=$CI_REPOSITORY_OWNER"
           echo "CI_REPOSITORY_NAME=$CI_REPOSITORY_NAME"
       - name: Log in to GitHub Docker Registry
-          uses: docker/login-action@v1
-          with:
-            registry: docker.pkg.github.com
-            username: ${{ github.actor }}
-            password: ${{ secrets.CR_PAT }}
+        uses: docker/login-action@v1
+        with:
+          registry: docker.pkg.github.com
+          username: ${{ github.actor }}
+          password: ${{ secrets.CR_PAT }}
       - name: Build container image
           uses: docker/build-push-action@v2
           with:
