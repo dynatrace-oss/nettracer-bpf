@@ -15,12 +15,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: make
       run: make
-
-name: Publish Docker image
-on:
-  release:
-    types: [published]
-jobs:
   push_to_registry:
     name: Push Docker image to GitHub Packages
     runs-on: ubuntu-latest
