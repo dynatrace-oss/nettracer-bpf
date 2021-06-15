@@ -32,6 +32,6 @@ jobs:
           file: ./Dockerfile
           # platforms: linux/amd64,linux/arm64
           push: true
-          tags: nettracer-bpf:latest
+          tags: augustasv/nettracer-bpf:latest
           secrets: |
             GIT_AUTH_TOKEN=${{ secrets.CR_PAT }}
