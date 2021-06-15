@@ -28,6 +28,8 @@ jobs:
         with:
           username: ${{ secrets.CR_USERNAME }}
           password: ${{ secrets.CR_PAT }}
+          context: ./
+          file: ./Dockerfile
           # platforms: linux/amd64,linux/arm64
           push: true
           tags: nettracer-bpf:latest
