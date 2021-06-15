@@ -30,10 +30,9 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v1
         with:
-          platforms: linux/amd64,linux/arm64
           context: .
+          platforms: linux/amd64,linux/arm64
           push: true
-          tags: augustasv/nettracer-bpf:latest
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
 
