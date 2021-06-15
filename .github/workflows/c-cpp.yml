@@ -18,10 +18,6 @@ jobs:
     name: Push Docker image to GitHub Packages
     runs-on: ubuntu-latest
     steps:
-      - name: DOCKER_BUILDKIT=0
-        run: export DOCKER_BUILDKIT=0
-      - name: COMPOSE_DOCKER_CLI_BUILD=0
-        run: export COMPOSE_DOCKER_CLI_BUILD=0
       - name: Log in to Docker Hub
         uses: docker/login-action@v1
         with:
