@@ -22,7 +22,7 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: docker.pkg.github.com
-          username: ${{ github.CR_USERNAME }}
+          username: ${{ secrets.CR_USERNAME }}
           password: ${{ secrets.CR_PAT }}
       - name: Build container image
         uses: docker/build-push-action@v2
