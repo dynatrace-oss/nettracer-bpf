@@ -35,8 +35,9 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
+          load: true
           tags: test:latest
+      - run: docker push ${{ env.IMAGE }}:${{ env.GIT_SHA }}
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
 
