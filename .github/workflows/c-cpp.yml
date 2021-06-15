@@ -28,7 +28,7 @@ jobs:
         with:
           username: ${{ secrets.CR_USERNAME }}
           password: ${{ secrets.CR_PAT }}
-          platforms: linux/amd64,linux/arm64
+          # platforms: linux/amd64,linux/arm64
           push: true
           tags: nettracer-bpf:latest
           secrets: |
