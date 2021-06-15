@@ -23,6 +23,7 @@ jobs:
         with:
           username: ${{ secrets.CR_USERNAME }}
           password: ${{ secrets.CR_PAT }}
+      - uses: actions/checkout@v2
       - name: Build container image
         uses: docker/build-push-action@v1
         with:
