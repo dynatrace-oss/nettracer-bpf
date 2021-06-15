@@ -30,6 +30,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
+          images: nettracer-bpf/app
           # generate Docker tags based on the following events/attributes
           tags: |
             type=schedule
