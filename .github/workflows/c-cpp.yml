@@ -37,7 +37,9 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ secrets.CR_USERNAME }}/test:latest
+          tags: |
+            ${{ secrets.CR_USERNAME }}/nettracer-bpf:latest
+            ${{ secrets.CR_USERNAME }}/nettracer-bpf:${{ github.run_number }}
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
 
