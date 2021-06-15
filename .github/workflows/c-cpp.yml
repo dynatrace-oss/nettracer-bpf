@@ -37,7 +37,6 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          load: true
           tags: ${{ secrets.CR_USERNAME }}/test:latest
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
