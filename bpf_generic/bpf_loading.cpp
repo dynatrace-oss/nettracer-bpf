@@ -182,7 +182,7 @@ void bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 	int insns_cnt = probe.size / sizeof(bpf_insn);
 	probe.fd = bpf::loadProgram(BPF_PROG_TYPE_KPROBE, probe.insn, insns_cnt, license, debug_print, kernVersion, sysCallBPF);
 	if (probe.fd < 0) {
-		throw std::runtime_error{fmt::format("loadProgram() failed with err={:d} ({}), logs: {}", errno, strerror(errno), getLogBuffer())};
+		throw std::runtime_error{fmt::format("loadProgram() failed for {} with err={:d} ({}), logs: {}", probe.fname, errno, strerror(errno), getLogBuffer())};
 	}
 
 	std::string name_prefix;
