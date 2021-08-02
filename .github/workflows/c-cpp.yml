@@ -12,8 +12,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: make
-      run: make
+    # - name: make
+    #   run: make
   push_to_registry:
     name: Push Docker image to GitHub Packages
     runs-on: ubuntu-latest

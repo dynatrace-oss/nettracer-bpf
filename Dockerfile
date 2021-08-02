@@ -1,5 +1,5 @@
 FROM ubuntu:18.04
-
+ENV DEBIAN_FRONTEND=noninteractive
 ARG KERNEL_VERSION=4.15.0-101-generic
 ENV KERNEL_VERSION=$KERNEL_VERSION
 RUN apt-get update -y -qq && \
