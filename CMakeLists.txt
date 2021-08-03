@@ -63,7 +63,45 @@ else()
 	message(FATAL_ERROR "Architecture not supported!")
 endif()
 
-set(KERNEL_HEADERS "/lib/modules/${KERNEL_VERSION}/build")
+# we need to detect locations of kernel headers
+# first, we define base directories:
+# - the one related to the current version & arch
+# - and possibly another one for generic headers
+function(try_adding_kernel_headers_base_dir out_dirs suffix)
+	string(REGEX REPLACE "-[^-]+$" "-${suffix}" MOD_KERNEL_VERSION "${KERNEL_VERSION}")
+	if(NOT MOD_KERNEL_VERSION STREQUAL KERNEL_VERSION)
+		set(DIR "/usr/src/linux-headers-${MOD_KERNEL_VERSION}")
+		if(EXISTS "${DIR}")
+			set(${out_dirs} "${${out_dirs}};${DIR}" PARENT_SCOPE)
+		endif()
+	endif()
+endfunction()
+set(KERNEL_HEADERS_BASE "/usr/src/linux-headers-${KERNEL_VERSION}")
+try_adding_kernel_headers_base_dir(KERNEL_HEADERS_BASE "common")
+# then we add various potential suffixes to the base directories and obtain actual directories to include
+function(collect_kernel_headers_dirs base_dirs out_dirs)
+	set(SUBDIRS "\
+include;\
+include/uapi;\
+include/generated;\
+include/generated/uapi;\
+arch/${ARCH}/include;\
+arch/${ARCH}/include/uapi;\
+arch/${ARCH}/include/generated;\
+arch/${ARCH}/include/generated/uapi")
+	set(COMBINED "")
+	foreach(base_dir ${base_dirs})
+		foreach(subdir ${SUBDIRS})
+			set(DIR "${base_dir}/${subdir}")
+			if(EXISTS "${DIR}")
+				list(APPEND COMBINED "${DIR}")
+			endif()
+		endforeach()
+	endforeach()
+	set(${out_dirs} "${COMBINED}" PARENT_SCOPE)
+endfunction()
+collect_kernel_headers_dirs("${KERNEL_HEADERS_BASE}" KERNEL_HEADERS)
+
 set(GCC_HEADERS "/usr/lib/gcc/${ARCHITECTURE}-linux-gnu/${GCC_VERSION}/include")
 
 # Must add include paths here because includes are applied before flags in CMake and -nostdinc messes things up
