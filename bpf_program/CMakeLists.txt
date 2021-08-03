@@ -11,6 +11,11 @@ else()
 	set(BPF_OPTIMIZATION "-O2")
 endif()
 
+set(ISYSTEM_KERNEL_HEADERS "")
+foreach(dir ${KERNEL_HEADERS})
+	list(APPEND ISYSTEM_KERNEL_HEADERS "-isystem" "${dir}")
+endforeach()
+
 set(CLANG_COMMAND clang
 	-D__KERNEL__ -D__TARGET_ARCH_${ARCH}
 	-D${BUILD_TYPE_MACRO}
@@ -21,13 +26,7 @@ set(CLANG_COMMAND clang
 	-nostdinc
 	-I "${CMAKE_CURRENT_LIST_DIR}"
 	-isystem ${GCC_HEADERS}
-	-isystem ${KERNEL_HEADERS}/include
-	-isystem ${KERNEL_HEADERS}/include/uapi
-	-isystem ${KERNEL_HEADERS}/include/generated/uapi
-	-isystem ${KERNEL_HEADERS}/arch/${ARCH}/include
-	-isystem ${KERNEL_HEADERS}/arch/${ARCH}/include/uapi
-	-isystem ${KERNEL_HEADERS}/arch/${ARCH}/include/generated
-	-isystem ${KERNEL_HEADERS}/arch/${ARCH}/include/generated/uapi
+	${ISYSTEM_KERNEL_HEADERS}
 	-o nettracer-bpf.c.o
 )
 

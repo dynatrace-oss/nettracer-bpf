@@ -9,8 +9,7 @@ RUN apt update -y && \
 	# for preparing dependencies
 	git libelf-dev libboost-program-options-dev \
 	make gcc-8 g++-8 linux-headers-$KERNEL_VERSION cmake && \
-	# update links to use version 8.x of gcc/g++ and fix missing c++ link (due to not installed g++-7)
-	update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 && \
+	# update links to use version 8.x of gcc/g++
 	update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8 && \
 	update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 --slave /usr/bin/c++ c++ /usr/bin/g++
 RUN wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - 10
