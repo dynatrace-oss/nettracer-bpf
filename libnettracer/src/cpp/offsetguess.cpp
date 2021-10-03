@@ -81,7 +81,6 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	logger->debug("guess status, set state: {:d}", status.state);
 
 	// prepare values used to verify that we are at right offset
-	field_values expected;
 	try {
 		auto expectedOpt{getExpectedValues()};
 		if (!expectedOpt) {
