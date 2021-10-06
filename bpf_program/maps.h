@@ -120,3 +120,11 @@ struct bpf_map_def SEC("maps") tcp_stats_ipv6 = {
 	.value_size = sizeof(struct tcp_stats_t),
 	.max_entries = MAP_MAX_ENTRIES
 };
+
+struct bpf_map_def SEC("maps") map_sends = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(uint64_t),
+	.value_size = sizeof(void *),
+	.max_entries = MAP_MAX_ENTRIES
+};
+

@@ -54,11 +54,26 @@ static int send_metric(struct sock* sk, int32_t bytes_sent) {
 }
 
 SEC("kprobe/tcp_sendmsg")
-int kprobe__tcp_sendmsg(struct pt_regs *ctx) {
-	struct sock *sk = (struct sock*)PT_REGS_PARM1(ctx);
-	int32_t bytes_sent = (int32_t)PT_REGS_PARM3(ctx);
+int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
+	struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
+	uint64_t pid = bpf_get_current_pid_tgid();
+	bpf_map_update_elem(&map_sends, &pid, &sk, BPF_ANY);
+	return 0;
+}
 
-	return send_metric(sk, bytes_sent);
+SEC("kretprobe/tcp_sendmsg")
+int kretprobe__tcp_sendmsg(struct pt_regs *ctx) {
+	uint64_t pid = bpf_get_current_pid_tgid();
+	struct sock **skpp;
+
+	skpp = bpf_map_lookup_elem(&map_sends, &pid);
+	if (skpp == 0) {
+		return 0;	// missed entry
+	}
+
+	bpf_map_delete_elem(&map_sends, &pid);
+	int32_t bytes_sent = PT_REGS_RC(ctx);
+	return send_metric(*skpp, bytes_sent);
 }
 
 SEC("kprobe/tcp_sendpage")
