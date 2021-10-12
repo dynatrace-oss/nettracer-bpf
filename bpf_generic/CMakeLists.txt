@@ -3,6 +3,7 @@ set(SOURCES
 	bpf_wrapper.cpp
 	elf_utils.cpp
 	log.cpp
+	kernel_version.cpp
 	maps_loading.cpp
 )
 
@@ -11,6 +12,7 @@ set(HEADERS
 	bpf_wrapper.h
 	elf_utils.h
 	log.h
+	kernel_version.h
 	maps_loading.h
 	perf_event.h
 	perf_sys.h
