@@ -2,6 +2,7 @@
 
 #include "bpf_wrapper.h"
 #include "elf_utils.h"
+#include "kernel_version.h"
 #include "log.h"
 #include "maps_loading.h"
 #include "perf_sys.h"
@@ -206,7 +207,6 @@ void bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 struct ElfFileContent {
 	std::vector<elf_section> sections;
 	char license[128] = {0};
-	int kernVersion = -1;
 	int mapsShndx = -1;
 	int strtabidx = -1;
 	Elf_Data* symbols = nullptr;
@@ -218,10 +218,6 @@ struct ElfFileContent {
 		}
 		if (*license == '\n') {
 			LOG_ERROR("No license found");
-			return false;
-		}
-		if (kernVersion == -1) {
-			LOG_ERROR("No kernel version specified");
 			return false;
 		}
 		if (mapsShndx == -1) {
@@ -257,7 +253,10 @@ ElfFileContent scanElfSections(Elf* elf, GElf_Ehdr* ehdr) {
 			if (sec.data->d_size != sizeof(int)) {
 				throw std::runtime_error{"Invalid size of version, section: " + std::to_string(sec.data->d_size)};
 			}
-			memcpy(&fileContent.kernVersion, sec.data->d_buf, sizeof(int));
+			// Actually disregard the kernel version from ELF section
+			// Checking if the version of a probe to be loaded matches the present kernel version didn't work well as a compatibility test anyway
+			// and in kernel 5 the check was removed.
+			// memcpy(&fileContent.kernVersion, sec.data->d_buf, sizeof(int));
 		}
 		else if (sec.shname == "maps") {
 			fileContent.mapsShndx = fileContent.sections.size();
@@ -346,7 +345,13 @@ void bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 		LOG_ERROR("Cannot initialize perf maps");
 
 	processReloSections(elf, &ehdr, content.sections, content.symbols, maps);
-	load_programs_from_sections(content.sections, content.license, content.kernVersion);
+
+	auto kernelVersion{getKernelVersion()};
+	if (!kernelVersion) {
+		throw std::runtime_error{"Could not obtain current kernel version"};
+	}
+
+	load_programs_from_sections(content.sections, content.license, *kernelVersion);
 }
 
 void bpf_subsystem::close_all_probes() {
