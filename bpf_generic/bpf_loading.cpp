@@ -350,6 +350,9 @@ void bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 	if (!kernelVersion) {
 		throw std::runtime_error{"Could not obtain current kernel version"};
 	}
+	if (!isKernelSupported(*kernelVersion)) {
+		LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(*kernelVersion));
+	}
 
 	load_programs_from_sections(content.sections, content.license, *kernelVersion);
 }

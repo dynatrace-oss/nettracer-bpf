@@ -8,6 +8,10 @@ namespace bpf {
 
 std::optional<int> getKernelVersion();
 
+bool isKernelSupported(int kernelVersion);
+
+std::string kernelVersionToString(int kernelVersion);
+
 namespace detail {
 
 std::optional<int> getKernelVersionOnUbuntu();
