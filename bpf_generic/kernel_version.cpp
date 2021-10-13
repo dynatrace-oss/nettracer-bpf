@@ -24,6 +24,17 @@ std::optional<int> getKernelVersion() {
 	}
 }
 
+bool isKernelSupported(int kernelVersion) {
+	return kernelVersion >= KERNEL_VERSION(4, 15, 0);
+}
+
+std::string kernelVersionToString(int kernelVersion) {
+	int major{kernelVersion >> 16};
+	int minor{(kernelVersion >> 8) - (major << 8)};
+	int patch{kernelVersion - (major << 16) - (minor << 8)};
+	return std::to_string(major) + '.' + std::to_string(minor) + '.' + std::to_string(patch);
+}
+
 namespace detail {
 
 std::optional<int> getKernelVersionOnUbuntu() {
