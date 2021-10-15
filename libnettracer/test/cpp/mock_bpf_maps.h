@@ -1,6 +1,6 @@
 #pragma once
 
-#include "bpf_generic/bpf_wrapper.h"
+#include "bpf_generic/src/bpf_wrapper.h"
 #include <gmock/gmock.h>
 #include <memory>
 #include <unordered_map>

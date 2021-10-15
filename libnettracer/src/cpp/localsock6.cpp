@@ -1,5 +1,5 @@
 #include "localsock6.h"
-#include "bpf_generic/log.h"
+#include "bpf_generic/src/log.h"
 #include <arpa/inet.h>
 #include <cerrno>
 #include <cstdio>

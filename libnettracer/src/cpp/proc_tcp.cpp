@@ -1,6 +1,6 @@
 #include "proc_tcp.h"
 
-#include "bpf_generic/log.h"
+#include "bpf_generic/src/log.h"
 #include "tuple_utils.h"
 
 #include <filesystem>

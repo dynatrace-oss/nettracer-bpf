@@ -1,8 +1,8 @@
 #pragma once
 
 #include "bpf_program/nettracer-bpf.h"
-#include "bpf_generic/bpf_wrapper.h"
-#include "bpf_generic/log.h"
+#include "bpf_generic/src/bpf_wrapper.h"
+#include "bpf_generic/src/log.h"
 #include "tuple_utils.h"
 #include "proc_tcp.h"
 #include <unordered_set>

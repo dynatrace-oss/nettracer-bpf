@@ -1,6 +1,6 @@
 #include "netstat.h"
-#include "bpf_generic/bpf_wrapper.h"
-#include "bpf_generic/log.h"
+#include "bpf_generic/src/bpf_wrapper.h"
+#include "bpf_generic/src/log.h"
 #include "proc_tcp.h"
 #include <iomanip>
 #include <iostream>

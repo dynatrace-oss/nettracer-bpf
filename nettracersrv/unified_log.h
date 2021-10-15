@@ -1,6 +1,6 @@
 #pragma once
 
-#include "bpf_generic/log.h"
+#include "bpf_generic/src/log.h"
 #include "bpf_program/nettracer-bpf.h"
 #include <boost/program_options.hpp>
 

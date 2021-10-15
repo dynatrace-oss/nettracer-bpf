@@ -1,7 +1,7 @@
 #include "connections_printing.h"
-#include "bpf_generic/bpf_loading.h"
-#include "bpf_generic/bpf_wrapper.h"
-#include "bpf_generic/log.h"
+#include "bpf_generic/src/bpf_loading.h"
+#include "bpf_generic/src/bpf_wrapper.h"
+#include "bpf_generic/src/log.h"
 #include <fmt/core.h>
 
 using namespace std::chrono_literals;
