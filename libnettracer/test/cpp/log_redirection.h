@@ -2,7 +2,7 @@
 
 // Used for redirecting logs so that they can be easily checked in unit tests
 
-#include "bpf_generic/log.h"
+#include "bpf_generic/src/log.h"
 #include <fmt/core.h>
 #include <spdlog/sinks/ringbuffer_sink.h>
 #include <memory>
