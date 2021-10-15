@@ -19,7 +19,7 @@ add_executable(libnettracer_test ${SOURCES_FULL} ${HEADERS_FULL})
 
 target_include_directories(libnettracer_test
 	PRIVATE
-		"${PROJECT_SOURCE_DIR}/libnettracer/src/cpp"
+		"${PROJECT_SOURCE_DIR}/libnettracer/src"
 )
 
 target_link_libraries(libnettracer_test libnettracer)

@@ -12,7 +12,7 @@ add_executable(nettracer ${SOURCES_FULL} ${HEADERS_FULL})
 
 target_include_directories(nettracer
 	PRIVATE
-		"${PROJECT_SOURCE_DIR}/libnettracer/src/cpp"
+		"${PROJECT_SOURCE_DIR}/libnettracer/src"
 )
 
 target_link_libraries(nettracer bpf_generic)

@@ -7,7 +7,6 @@ set(SOURCES
 	tuple_utils.cpp
 	netstat.cpp
 )
-PREPEND(SOURCES_FULL "${CMAKE_CURRENT_LIST_DIR}/cpp" ${SOURCES})
 
 set(HEADERS
 	connections_printing.h
@@ -18,9 +17,8 @@ set(HEADERS
 	tuple_utils.h
 	netstat.h
 )
-PREPEND(HEADERS_FULL "${CMAKE_CURRENT_LIST_DIR}/cpp" ${HEADERS})
 
-add_library(libnettracer STATIC ${SOURCES_FULL} ${HEADERS_FULL})
+add_library(libnettracer STATIC ${SOURCES} ${HEADERS})
 
 target_include_directories(libnettracer
 	PUBLIC
