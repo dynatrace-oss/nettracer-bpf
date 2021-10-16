@@ -159,6 +159,12 @@ add_definitions(-DNETTRACER_VERSION_PATCH=${NETTRACER_VERSION_PATCH})
 include(CTest)
 enable_testing()
 
+# generated make target 'test' doesn't record output so we define a custom wrapper target to be used instead
+add_custom_target(run-tests COMMAND ${CMAKE_CTEST_COMMAND}
+	-T Test
+	--no-compress-output
+	--output-on-failure)
+
 add_subdirectory(bpf_program)
 add_subdirectory(bpf_generic)
 add_subdirectory(libnettracer)
