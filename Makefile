@@ -28,9 +28,8 @@ test-project-docker:
 	$(DOCKER_SUDO) docker run --rm \
 		-v $(shell pwd):/opt/mount:z \
 		$(IMAGE_NAME) \
-		bash -c 'cd /nettracer/build/bpf_generic/test && ctest -T Test --no-compress-output --output-on-failure; \
-			cd /nettracer/build/libnettracer/test && ctest -T Test --no-compress-output --output-on-failure; \
-			cd /nettracer/build && mkdir -p /opt/mount/build && cp ./**/test/Testing/**/Test.xml --parents /opt/mount/build'
+		bash -c 'cd /nettracer/build && make run-tests; \
+			cd /nettracer/build && mkdir -p /opt/mount/build && cp ./Testing/**/Test.xml --parents /opt/mount/build'
 
 dump-bpf-docker:
 	$(DOCKER_SUDO) docker run --rm \
@@ -59,8 +58,7 @@ build-project:
 	make -j `nproc`
 
 test-project:
-	cd build/bpf_generic/test && ctest -T Test --no-compress-output --output-on-failure
-	cd build/libnettracer/test && ctest -T Test --no-compress-output --output-on-failure
+	cd build && make run-tests
 
 dump-bpf:
 	mkdir -p build && \
