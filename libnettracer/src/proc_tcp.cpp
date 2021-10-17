@@ -364,7 +364,7 @@ tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file) {
 			continue;
 		}
 		if (!std::any_of(visited.begin(), visited.end(), [currnet_ns](auto& i) { return i == currnet_ns; })) {
-			if (!readTcpFile<IPTYPE>(table, p / "net" / file, currnet_ns))
+			if (!readTcpFile<IPTYPE>(table, p.path() / "net" / file, currnet_ns))
 				continue;
 
 			LOG_INFO("tcptable for nondeafult ns : {} read", currnet_ns);
