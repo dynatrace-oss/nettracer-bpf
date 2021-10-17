@@ -18,7 +18,12 @@ set(HEADERS
 
 add_library(bpf_generic STATIC ${SOURCES} ${HEADERS})
 
-target_link_libraries(bpf_generic /usr/lib/${ARCHITECTURE}-linux-gnu/libelf.a)
-target_link_libraries(bpf_generic -lstdc++fs)
-target_link_libraries(bpf_generic spdlog::spdlog)
-target_link_libraries(bpf_generic fmt::fmt)
+if(DEFINED CONAN_DEPS)
+    target_link_libraries(bpf_generic CONAN_PKG::spdlog)
+    target_link_libraries(bpf_generic CONAN_PKG::fmt)
+    target_link_libraries(bpf_generic CONAN_PKG::elfutils)
+else()
+    target_link_libraries(nettracersrv spdlog::spdlog)
+    target_link_libraries(nettracersrv fmt::fmt)
+    target_link_libraries(bpf_generic /usr/lib/${ARCHITECTURE}-linux-gnu/libelf.a)
+endif()

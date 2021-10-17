@@ -24,20 +24,27 @@ project(nettracer LANGUAGES C CXX DESCRIPTION "")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_VERBOSE_MAKEFILE TRUE)
-
 set(CMAKE_CXX_EXTENSIONS FALSE)
 
-if(NOT TARGET fmt)
-	find_package(fmt 7.0.3 REQUIRED)
-endif(NOT TARGET fmt)
-if(NOT TARGET spdlog)
-	find_package(spdlog 1.8.0 REQUIRED)
-endif(NOT TARGET spdlog)
+if(DEFINED CONAN_DEPS)
+    include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+    conan_basic_setup(TARGETS)
+    set(ignore "${CONAN_DEPS}")
+else()
+    if(NOT TARGET fmt)
+    find_package(fmt 7.0.3 REQUIRED)
+    endif(NOT TARGET fmt)
+    if(NOT TARGET spdlog)
+    find_package(spdlog REQUIRED)
+    endif(NOT TARGET spdlog)
 
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost REQUIRED COMPONENTS program_options)
-if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
+    set(Boost_USE_STATIC_LIBS ON)
+    find_package(Boost REQUIRED COMPONENTS program_options)
+    if(Boost_FOUND)
+    include_directories(${CONAN_INCLUDE_LIBS})
+        include_directories(${Boost_INCLUDE_DIRS})
+    endif()
+    set(GITHUB_GTEST 1)
 endif()
 
 if(DEFINED BPF_DEBUG)
@@ -120,26 +127,6 @@ function(PREPEND var prefix)
 	set(${var} "${listVar}" PARENT_SCOPE)
 endfunction(PREPEND)
 
-# Set up GTest, similarly to how it's proposed in https://github.com/google/googletest/tree/master/googletest#incorporating-into-an-existing-cmake-project
-configure_file(GoogleTest.cmake.in googletest-download/CMakeLists.txt)
-execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-	RESULT_VARIABLE result
-	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download
-)
-if(result)
-	message(FATAL_ERROR "CMake step for googletest failed: ${result}")
-endif()
-execute_process(COMMAND ${CMAKE_COMMAND} --build .
-	RESULT_VARIABLE result
-	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download)
-if(result)
-	message(FATAL_ERROR "Build step for googletest failed: ${result}")
-endif()
-
-add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
-                 ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
-                 EXCLUDE_FROM_ALL)
-
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
@@ -149,15 +136,13 @@ string(REGEX MATCH "version=([0-9]+)\.([0-9]+)\.([0-9]+)" _ ${ver})
 if(NOT CMAKE_MATCH_COUNT EQUAL 3)
 	message(FATAL_ERROR "Version parsing failed\n    Got: ${ver}")
 endif()
+
 set(NETTRACER_VERSION_MAJOR ${CMAKE_MATCH_1})
 set(NETTRACER_VERSION_MINOR ${CMAKE_MATCH_2})
 set(NETTRACER_VERSION_PATCH ${CMAKE_MATCH_3})
 add_definitions(-DNETTRACER_VERSION_MAJOR=${NETTRACER_VERSION_MAJOR})
 add_definitions(-DNETTRACER_VERSION_MINOR=${NETTRACER_VERSION_MINOR})
 add_definitions(-DNETTRACER_VERSION_PATCH=${NETTRACER_VERSION_PATCH})
-
-include(CTest)
-enable_testing()
 
 add_subdirectory(bpf_program)
 add_subdirectory(bpf_generic)
