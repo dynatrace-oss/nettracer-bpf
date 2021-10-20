@@ -25,7 +25,7 @@ set(CLANG_COMMAND clang
 	-c "${CMAKE_CURRENT_LIST_DIR}/nettracer-bpf.c"
 	-nostdinc
 	-I "${CMAKE_CURRENT_LIST_DIR}"
-	-isystem ${GCC_HEADERS}
+	-isystem ${LLVM_HEADERS}
 	${ISYSTEM_KERNEL_HEADERS}
 	-o nettracer-bpf.c.o
 )
