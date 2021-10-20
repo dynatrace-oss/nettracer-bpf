@@ -5,6 +5,7 @@ set(SOURCES
 	log.cpp
 	kernel_version.cpp
 	maps_loading.cpp
+	system_calls.cpp
 )
 
 set(HEADERS
@@ -16,6 +17,7 @@ set(HEADERS
 	maps_loading.h
 	perf_event.h
 	perf_sys.h
+	system_calls.h
 )
 
 add_library(bpf_generic STATIC ${SOURCES} ${HEADERS})
