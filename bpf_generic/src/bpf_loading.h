@@ -1,5 +1,6 @@
 #pragma once
 
+#include "system_calls.h"
 #include <linux/bpf.h>
 #include <string>
 #include <vector>
@@ -22,6 +23,7 @@ class bpf_subsystem {
 	maps_config maps;
 	std::vector<kprobe> probes;
 	bool debug_print = true;
+	const ISystemCalls& sysCalls;
 
 	void load_and_attach(kprobe& prgrm, const char* license, int kernVersion);
 	void load_programs_from_sections(std::vector<elf_section>& allSections, const char* license, int kernVersion);
@@ -32,6 +34,7 @@ class bpf_subsystem {
 	void set_maps_max_entries(uint32_t map_max_entries);
 
 public:
+	explicit bpf_subsystem(const ISystemCalls& sysCalls = SystemCalls::getInstance());
 	void load_bpf_file(const std::string& path, uint32_t map_max_entries);
 	int get_map_fd(const std::string& name);
 	map_data get_perf_map(const std::string& name);

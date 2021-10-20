@@ -313,6 +313,9 @@ void bpf_subsystem::set_maps_max_entries(uint32_t map_max_entries) {
 	}
 }
 
+bpf_subsystem::bpf_subsystem(const ISystemCalls& sysCalls)
+	: sysCalls(sysCalls) {}
+
 void bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entries) {
 	if (elf_version(EV_CURRENT) == EV_NONE)
 		throw std::runtime_error{"cannot read elf version"};
@@ -346,7 +349,7 @@ void bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 
 	processReloSections(elf, &ehdr, content.sections, content.symbols, maps);
 
-	auto kernelVersion{getKernelVersion()};
+	auto kernelVersion{getKernelVersion(sysCalls)};
 	if (!kernelVersion) {
 		throw std::runtime_error{"Could not obtain current kernel version"};
 	}
