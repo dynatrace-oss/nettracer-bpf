@@ -65,12 +65,12 @@ This way, NetTracer's going to start in logging mode - all the information about
 
 Note that you need the following capabilities in order to run NetTracer:
 
-- _CAP\_BPF_
 - _CAP\_DAC\_OVERRIDE_
-- _CAP\_PERFMON_
-- _CAP\_SYS\_ADMIN_
 - _CAP\_SYS\_PTRACE_
 - _CAP\_SYS\_RESOURCE_
+- _CAP\_BPF_
+- _CAP\_PERFMON_
+- _CAP\_SYS\_ADMIN_ (only if kernel version < 5.8, used instead of _CAP\_BPF_ and _CAP\_PERFMON_)
 
 However, to obtain a cleaner output, more appropriate for e.g. collecting metrics from NetTracer by an external tool, you should add _-d_ option:
 
