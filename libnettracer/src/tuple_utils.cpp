@@ -1,10 +1,7 @@
 #include "tuple_utils.h"
-
 #include "proc_tcp.h"
-
-#include <fmt/core.h>
-
 #include <arpa/inet.h>
+#include <fmt/core.h>
 #include <functional>
 #include <netinet/in.h>
 
