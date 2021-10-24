@@ -74,29 +74,29 @@ endif()
 # first, we define base directories:
 # - the one related to the current version & arch
 # - and possibly another one for generic headers
-function(try_adding_kernel_headers_base_dir out_dirs suffix)
+function(try_adding_kernel_headers_base_dir out_dirs suffix mod_include)
 	string(REGEX REPLACE "-[^-]+$" "-${suffix}" MOD_KERNEL_VERSION "${KERNEL_VERSION}")
 	if(NOT MOD_KERNEL_VERSION STREQUAL KERNEL_VERSION)
 		set(DIR "/usr/src/linux-headers-${MOD_KERNEL_VERSION}")
 		if(EXISTS "${DIR}")
-			set(${out_dirs} "${${out_dirs}};${DIR}" PARENT_SCOPE)
+			set(${mod_include} "${DIR}/include/linux" PARENT_SCOPE)
 		endif()
 	endif()
 endfunction()
 
-string(REGEX REPLACE "-[a-z]+[0-9]*" "-common" DEBIAN_KERNEL ${KERNEL_VERSION})
-find_path( KERNEL_INCLUDE NAMES kconfig.h PATHS  "/usr/src/kernels/${KERNEL_VERSION}/include/linux"
-						"/usr/src/linux-headers-${KERNEL_VERSION}/include/linux"
-						"/usr/src/linux-headers-${DEBIAN_KERNEL}/include/linux")
-
+set(KERNEL_HEADERS_BASE "/usr/src/linux-headers-${KERNEL_VERSION}")
+set(MOD_INCLUDE "")
+try_adding_kernel_headers_base_dir(KERNEL_HEADERS_BASE "common" MOD_INCLUDE)
+find_path( KERNEL_INCLUDE NAMES kconfig.h PATHS   "${MOD_INCLUDE}"
+						"/usr/src/linux-headers-${KERNEL_VERSION}/include/linux" 
+                         "/usr/src/kernels/${KERNEL_VERSION}/include/linux" )
 if(DEFINED KERNEL_INCLUDE)
-	get_filename_component(PARENT_DIR ${KERNEL_INCLUDE} PATH)
-	get_filename_component(PARENT_DIR ${PARENT_DIR} PATH)
-	set(KERNEL_HEADERS_BASE "${PARENT_DIR}")
+    get_filename_component(PARENT_DIR ${KERNEL_INCLUDE} PATH)
+    get_filename_component(PARENT_DIR ${PARENT_DIR} PATH)
+    set(KERNEL_HEADERS_BASE "${KERNEL_HEADERS_BASE};${PARENT_DIR}")
 endif()
-message( "root of kernel headers:  ${KERNEL_HEADERS_BASE}" )
 
-try_adding_kernel_headers_base_dir(KERNEL_HEADERS_BASE "common")
+message( "root of kernel headers:  ${KERNEL_HEADERS_BASE}")
 # then we add various potential suffixes to the base directories and obtain actual directories to include
 function(collect_kernel_headers_dirs base_dirs out_dirs)
 	set(SUBDIRS "\
