@@ -48,7 +48,7 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 			"no_stdout_log,n", "Log only to file")("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval")(
 			"log,l", po::value<std::string>()->default_value("./log"), "Logger path")("incremental,i", "Inceremental data")(
 			"program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")("header,s", "Add header size")(
-			"version,v", "")("map_size,m", po::value<uint32_t>()->default_value(2048), "Number of entries BPF maps");
+			"version,v", "")("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries BPF maps");
 	po::variables_map vm;
 	try {
 		po::store(po::parse_command_line(argc, argv, desc), vm);
