@@ -84,7 +84,11 @@ function(try_adding_kernel_headers_base_dir out_dirs suffix)
 	endif()
 endfunction()
 
-find_path( KERNEL_INCLUDE NAMES kconfig.h PATHS  "/usr/src/kernels/${KERNEL_VERSION}/include/linux"  "/usr/src/linux-headers-${KERNEL_VERSION}/include/linux")
+string(REGEX REPLACE "-[a-z]+[0-9]*" "-common" DEBIAN_KERNEL ${KERNEL_VERSION})
+find_path( KERNEL_INCLUDE NAMES kconfig.h PATHS  "/usr/src/kernels/${KERNEL_VERSION}/include/linux"
+						"/usr/src/linux-headers-${KERNEL_VERSION}/include/linux"
+						"/usr/src/linux-headers-${DEBIAN_KERNEL}/include/linux")
+
 if(DEFINED KERNEL_INCLUDE)
 	get_filename_component(PARENT_DIR ${KERNEL_INCLUDE} PATH)
 	get_filename_component(PARENT_DIR ${PARENT_DIR} PATH)
@@ -159,18 +163,6 @@ add_definitions(-DNETTRACER_VERSION_MAJOR=${NETTRACER_VERSION_MAJOR})
 add_definitions(-DNETTRACER_VERSION_MINOR=${NETTRACER_VERSION_MINOR})
 add_definitions(-DNETTRACER_VERSION_PATCH=${NETTRACER_VERSION_PATCH})
 
-<<<<<<< HEAD
-include(CTest)
-enable_testing()
-
-# generated make target 'test' doesn't record output so we define a custom wrapper target to be used instead
-add_custom_target(run-tests COMMAND ${CMAKE_CTEST_COMMAND}
-	-T Test
-	--no-compress-output
-	--output-on-failure)
-
-=======
->>>>>>> 192479b... Added build with conan defined dependencies
 add_subdirectory(bpf_program)
 add_subdirectory(bpf_generic)
 add_subdirectory(libnettracer)
