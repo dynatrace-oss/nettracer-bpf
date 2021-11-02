@@ -10,6 +10,7 @@
 #include "unified_log.h"
 
 #include <boost/program_options.hpp>
+#include <fmt/core.h>
 
 #include <chrono>
 #include <condition_variable>
@@ -116,12 +117,14 @@ int main(int argc, char* argv[]) {
 
 	auto vm{parseOptions(argc, argv)};
 
+	const std::string nettracerVersionStr{fmt::format("{}.{}.{}", NETTRACER_VERSION_MAJOR, NETTRACER_VERSION_MINOR, NETTRACER_VERSION_PATCH)};
 	if (vm.count("version")) {
-		std::cout<<"version: "<< NETTRACER_VERSION_MAJOR << "." << NETTRACER_VERSION_MINOR << "." << NETTRACER_VERSION_PATCH << std::endl;
+		std::cout << "version: " << nettracerVersionStr << std::endl;
 		return 0;
 	}
 
 	bool stdoutlog{setUpLogging(vm)};
+	LOG_INFO("Starting NetTracer v{}", nettracerVersionStr);
 
 	if (!increaseMemoryLimit()) {
 		return 1;
