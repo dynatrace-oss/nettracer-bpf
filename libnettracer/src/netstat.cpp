@@ -8,8 +8,8 @@
 
 namespace netstat {
 
-constexpr auto INACTIVE_TIMEOUT = minutes(5);
-constexpr unsigned INTERVAL_DIVIDER = 5;
+constexpr auto INACTIVE_TIMEOUT = minutes(1);
+constexpr unsigned INTERVAL_DIVIDER = 10;
 
 template <class IPTYPE>
 constexpr uint64_t addAvgHeaderSize(uint64_t pkts, bool count) {
@@ -33,10 +33,15 @@ void NetStat::process_bpf_map(int fd, F func) {
 	for (int k = 0; k < max_map_size && mapsWrapper->getNextKey(fd, &previousKey, &currentKey); ++k) {
 		T val{};
 		if (mapsWrapper->lookupElement(fd, &currentKey, &val)) {
-			std::unique_lock<std::mutex> l(mx);
-			auto& el = connections<IPTYPE>()[currentKey];
-			if (func(el, val)){
-				el.update_time = getCurrentTimeFromSteadyClock();
+			if (currentKey.sport > 0) {
+				std::unique_lock<std::mutex> l(mx);
+				auto& el = connections<IPTYPE>()[currentKey];
+				if (func(el, val)) {
+					el.update_time = getCurrentTimeFromSteadyClock();
+				}
+			} else {
+				LOG_INFO("src port = 0 for {}", to_string(currentKey));
+				mapsWrapper->removeElement(fd, static_cast<const void*>(&currentKey));
 			}
 		}
 		previousKey = currentKey;
@@ -131,6 +136,10 @@ void NetStat::event(const EventIPTYPE& evt) {
 
 	std::unique_lock<std::mutex> l(mx);
 	auto& el = connections<IPTYPE>()[key];
+	if( key.sport == 0 ){
+		LOG_INFO("Event src port = 0 for {} ", to_string(evt));
+		return;
+	}
 	el.pid = evt.pid;
 	el.update_time = getCurrentTimeFromSteadyClock();
 	if (evt.type == TCP_EVENT_TYPE_CONNECT) {

@@ -96,7 +96,7 @@ static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct guess_status_t *st
 	tuple->netns = net_ns_inum;
 
 	// if addresses or ports are 0, ignore
-	if (saddr == 0 || daddr == 0 || sport == 0 || dport == 0) {
+	if (saddr == 0 || daddr == 0 ||  dport == 0) {
 		return 0;
 	}
 
@@ -130,7 +130,7 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct guess_status_t *st
 	tuple->netns = net_ns_inum;
 
 	// if addresses or ports are 0, ignore
-	if (!(saddr_h || saddr_l) || !(daddr_h || daddr_l) || sport == 0 || dport == 0) {
+	if (!(saddr_h || saddr_l) || !(daddr_h || daddr_l) || dport == 0) {
 		return 0;
 	}
 

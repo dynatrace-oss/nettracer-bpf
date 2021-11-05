@@ -10,6 +10,7 @@
 #include "unified_log.h"
 
 #include <boost/program_options.hpp>
+#include <fmt/core.h>
 
 #include <chrono>
 #include <condition_variable>
@@ -51,7 +52,7 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 			"no_stdout_log,n", "Log only to file")("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval")(
 			"log,l", po::value<std::string>()->default_value("./log"), "Logger path")("incremental,i", "Inceremental data")(
 			"program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")("header,s", "Add header size")(
-			"version,v", "")("map_size,m", po::value<uint32_t>()->default_value(2048), "Number of entries BPF maps");
+			"version,v", "")("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries BPF maps");
 	po::variables_map vm;
 	try {
 		po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -119,12 +120,14 @@ int main(int argc, char* argv[]) {
 
 	auto vm{parseOptions(argc, argv)};
 
+	const std::string nettracerVersionStr{fmt::format("{}.{}.{}", NETTRACER_VERSION_MAJOR, NETTRACER_VERSION_MINOR, NETTRACER_VERSION_PATCH)};
 	if (vm.count("version")) {
-		std::cout<<"version: "<< NETTRACER_VERSION_MAJOR << "." << NETTRACER_VERSION_MINOR << "." << NETTRACER_VERSION_PATCH << std::endl;
+		std::cout << "version: " << nettracerVersionStr << std::endl;
 		return 0;
 	}
 
 	bool stdoutlog{setUpLogging(vm)};
+	LOG_INFO("Starting NetTracer v{}", nettracerVersionStr);
 
 	if (!increaseMemoryLimit()) {
 		return 1;
