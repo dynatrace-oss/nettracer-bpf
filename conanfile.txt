@@ -1,6 +1,6 @@
 [requires]
 fmt/8.0.1
-spdlog/1.9.0
+spdlog/1.9.2
 boost/1.70.0
 elfutils/0.180
 gtest/1.11.0

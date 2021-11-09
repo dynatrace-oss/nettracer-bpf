@@ -5,8 +5,8 @@ cmake_minimum_required(VERSION 3.10.2)
 # KERNEL_VERSION
 # Specifies which kernel headers are to be used by the compiler.
 #
-# GCC_VERSION
-# Specifies which GCC headers are to be used by the compiler.
+# LLVM_VERSION
+# Specifies which LLVM headers are to be used by the compiler.
 #
 # ARCHITECTURE
 # Specifies the target architecture.
@@ -32,16 +32,16 @@ if(DEFINED CONAN_DEPS)
     set(ignore "${CONAN_DEPS}")
 else()
     if(NOT TARGET fmt)
-    find_package(fmt 7.0.3 REQUIRED)
+    	find_package(fmt 8.0.1 REQUIRED)
     endif(NOT TARGET fmt)
     if(NOT TARGET spdlog)
-    find_package(spdlog REQUIRED)
+    	find_package(spdlog 1.9.2 REQUIRED)
     endif(NOT TARGET spdlog)
 
     set(Boost_USE_STATIC_LIBS ON)
     find_package(Boost REQUIRED COMPONENTS program_options)
     if(Boost_FOUND)
-    include_directories(${CONAN_INCLUDE_LIBS})
+    	include_directories(${CONAN_INCLUDE_LIBS})
         include_directories(${Boost_INCLUDE_DIRS})
     endif()
     set(GITHUB_GTEST 1)
@@ -54,9 +54,12 @@ endif()
 if(NOT DEFINED KERNEL_VERSION)
 	execute_process(COMMAND uname -r OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE KERNEL_VERSION)
 endif()
-if(NOT DEFINED GCC_VERSION)
-	execute_process(COMMAND gcc -dumpversion OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE GCC_VERSION)
+
+if(NOT DEFINED LLVM_VERSION)
+	execute_process(COMMAND llvm-config  --version OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE LLVM_VERSION)
 endif()
+find_path( LLVM_HEADERS NAMES stdarg.h PATHS  "/usr/lib64/clang/${LLVM_VERSION}/include" "/usr/lib/clang/${LLVM_VERSION}/include")
+message("llvm headers: ${LLVM_HEADERS}")
 
 if(NOT DEFINED ARCHITECTURE)
 	execute_process(COMMAND uname -m OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE ARCHITECTURE)
@@ -121,14 +124,6 @@ arch/${ARCH}/include/generated/uapi")
 endfunction()
 collect_kernel_headers_dirs("${KERNEL_HEADERS_BASE}" KERNEL_HEADERS)
 
-if(DEFINED CONAN_DEPS)
-	find_package(Clang REQUIRED CONFIG QUIET)
-else()
-	execute_process(COMMAND llvm-config-10  --version OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE LLVM_VERSION)
-endif()
-
-find_path( LLVM_HEADERS NAMES stdarg.h PATHS  "/usr/lib64/clang/${LLVM_VERSION}/include" "/usr/lib/clang/${LLVM_VERSION}/include")
-message("llvm headers: ${LLVM_HEADERS}")
 
 # Must add include paths here because includes are applied before flags in CMake and -nostdinc messes things up
 add_compile_options(-Wall -I/usr/include -I/usr/include/${ARCHITECTURE}-linux-gnu)
@@ -156,12 +151,18 @@ if(NOT CMAKE_MATCH_COUNT EQUAL 3)
 	message(FATAL_ERROR "Version parsing failed\n    Got: ${ver}")
 endif()
 
+
+
 set(NETTRACER_VERSION_MAJOR ${CMAKE_MATCH_1})
 set(NETTRACER_VERSION_MINOR ${CMAKE_MATCH_2})
 set(NETTRACER_VERSION_PATCH ${CMAKE_MATCH_3})
 add_definitions(-DNETTRACER_VERSION_MAJOR=${NETTRACER_VERSION_MAJOR})
 add_definitions(-DNETTRACER_VERSION_MINOR=${NETTRACER_VERSION_MINOR})
 add_definitions(-DNETTRACER_VERSION_PATCH=${NETTRACER_VERSION_PATCH})
+
+include(CTest)
+enable_testing()
+add_custom_target(run-tests COMMAND ${CMAKE_CTEST_COMMAND} -T Test --no-compress-output --output-on-failure)
 
 add_subdirectory(bpf_program)
 add_subdirectory(bpf_generic)

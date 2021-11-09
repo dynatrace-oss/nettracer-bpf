@@ -22,9 +22,6 @@ if(DEFINED GITHUB_GTEST)
                      EXCLUDE_FROM_ALL)
 endif()
 
-include(CTest)
-enable_testing()
-
 set(SOURCES
 	connection_test.cpp
 	connections_printing_test.cpp
