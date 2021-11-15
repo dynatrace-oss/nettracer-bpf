@@ -53,6 +53,16 @@ make test-project
 
 You may want to see the _Dockerfile_ to check what dependencies need to be installed.
 
+Building with conan and cmake:
+
+```
+mkdir build && cd build
+conan install --build=boost ..
+cmake -DCONAN_DEPS=1  -DCMAKE_BUILD_TYPE=Release  -DLLVM_VERSION=10 ..
+cmake --build .
+ctest .
+```
+
 ## Usage
 
 To run NetTracer, simply do this:
@@ -65,7 +75,7 @@ This way, NetTracer's going to start in logging mode - all the information about
 
 Note that you need the following capabilities in order to run NetTracer:
 
-- _CAP\_DAC\_OVERRIDE_
+- _CAP\_DAC\_READ_SEARCH__
 - _CAP\_SYS\_PTRACE_
 - _CAP\_SYS\_RESOURCE_
 - _CAP\_BPF_
