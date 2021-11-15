@@ -32,10 +32,10 @@ if(DEFINED CONAN_DEPS)
     set(ignore "${CONAN_DEPS}")
 else()
     if(NOT TARGET fmt)
-    	find_package(fmt 8.0.1 REQUIRED)
+	find_package(fmt 8.0.1 REQUIRED)
     endif(NOT TARGET fmt)
     if(NOT TARGET spdlog)
-    	find_package(spdlog 1.9.2 REQUIRED)
+	find_package(spdlog 1.9.2 REQUIRED)
     endif(NOT TARGET spdlog)
 
     set(Boost_USE_STATIC_LIBS ON)
@@ -77,7 +77,7 @@ endif()
 # first, we define base directories:
 # - the one related to the current version & arch
 # - and possibly another one for generic headers
-function(try_adding_kernel_headers_base_dir out_dirs suffix mod_include)
+function(try_adding_kernel_headers_base_dir suffix mod_include)
 	string(REGEX REPLACE "-[^-]+$" "-${suffix}" MOD_KERNEL_VERSION "${KERNEL_VERSION}")
 	if(NOT MOD_KERNEL_VERSION STREQUAL KERNEL_VERSION)
 		set(DIR "/usr/src/linux-headers-${MOD_KERNEL_VERSION}")
@@ -89,14 +89,16 @@ endfunction()
 
 set(KERNEL_HEADERS_BASE "/usr/src/linux-headers-${KERNEL_VERSION}")
 set(MOD_INCLUDE "")
-try_adding_kernel_headers_base_dir(KERNEL_HEADERS_BASE "common" MOD_INCLUDE)
+try_adding_kernel_headers_base_dir("common" MOD_INCLUDE)
 find_path( KERNEL_INCLUDE NAMES kconfig.h PATHS   "${MOD_INCLUDE}"
 						"/usr/src/linux-headers-${KERNEL_VERSION}/include/linux" 
                          "/usr/src/kernels/${KERNEL_VERSION}/include/linux" )
 if(DEFINED KERNEL_INCLUDE)
     get_filename_component(PARENT_DIR ${KERNEL_INCLUDE} PATH)
     get_filename_component(PARENT_DIR ${PARENT_DIR} PATH)
-    set(KERNEL_HEADERS_BASE "${KERNEL_HEADERS_BASE};${PARENT_DIR}")
+    if(NOT ${KERNEL_HEADERS_BASE} STREQUAL ${PARENT_DIR})
+	    set(KERNEL_HEADERS_BASE "${KERNEL_HEADERS_BASE};${PARENT_DIR}")
+    endif()
 endif()
 
 message( "root of kernel headers:  ${KERNEL_HEADERS_BASE}")

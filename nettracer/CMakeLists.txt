@@ -15,10 +15,7 @@ target_include_directories(nettracer
 		"${PROJECT_SOURCE_DIR}/libnettracer/src"
 )
 
-target_link_libraries(nettracer bpf_generic)
 target_link_libraries(nettracer libnettracer)
-target_link_libraries(nettracer -lpthread)
-target_link_libraries(nettracer -lz)
 if(DEFINED CONAN_DEPS)
     target_link_libraries(nettracer CONAN_PKG::boost)
 else()
