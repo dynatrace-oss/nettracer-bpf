@@ -16,12 +16,14 @@ target_include_directories(bpf_generic_test
 )
 
 target_link_libraries(bpf_generic_test bpf_generic)
-target_link_libraries(bpf_generic_test /usr/lib/${ARCHITECTURE}-linux-gnu/libelf.a)
 target_link_libraries(bpf_generic_test -lstdc++fs)
-target_link_libraries(bpf_generic_test spdlog::spdlog)
-target_link_libraries(bpf_generic_test fmt::fmt)
-target_link_libraries(bpf_generic_test gmock_main)
-target_link_libraries(bpf_generic_test gtest_main)
+
+if(DEFINED CONAN_DEPS)
+    target_link_libraries(bpf_generic_test CONAN_PKG::gtest)
+else()
+    target_link_libraries(bpf_generic_test gmock_main)
+    target_link_libraries(bpf_generic_test gtest_main)
+endif()
 
 include(GoogleTest)
 gtest_discover_tests(bpf_generic_test)

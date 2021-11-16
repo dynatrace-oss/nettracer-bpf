@@ -14,12 +14,12 @@ RUN apt update -y && \
 	update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 --slave /usr/bin/c++ c++ /usr/bin/g++
 RUN wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - 10
 
-ARG FMT_VERSION=7.0.3
+ARG FMT_VERSION=8.0.1
 ENV FMT_VERSION=$FMT_VERSION
 RUN git clone --depth 1 --branch $FMT_VERSION https://github.com/fmtlib/fmt.git && \
 	cd fmt && mkdir build && cd build && \
 	cmake -DFMT_TEST=OFF .. && make -j && make install
-ARG SPDLOG_VERSION=1.8.1
+ARG SPDLOG_VERSION=1.9.2
 ENV SPDLOG_VERSION=$SPDLOG_VERSION
 RUN git clone --depth 1 --branch v$SPDLOG_VERSION https://github.com/gabime/spdlog.git && \
 	cd spdlog && mkdir build && cd build && \
@@ -35,6 +35,5 @@ RUN export PATH=$(dirname `find / -iname clang -type f`):$PATH && \
 	cd build && \
 	cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. \
 		-DCMAKE_INSTALL_PREFIX=./install \
-		-DKERNEL_VERSION=$KERNEL_VERSION \
-		-DGCC_VERSION=8 && \
+		-DKERNEL_VERSION=$KERNEL_VERSION  &&\
 	make -j `nproc`

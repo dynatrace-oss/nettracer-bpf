@@ -32,6 +32,8 @@ static ExitCtrl exitCtrl;
 
 void atexit_handler(int a) {
 	exitCtrl.running = false;
+	close(0);
+	close(1);
 	exitCtrl.cv.notify_all();
 }
 
@@ -41,6 +43,7 @@ void setUpExitBehavior() {
 	action.sa_flags = 0;
 	sigaction(SIGINT, &action, nullptr);
 	sigaction(SIGTERM, &action, nullptr);
+	sigaction(SIGPIPE, &action, nullptr);
 }
 
 po::variables_map parseOptions(int argc, char* argv[]) {

@@ -15,12 +15,9 @@ target_include_directories(nettracer
 		"${PROJECT_SOURCE_DIR}/libnettracer/src"
 )
 
-target_link_libraries(nettracer bpf_generic)
 target_link_libraries(nettracer libnettracer)
-target_link_libraries(nettracer /usr/lib/${ARCHITECTURE}-linux-gnu/libelf.a)
-target_link_libraries(nettracer -lpthread)
-target_link_libraries(nettracer -lz)
-target_link_libraries(nettracer -lstdc++fs)
-target_link_libraries(nettracer spdlog::spdlog)
-target_link_libraries(nettracer fmt::fmt)
-target_link_libraries(nettracer Boost::program_options)
+if(DEFINED CONAN_DEPS)
+    target_link_libraries(nettracer CONAN_PKG::boost)
+else()
+    target_link_libraries(nettracer Boost::program_options)
+endif()

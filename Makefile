@@ -41,8 +41,7 @@ dump-bpf-docker:
 			cd build && \
 			cmake -DCMAKE_BUILD_TYPE=Debug \
 				-DDEBUG_BPF=1
-				-DKERNEL_VERSION=4.15.0-101-generic \
-				-DGCC_VERSION=8 .. && \
+				-DKERNEL_VERSION=4.15.0-101-generic .. && \
 			make bpf_program && \
 			llvm-objdump -t -S -no-show-raw-insn bin/nettracer-bpf.o'
 

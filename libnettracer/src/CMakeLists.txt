@@ -27,8 +27,4 @@ target_include_directories(libnettracer
 
 add_dependencies(libnettracer bpf_program)
 target_link_libraries(libnettracer bpf_generic)
-target_link_libraries(libnettracer -lpthread)
-target_link_libraries(libnettracer -lz)
 target_link_libraries(libnettracer -lstdc++fs)
-target_link_libraries(libnettracer spdlog::spdlog)
-target_link_libraries(libnettracer fmt::fmt)
