@@ -1,7 +1,0 @@
-apiVersion: v1
-data:
-  {{ .Values.metadata.Configmap.data }}
-kind: ConfigMap
-metadata:
-  name: {{ .Values.metadata.name }}
-  namespace: {{ .Values.metadata.namespace}}

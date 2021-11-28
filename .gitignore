@@ -8,3 +8,4 @@ build/
 *.a
 *.so
 *.so.*
+.devspace/

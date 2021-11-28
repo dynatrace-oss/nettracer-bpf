@@ -1,9 +1,0 @@
-apiVersion: v1
-name: nettracer-bpf
-description: This is nettracer-bpf deployment helm chart
-keywords:
-- nettracer-bpf
-version: 1.0.0
-maintainers:
-- name: AugustasV
-- email: reg1nt1z(e_ta)gmail.com

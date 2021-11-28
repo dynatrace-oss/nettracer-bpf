@@ -42,17 +42,3 @@ jobs:
             ${{ secrets.CR_USERNAME }}/nettracer-bpf:${{ github.run_number }}
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
-
-      # - name: Set up Docker Buildx
-      #   id: buildx
-      #   uses: crazy-max/ghaction-docker-buildx@v3
-      #   with:
-      #     buildx-version: latest
-      #     qemu-version: latest
-      # - name: Available platforms
-      #   run: echo ${{ steps.buildx.outputs.platforms }}
-      # - name: Run Buildx
-      #   run: |
-      #     docker buildx build \
-      #       --platform linux/amd64,linux/arm64 \
-      #       --output "type=image,push=false" \
