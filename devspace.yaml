@@ -1,0 +1,59 @@
+version: v1beta11
+
+vars:
+- name: IMAGE
+  value: augustris/nettracer-bpf
+- name: BRANCH
+  default: master
+
+deployments:
+- name: nettracer-bpf
+  helm:
+    componentChart: true
+
+    values:
+      containers:
+      - image: ${IMAGE} 
+
+dev:
+  # `dev.sync` configures a file sync between our Pods in k8s and your local project files
+  sync:
+  - imageSelector: ${IMAGE} 
+    excludePaths:
+    - .git/
+    - .devspace/
+    - .github/
+
+  terminal:
+    imageSelector: ${IMAGE} 
+    command:
+    - /bin/bash
+  replacePods:
+  - imageSelector: ${IMAGE} 
+    replaceImage: loftsh/alpine:latest
+    patches:
+    - op: replace
+      path: spec.containers[0].command
+      value:
+      - sleep
+    - op: replace
+      path: spec.containers[0].args
+      value:
+      - "9999999"
+    - op: remove
+      path: spec.containers[0].securityContext
+
+profiles:
+- name: production
+  merge:
+    images:
+      app:
+        image: ${IMAGE} 
+        dockerfile: ./Dockerfile
+        
+dependencies:
+- name: clone branch
+  source:
+    git: https://github.com/augustasv/nettracer-bpf
+    branch: ${BRANCH}
+  ignoreDependencies: true
