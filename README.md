@@ -4,7 +4,9 @@ NetTracer is a tool for tracing TCP events and collecting network connections me
 
 The BPF program, composed of BPF maps and kprobes, is compiled to an ELF object file. At runtime, that object file is loaded by NetTracer using utilities found in _bpf\_generic_.
 
-NetTracer does not have any runtime dependencies on kernel headers, nor it is tied to any specific kernel version or configuration. To adapt to the currently running kernel at runtime, NetTracer creates a series of TCP connections with known parameters (such as known IP addresses and ports) and discovers where those parameters are stored in the kernel struct sock. This process is often referred to as offset guessing. Since a BPF programs cannot loop, NetTracer does not directly iterate over the possible offsets. It is instead controlled from user space by the binary using a state machine.
+# How NetTracer works
+
+NetTracer does not have any runtime dependencies on kernel headers, nor it is tied to any specific kernel version or configuration. To adapt to the currently running kernel at runtime, NetTracer creates a series of TCP connections with known parameters (such as known IP addresses and ports) and discovers where those parameters are stored in the kernel [struct sock](https://www.kernel.org/doc/htmldocs/networking/API-struct-sock.html). This process is often referred to as offset guessing. Since a BPF programs cannot loop, NetTracer does not directly iterate over the possible offsets. It is instead controlled from user space by the binary using a state machine.
 
 Only Linux kernels of version 4.15 or above are supported. NetTracer was inspired by [weaveworks' tcptracer-bpf](https://github.com/weaveworks/tcptracer-bpf).
 
@@ -53,16 +55,6 @@ make test-project
 
 You may want to see the _Dockerfile_ to check what dependencies need to be installed.
 
-Building with conan and cmake:
-
-```
-mkdir build && cd build
-conan install --build=boost ..
-cmake -DCONAN_DEPS=1  -DCMAKE_BUILD_TYPE=Release  -DLLVM_VERSION=10 ..
-cmake --build .
-ctest .
-```
-
 ## Usage
 
 To run NetTracer, simply do this:
@@ -75,12 +67,12 @@ This way, NetTracer's going to start in logging mode - all the information about
 
 Note that you need the following capabilities in order to run NetTracer:
 
-- _CAP\_DAC\_READ_SEARCH__
+- _CAP\_BPF_
+- _CAP\_DAC\_OVERRIDE_
+- _CAP\_PERFMON_
+- _CAP\_SYS\_ADMIN_
 - _CAP\_SYS\_PTRACE_
 - _CAP\_SYS\_RESOURCE_
-- _CAP\_BPF_
-- _CAP\_PERFMON_
-- _CAP\_SYS\_ADMIN_ (only if kernel version < 5.8, used instead of _CAP\_BPF_ and _CAP\_PERFMON_)
 
 However, to obtain a cleaner output, more appropriate for e.g. collecting metrics from NetTracer by an external tool, you should add _-d_ option:
 
@@ -121,7 +113,7 @@ SLAs apply according to the customer's support level.
 
 ## Contributing
 
-See CONTRIBUTING.md for details on submitting changes.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to submit changes and how to prepare [local development environment](./CONTRIBUTING.md#local-deployment-environment-setup-necessary-tools).
 
 ## License
 
