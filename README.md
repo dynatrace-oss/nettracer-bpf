@@ -121,7 +121,7 @@ SLAs apply according to the customer's support level.
 
 ## Contributing
 
-See CONTRIBUTING.md for details on submitting changes.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to submit changes and how to prepare [local development environment](./CONTRIBUTING.md#local-deployment-environment-setup-necessary-tools).
 
 ## License
 
