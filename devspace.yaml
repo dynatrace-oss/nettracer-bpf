@@ -54,6 +54,6 @@ profiles:
 dependencies:
 - name: clone branch
   source:
-    git: https://github.com/augustasv/nettracer-bpf
+    git: https://github.com/dynatrace-oss/nettracer-bpf
     branch: ${BRANCH}
   ignoreDependencies: true
