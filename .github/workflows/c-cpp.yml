@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
   push_to_registry:
-    name: Push Docker image to GitHub Packages
+    name: Build docker image
     runs-on: ubuntu-latest
     steps:
     # required for buildx and multi platform build
@@ -25,7 +25,7 @@ jobs:
       - name: Set the value
         id: version_env
         run: |
-          echo cat {{ $GITHUB_WORKSPACE}}/version.properties >> $GITHUB_ENV
+          echo cat $GITHUB_WORKSPACE/version.properties >> $GITHUB_ENV
       - name: Build container image
         id: docker_build
         uses: docker/build-push-action@v2
