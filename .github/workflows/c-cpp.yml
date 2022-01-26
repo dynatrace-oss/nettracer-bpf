@@ -8,15 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v2
-  push_to_registry:
     name: Build docker image
     runs-on: ubuntu-latest
     steps:
     # required for buildx and multi platform build
+      - uses: actions/checkout@v2
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -25,7 +21,7 @@ jobs:
       - name: Set the value
         id: version_env
         run: |
-          cat $GITHUB_WORKSPACE/version.properties 2>&1 | head -n 1 | awk -F 'version=' '{print $2}' >> $GITHUB_ENV
+          awk -F 'version=' '{print $2}' $GITHUB_WORKSPACE/version.properties >> $GITHUB_ENV
       - name: Build container image
         id: docker_build
         uses: docker/build-push-action@v2
