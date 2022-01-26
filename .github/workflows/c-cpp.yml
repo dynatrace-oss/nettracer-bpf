@@ -25,7 +25,7 @@ jobs:
       - name: Set the value
         id: version_env
         run: |
-          echo cat $GITHUB_WORKSPACE/version.properties >> $GITHUB_ENV
+          cat $GITHUB_WORKSPACE/version.properties 2>&1 | head -n 1 | awk -F 'version=' '{print $2}' >> $GITHUB_ENV
       - name: Build container image
         id: docker_build
         uses: docker/build-push-action@v2
@@ -34,5 +34,8 @@ jobs:
           file: ./Dockerfile
           push: false
           platforms: linux/amd64,linux/arm64
+          tags: |
+            nettracer-bpf:latest
+            nettracer-bpf:${{ env.version }}
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
