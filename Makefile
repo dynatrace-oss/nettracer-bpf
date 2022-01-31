@@ -12,7 +12,7 @@ DOCKER_SUDO=$(shell docker version > /dev/null 2>&1 || echo "sudo")
 
 all: build-image build-project-docker test-project-docker
 
-build-image:
+build-image: 
 	$(DOCKER_SUDO) docker build --network=host \
 		--build-arg BUILD_TYPE=$(BUILD_TYPE) \
 		-t $(IMAGE_NAME) .
