@@ -20,6 +20,7 @@ jobs:
         with:
           image: tonistiigi/binfmt:latest
           platforms: linux/amd64,linux/arm64
+
       - uses: actions/checkout@v2
       - name: Set the value
         id: version_env
