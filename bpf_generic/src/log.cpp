@@ -1,12 +1,15 @@
 #include "log.h"
 
-#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <filesystem>
 #include <unistd.h>
 #include <vector>
 
 namespace logging {
+
+constexpr std::size_t max_size = 10 * 1024 * 1024;
+constexpr std::size_t max_files = 3;
 
 void setUpLogger(const std::string& logDir, bool standardout) {
 	namespace fs = std::filesystem;
@@ -23,7 +26,7 @@ void setUpLogger(const std::string& logDir, bool standardout) {
 		}
 		else {
 			std::string logFile = fmt::format("{}/oneagent_nettracer_{:d}.log", logDir, getpid());
-			sinks.emplace_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFile));
+			sinks.emplace_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logFile, max_size, max_files));
 		}
 	}
 
