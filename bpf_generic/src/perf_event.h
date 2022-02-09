@@ -8,9 +8,10 @@
 #include <thread>
 #include <vector>
 
+constexpr int maxbuf_len = 512;
 struct read_state {
-	void* buf;
-	int buf_len;
+	const int buf_len = maxbuf_len;
+	uint8_t buf[maxbuf_len];
 };
 
 struct perf_event_lost {
