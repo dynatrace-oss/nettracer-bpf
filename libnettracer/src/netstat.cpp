@@ -40,7 +40,7 @@ void NetStat::process_bpf_map(int fd, F func) {
 					el.update_time = getCurrentTimeFromSteadyClock();
 				}
 			} else {
-				LOG_INFO("src port = 0 for {}", to_string(currentKey));
+				LOG_DEBUG("src port = 0 for {}", to_string(currentKey));
 				mapsWrapper->removeElement(fd, static_cast<const void*>(&currentKey));
 			}
 		}
@@ -137,7 +137,7 @@ void NetStat::event(const EventIPTYPE& evt) {
 	std::unique_lock<std::mutex> l(mx);
 	auto& el = connections<IPTYPE>()[key];
 	if( key.sport == 0 ){
-		LOG_INFO("Event src port = 0 for {} ", to_string(evt));
+		LOG_DEBUG("Event src port = 0 for {} ", to_string(evt));
 		return;
 	}
 	el.pid = evt.pid;
@@ -188,7 +188,7 @@ static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
 			b = a;
 		}
 	} else {
-		LOG_INFO("nonmonotonic values {} < {} pos: {}", a, b, pos);
+		LOG_DEBUG("nonmonotonic values {} < {} pos: {}", a, b, pos);
 	}
 	return result;
 }
