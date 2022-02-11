@@ -102,6 +102,9 @@ void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf_fd
 
 template<typename Tuple, typename Event>
 void updateConnectionsAfterEvent(const Event& evt, ConnectionsState<Tuple>& connsState) {
+	std::string etype = name_of_evt[evt.type];
+	LOG_INFO("event {} {}", etype, to_string(evt));
+	
 	Tuple conn{eventToTuple(evt)};
 	std::lock_guard<std::mutex> lock{connsState.mutex};
 

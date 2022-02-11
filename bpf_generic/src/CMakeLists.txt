@@ -5,6 +5,7 @@ set(SOURCES
 	log.cpp
 	kernel_version.cpp
 	maps_loading.cpp
+	perf_event.cpp
 	system_calls.cpp
 )
 
