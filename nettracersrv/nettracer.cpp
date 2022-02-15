@@ -181,8 +181,6 @@ int main(int argc, char* argv[]) {
 
 	netstat::NetStat netst{exitCtrl, vm.count("incremental"), vm.count("header")};
 	netst.init();
-	ConnectionsState<ipv4_tuple_t> ipv4Connections;
-	ConnectionsState<ipv6_tuple_t> ipv6Connections;
 
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
@@ -193,6 +191,8 @@ int main(int argc, char* argv[]) {
 		ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
 		map_reading = [&]() { netst.map_loop(ipv4_fds, ipv6_fds); };
 	} else {
+		static ConnectionsState<ipv4_tuple_t> ipv4Connections;
+		static ConnectionsState<ipv6_tuple_t> ipv6Connections;
 		bpf_log_event_update = [](const bpf_log_event_t& evt) { unifyBPFLog(evt); };
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) {
 			std::string etype = name_of_evt[evt.type];
