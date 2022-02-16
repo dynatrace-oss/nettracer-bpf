@@ -74,7 +74,8 @@ void log_bpf(struct pt_regs *ctx, enum bpf_log_level severity, const char* fmt, 
 #define LOG_ERROR_BPF(ctx, fmt, ...)    LOG_BPF(ctx, BPF_LOG_LEVEL_ERROR, fmt, __VA_ARGS__)
 #define LOG_CRITICAL_BPF(ctx, fmt, ...) LOG_BPF(ctx, BPF_LOG_LEVEL_CRITICAL, fmt, __VA_ARGS__)
 
-// use DEBUG_BPF only for debugging purposes
+// use DEBUG_BPF only for debugging purposes where using perf event-based logging is not possible
+// the messages appear in /sys/kernel/debug/tracing/trace
 // max 3 printf-style args allowed
 
 #ifdef DEBUG

@@ -132,7 +132,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 		);
 		if (status.state != GUESS_STATE_CHECKED) {
 			if (maxRetries == 0) {
-				logger->error("max retries exhausted");
+				logger->error("max retries of communicating with kernel side exhausted");
 				return false;
 			} else {
 				--maxRetries;
