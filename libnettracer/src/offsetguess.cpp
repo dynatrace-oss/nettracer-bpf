@@ -50,16 +50,15 @@ bool OffsetGuessing::guess(int status_fd) {
 bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	logger = logging::getLogger();
 
-	uint32_t zero = 0;
 	int max_retries = 100;
 
-	logger->debug("guess enter fd:{:d}", status_fd);
+	logger->debug("guess enter fd: {:d}", status_fd);
 	// nettracer_status map holds only one entry with key zero which is
 	// created (and updated) in bpf program inside call are_offsets_ready_v(4|6)
 	// which in turn are called in kretprobe tcp_v(4|6)_connect
 
 	uint64_t pid_tgid = (uint64_t)getpid() << 32 | syscall(SYS_gettid);
-	logger->debug("guess thread pid:{:d}", pid_tgid);
+	logger->debug("guess thread pid: {:d}", pid_tgid);
 
 	// prepare server ipv4 and client ipv6 on this thread
 	localsock = detail::startLocalSock();
@@ -71,6 +70,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 
 	// create or update status entry in map - signal that we are starting guessing
 	bpf::BPFMapsWrapper mapsWrapper;
+	const uint32_t zero = 0;
 	status = {};
 	status.state = GUESS_STATE_CHECKING;
 	status.pid_tgid = pid_tgid;
@@ -208,7 +208,7 @@ void OffsetGuessing::guessNetns() {
 		logger->debug("Network namespace offset: {:#010x}", status.offset_netns);
 		status.what = GUESS_FIELD_DADDR_IPV6;
 	} else {
-		status.offset_ino++;
+		++status.offset_ino;
 		if (status.err != 0 || status.offset_ino >= thresholdInetSock) {
 			status.offset_ino = 0;
 			status.offset_netns++;
