@@ -50,7 +50,7 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 	po::options_description desc{"Options"};
 	desc.add_options()("help,h", "Help screen")("clear_probes,c", "Clear all probes")("debug,d", "Debug logs")(
 			"no_stdout_log,n", "Log only to file")("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval")(
-			"log,l", po::value<std::string>()->default_value("./log"), "Logger path")("incremental,i", "Inceremental data")(
+			"log,l", po::value<std::string>()->default_value("./log"), "Logger path")("incremental,i", "Incremental data")(
 			"program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")("header,s", "Add header size")(
 			"version,v", "")("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries BPF maps");
 	po::variables_map vm;

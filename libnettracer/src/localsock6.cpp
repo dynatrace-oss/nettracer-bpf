@@ -16,7 +16,7 @@
 // implementation of test client for ipv6 //
 
 static const char* printIpAddr(const sockaddr_in6* addr){
-	static char buffer[INET6_ADDRSTRLEN ] = {0};
+	static char buffer[INET6_ADDRSTRLEN] = {0};
 	return inet_ntop(AF_INET6, &(addr->sin6_addr), buffer, sizeof(buffer));
 }
 
@@ -32,11 +32,11 @@ bool ClientSock6::setRemoteServerAndPort(const std::string& serverIp, uint16_t t
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_STREAM;
 	std::string ipv6AddressOnEthIfc = serverIp + "%" + localInterface;
-	int gai_err = getaddrinfo( ipv6AddressOnEthIfc.c_str(), "554", &hints, &res);
+	int gai_err = getaddrinfo(ipv6AddressOnEthIfc.c_str(), "554", &hints, &res);
 
 	if (gai_err)	{
-    	LOG_ERROR("getaddrinfo: %{:s}", gai_strerror(gai_err));
-    	return false;
+		LOG_ERROR("getaddrinfo: {:s}", gai_strerror(gai_err));
+		return false;
 	}
 	remoteServerInfo = *res;
 	sockaddr_in6* addr = (sockaddr_in6*)(remoteServerInfo.ai_addr);
@@ -46,7 +46,7 @@ bool ClientSock6::setRemoteServerAndPort(const std::string& serverIp, uint16_t t
 }
 
 bool ClientSock6::getDAddress(uint32_t* daddress) const {
-	if( remoteServerInfo.ai_family == AF_INET6 && remoteServerInfo.ai_addr != nullptr ) {
+	if (remoteServerInfo.ai_family == AF_INET6 && remoteServerInfo.ai_addr != nullptr) {
 		sockaddr_in6* addr = (sockaddr_in6*)(remoteServerInfo.ai_addr);
 		daddress[0] = addr->sin6_addr.s6_addr32[0];
 		daddress[1] = addr->sin6_addr.s6_addr32[1];
@@ -58,7 +58,7 @@ bool ClientSock6::getDAddress(uint32_t* daddress) const {
 }
 
 bool ClientSock6::readLocalInterface() {
-/* format of /proc/net/if_inte6 file entries
+/* format of /proc/net/if_inet6 file entries
 fe8000000000000002155dfffe67f8d5 05 40 20 80 eth0
 00000000000000000000000000000001 01 80 10 80 lo
 +------------------------------+ ++ ++ ++ ++ ++
@@ -121,11 +121,11 @@ bool ClientSock6::pokeRemoteServerAndPort() {
 	}
 	int arg  = 0;
   	// Set non-blocking
-  	if( (arg = fcntl(fd, F_GETFL, NULL)) < 0) {
-  		LOG_TRACE( "Error fcntl(..., F_GETFL) {:s}", strerror(errno));
+	if ((arg = fcntl(fd, F_GETFL, NULL)) < 0) {
+		LOG_TRACE("Error fcntl(..., F_GETFL) {:s}", strerror(errno));
   	} else {
   		arg |= O_NONBLOCK;
-  		if( fcntl(fd, F_SETFL, arg) < 0) {
+		if (fcntl(fd, F_SETFL, arg) < 0) {
      		LOG_TRACE("Error fcntl(..., F_SETFL) {:s}", strerror(errno));
 		}
 	}
