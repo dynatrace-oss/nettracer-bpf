@@ -115,6 +115,12 @@ bpf_fds getIPv6Fds(bpf::bpf_subsystem& ebpf) {
 	return ipv6_fds;
 }
 
+bool isIPv6MonitoringPossible(int status_fd, bpf::BPFMapsWrapper& mapsWrapper) {
+	const uint32_t zero = 0;
+	guess_status_t status;
+	return mapsWrapper.lookupElement(status_fd, &zero, &status) && status.offset_daddr_ipv6 != 0;
+}
+
 int main(int argc, char* argv[]) {
 	setUpExitBehavior();
 
@@ -174,21 +180,25 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	if (!OffsetGuessing{}.guess(status_fd)) {
+	if (!doOffsetGuessing(status_fd)) {
 		LOG_ERROR("Offset guessing failed");
 		return 1;
 	}
+
+	bool monitorIPv6 = isIPv6MonitoringPossible(status_fd, mapsWrapper);
 
 	netstat::NetStat netst{exitCtrl, vm.count("incremental"), vm.count("header")};
 	netst.init();
 
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
-	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
+	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update = [](const tcp_ipv6_event_t&) {}; // it stays a dummy function if monitoring of IPv6 is disabled
 	std::function<void(const bpf_log_event_t&)> bpf_log_event_update;
 	std::function<void()> map_reading;
 	if (stdoutlog) {
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst.event<ipv4_tuple_t>(evt); };
-		ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
+		if (monitorIPv6) {
+			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
+		}
 		map_reading = [&]() { netst.map_loop(ipv4_fds, ipv6_fds); };
 	} else {
 		static ConnectionsState<ipv4_tuple_t> ipv4Connections;
@@ -199,15 +209,19 @@ int main(int argc, char* argv[]) {
 			LOG_INFO("event {} {}", etype, to_string(evt));
 			updateConnectionsAfterEvent(evt, ipv4Connections);
 		};
-		ipv6_event_update = [&](const tcp_ipv6_event_t& evt) {
-			std::string etype = name_of_evt[evt.type];
-			LOG_INFO("event {} {}", etype, to_string(evt));
-			updateConnectionsAfterEvent(evt, ipv6Connections);
-		};
+		if (monitorIPv6) {
+			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) {
+				std::string etype = name_of_evt[evt.type];
+				LOG_INFO("event {} {}", etype, to_string(evt));
+				updateConnectionsAfterEvent(evt, ipv6Connections);
+			};
+		}
 		map_reading = [&](){
 			while (exitCtrl.running) {
 				updateConnectionsFromMaps(ipv4Connections, ipv4_fds, mapsWrapper);
-				updateConnectionsFromMaps(ipv6Connections, ipv6_fds, mapsWrapper);
+				if (monitorIPv6) {
+					updateConnectionsFromMaps(ipv6Connections, ipv6_fds, mapsWrapper);
+				}
 
 				std::unique_lock<std::mutex> lk{exitCtrl.m};
 				exitCtrl.cv.wait_for(lk, std::chrono::seconds(exitCtrl.wait_time), [] { return !exitCtrl.running; });
@@ -231,7 +245,7 @@ int main(int argc, char* argv[]) {
 
 	auto ipv6_pmap = ebpf.get_perf_map("tcp_event_ipv6");
 	event_reader ipv6_evnts;
-	if (!ipv6_pmap.pfd.empty()) {
+	if (!ipv6_pmap.pfd.empty() && monitorIPv6) {
 		LOG_INFO("Starting TCP IPv6 events");
 		ipv6_evnts.start<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
 	}
@@ -244,7 +258,9 @@ int main(int argc, char* argv[]) {
 		map_reader.join();
 	};
 	ipv4_evnts.stop();
-	ipv6_evnts.stop();
+	if (monitorIPv6) {
+		ipv6_evnts.stop();
+	}
 	log_evnts.stop();
 
 	LOG_INFO("Events stopped");

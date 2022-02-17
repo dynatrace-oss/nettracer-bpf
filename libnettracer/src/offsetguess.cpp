@@ -3,6 +3,8 @@
 #include "bpf_generic/src/bpf_loading.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
+#include "localsock.h"
+#include "localsock6.h"
 
 #include <fmt/core.h>
 
@@ -32,6 +34,12 @@ inline const int thresholdTcpSock = 2500; // Fields outside inet_sock are stored
 
 }
 
+namespace detail {
+
+// ctor and dtor definitions moved after definition of LocalSock and ClientSock6 to allow fwd declaration
+OffsetGuessing::OffsetGuessing() = default;
+OffsetGuessing::~OffsetGuessing() = default;
+
 bool OffsetGuessing::guess(int status_fd) {
 	const unsigned maxAttempts = 3;
 	for (unsigned i = 0; i < maxAttempts; ++i) {
@@ -50,8 +58,6 @@ bool OffsetGuessing::guess(int status_fd) {
 bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	logger = logging::getLogger();
 
-	int max_retries = 100;
-
 	logger->debug("guess enter fd: {:d}", status_fd);
 	// nettracer_status map holds only one entry with key zero which is
 	// created (and updated) in bpf program inside call are_offsets_ready_v(4|6)
@@ -61,12 +67,18 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	logger->debug("guess thread pid: {:d}", pid_tgid);
 
 	// prepare server ipv4 and client ipv6 on this thread
-	localsock = detail::startLocalSock();
+	localsock = startLocalSock();
 	if (!localsock) {
 		return false;
 	}
 
-	client6 = detail::prepareClient6();
+	bool skipIPv6Guessing = false;
+	client6 = prepareClient6();
+	if (!client6) {
+		logger->warn("Skipping offset guessing for IPv6 due to failed preparation of ClientSock6");
+		logger->warn("NetTracer won't be able to monitor IPv6 traffic. To give it another try, please restart.");
+		skipIPv6Guessing = true;
+	}
 
 	// create or update status entry in map - signal that we are starting guessing
 	bpf::BPFMapsWrapper mapsWrapper;
@@ -82,7 +94,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 
 	// prepare values used to verify that we are at right offset
 	try {
-		auto expectedOpt{getExpectedValues()};
+		auto expectedOpt{getExpectedValues(skipIPv6Guessing)};
 		if (!expectedOpt) {
 			return false;
 		}
@@ -93,8 +105,11 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 		return false;
 	}
 
-	unsigned rttCurrentAttempts{0};
-	unsigned rttCurrentReps{0};
+	// limit how many failed attempts at communicating with the BPF side are accepted
+	int maxRetries = 100;
+
+	unsigned rttCurrentAttempts = 0;
+	unsigned rttCurrentReps = 0;
 
 	// in loop below we need a swich to select connect trigger from IPv4 to IPv6 - we start with IPv4
 	bool guessIPv6 = false;
@@ -104,7 +119,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 			status.state, status.what
 		);
 		if (guessIPv6) {
-			client6.pokeRemoteServerAndPort();
+			client6->pokeRemoteServerAndPort();
 		} else {
 			(void)localsock->getTCPInfo();
 		}
@@ -116,11 +131,11 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 			status.state, status.what
 		);
 		if (status.state != GUESS_STATE_CHECKED) {
-			if (max_retries == 0) {
-				logger->error("max_retries exhausted");
+			if (maxRetries == 0) {
+				logger->error("max retries exhausted");
 				return false;
 			} else {
-				--max_retries;
+				--maxRetries;
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				continue;
 			}
@@ -145,7 +160,13 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 		case GUESS_FIELD_NETNS:
 			guessNetns();
 			if (status.what == GUESS_FIELD_DADDR_IPV6) {
-				guessIPv6 = true;
+				if (skipIPv6Guessing) {
+					status.offset_daddr_ipv6 = 0;
+					status.what = GUESS_FIELD_SEGS_IN;
+				}
+				else {
+					guessIPv6 = true;
+				}
 			}
 			break;
 		case GUESS_FIELD_DADDR_IPV6:
@@ -161,7 +182,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 			GUESS_SIMPLE_FIELD(segs_out, "Segs out", GUESS_FIELD_RTT);
 			break;
 		case GUESS_FIELD_RTT:
-			if (!guessRTT(rttCurrentAttempts, rttCurrentReps)) {
+			if (!guessRTT(rttCurrentAttempts, rttCurrentReps, skipIPv6Guessing)) {
 				return false;
 			}
 			break;
@@ -239,7 +260,7 @@ void OffsetGuessing::guessDAddrIPv6() {
 	status.state = GUESS_STATE_CHECKING;
 }
 
-bool OffsetGuessing::guessRTT(unsigned& currentAttempts, unsigned& currentReps) {
+bool OffsetGuessing::guessRTT(unsigned& currentAttempts, unsigned& currentReps, bool skipIPv6) {
 	const unsigned maxAttempts = 10; // that many offsets may be verified
 	const unsigned requiredReps = 3; // value at an offset must match with the expected value at least that many times in a row
 
@@ -255,7 +276,7 @@ bool OffsetGuessing::guessRTT(unsigned& currentAttempts, unsigned& currentReps) 
 				return false;
 			}
 			try {
-				auto expectedOpt{getExpectedValues()};
+				auto expectedOpt{getExpectedValues(skipIPv6)};
 				if (!expectedOpt) {
 					return false;
 				}
@@ -297,14 +318,16 @@ bool OffsetGuessing::overflowOccurred() const {
 		status.offset_rtt >= thresholdTcpSock || status.offset_rtt_var >= thresholdTcpSock;
 }
 
-std::optional<field_values> OffsetGuessing::getExpectedValues() {
+std::optional<field_values> OffsetGuessing::getExpectedValues(bool skipIPv6) {
 	field_values expected;
 	expected.saddr = 0x0100007F;                   // 127.0.0.1
 	expected.daddr = 0x0200007F;                   // 127.0.0.2
 	expected.dport = htons(localsock->getServerPort());
 	expected.sport = htons(localsock->getClientPort());
 	expected.netns = own_net_ns();
-	client6.getDAddress(expected.daddr6);
+	if (!skipIPv6 && !client6->getDAddress(expected.daddr6)) {
+		LOG_WARN("Could not obtain IPv6 destination address for guessing");
+	}
 	expected.family = AF_INET;
 	expected.rtt = 0;
 	expected.rtt_var = 0;
@@ -334,8 +357,6 @@ std::optional<field_values> OffsetGuessing::getExpectedValues() {
 	return std::nullopt;
 }
 
-namespace detail {
-
 std::unique_ptr<LocalSock> startLocalSock() {
 	auto localsock = std::make_unique<LocalSock>();
 	if (!localsock->running()) {
@@ -361,10 +382,14 @@ std::unique_ptr<LocalSock> startLocalSock() {
 	return localsock;
 }
 
-ClientSock6 prepareClient6() {
-	ClientSock6 client6;
-	client6.readLocalInterface();
-	client6.setRemoteServerAndPort();
+std::unique_ptr<ClientSock6> prepareClient6() {
+	auto client6 = std::make_unique<ClientSock6>();
+	if (!client6->readLocalInterface() || !client6->setRemoteServerAndPort()) {
+		// there's no point in retrying
+		// reading local interface won't fix itself in the next attempt
+		// and setting IP/port even to a busy one should work fine unless interface reading failed
+		return {};
+	}
 	return client6;
 }
 
