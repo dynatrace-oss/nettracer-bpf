@@ -4,6 +4,7 @@
 #include <exception>
 #include <poll.h>
 #include <stdint.h>
+#include <unistd.h>
 
 void bpf_events::start() {
 	running = true;
@@ -47,7 +48,6 @@ void bpf_events::loop() {
 			continue;
 		}
 
-		LOG_DEBUG("event 2 {} {}", fds[0].events, res);
 		for (auto& fd : fds) {
 			if (!(fd.revents & POLLIN)) {
 				continue;
