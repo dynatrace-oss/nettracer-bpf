@@ -4,16 +4,16 @@
 
 bool setUpLogging(const boost::program_options::variables_map& vm) {
 	std::string logger_path = vm["log"].as<std::string>();
-	bool stdoutlog = vm.count("no_stdout_log"); // TODO improve wording
+	bool noStdoutLog = vm.count("no_stdout_log");
 
 	std::filesystem::create_directory(logger_path);
-	logging::setUpLogger(logger_path, !stdoutlog);
+	logging::setUpLogger(logger_path, !noStdoutLog);
 
 	if (areDebugLogsEnabled(vm)) {
 		logging::getLogger()->set_level(spdlog::level::debug);
 	}
 
-	return stdoutlog;
+	return noStdoutLog;
 }
 
 spdlog::level::level_enum bpfLogLevelToSpdlogLevel(const bpf_log_level& level) {
