@@ -53,7 +53,8 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 			"no_stdout_log,n", "Log only to file")("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval")(
 			"log,l", po::value<std::string>()->default_value("./log"), "Logger path")("incremental,i", "Incremental data")(
 			"program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")("header,s", "Add header size")(
-			"version,v", "")("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries BPF maps");
+			"test", "Check if NetTracer can start properly and exit")("version,v", "")("map_size,m",
+			po::value<uint32_t>()->default_value(4096), "Number of entries BPF maps");
 	po::variables_map vm;
 	try {
 		po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -133,7 +134,7 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 
-	bool stdoutlog{setUpLogging(vm)};
+	bool noStdoutLog{setUpLogging(vm)};
 	LOG_INFO("Starting NetTracer v{}", nettracerVersionStr);
 
 	if (!increaseMemoryLimit()) {
@@ -181,6 +182,11 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
+	if (vm.count("test")) {
+	    LOG_INFO("All checks passed, stopping NetTracer");
+	    return 0;
+	}
+
 	if (!doOffsetGuessing(status_fd)) {
 		LOG_ERROR("Offset guessing failed");
 		return 1;
@@ -197,7 +203,7 @@ int main(int argc, char* argv[]) {
 	std::function<void(const bpf_log_event_t&)> bpf_log_event_update;
 	std::function<void()> map_reading;
 
-	if (stdoutlog) {
+	if (noStdoutLog) {
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst.event<ipv4_tuple_t>(evt); };
 		if (monitorIPv6) {
 			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
@@ -228,7 +234,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	auto log_pmap = ebpf.get_perf_map("bpf_logs");
-	if (!log_pmap.pfd.empty() && !stdoutlog) {
+	if (!log_pmap.pfd.empty() && !noStdoutLog) {
 		LOG_INFO("Starting BPF log events");
 		bevents.add_observer({ log_pmap,bpf_log_event_update});
 	}
