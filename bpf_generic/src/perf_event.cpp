@@ -1,137 +1,60 @@
-#include "log.h"
-#include <fmt/core.h>
+#include "perf_event.h"
+#include <arpa/inet.h>
 #include <chrono>
 #include <functional>
-#include <poll.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <variant>
 #include <vector>
 
-template <typename... Ts>
-struct overload : Ts... {
-	using Ts::operator()...;
-};
-template <class... Ts>
-overload(Ts...) -> overload<Ts...>;
-
-template <typename T>
-using event = std::variant<perf_event_sample<T>, perf_event_lost, std::monostate>;
-
+namespace bpf{
 // pattern https://github.com/cilium/cilium/blob/master/pkg/bpf/perf.go
-template <typename T>
-event<T> perf_event_read(int page_count, int page_size, read_state* state, perf_event_mmap_page* header) {
+perf_read_result perf_event_read(int page_count, int page_size, read_buffer* state, perf_event_mmap_page* header) {
 	uint64_t data_head = header->data_head;
 	uint64_t data_tail = header->data_tail;
 	uint64_t raw_size = (uint64_t)page_count * page_size;
 	uint8_t* base = ((uint8_t*)header) + page_size;
-	perf_event_sample<T>* e;
 	uint8_t *begin, *end;
-	event<T> evt;
+	perf_read_result res = perf_read_result::error;
 
 	// No data to read on this ring
 	__sync_synchronize();
 	if (data_head == data_tail)
-		return std::monostate{};
+		return res;
 
 	begin = base + data_tail % raw_size;
-	e = (perf_event_sample<T>*)begin;
-	end = base + (data_tail + e->header.size) % raw_size;
-
-	if (state->buf_len < e->header.size || !state->buf) {
-		LOG_INFO("event of unexpected size {}", e->header.size );
-		return std::monostate{};
+	perf_event_header* pheader = (perf_event_header*)begin;
+	end = base + (data_tail + pheader->size) % raw_size;
+	if (state->buf_len < pheader->size) {
+		LOG_INFO("event of unexpected size {}", pheader->size);
+		return res;
 	}
 
 	if (end < begin) {
 		uint64_t len = base + raw_size - begin;
 		memcpy(state->buf, begin, len);
-		memcpy((char*)state->buf + len, base, e->header.size - len);
-		e = (perf_event_sample<T>*)state->buf;
+		memcpy((char*)state->buf + len, base, pheader->size - len);
 	} else {
-		memcpy(state->buf, begin, e->header.size);
+		memcpy(state->buf, begin, pheader->size);
 	}
-	switch (e->header.type) {
+	switch (pheader->type) {
 	case PERF_RECORD_SAMPLE:
-		evt =  *((perf_event_sample<T>*)state->buf);
+		res = perf_read_result::sample;
 		break;
 	case PERF_RECORD_LOST:
-		evt  = *((perf_event_lost*)state->buf);
+		res = perf_read_result::lost;
 		break;
 	}
 
 	__sync_synchronize();
-	header->data_tail += e->header.size;
+	header->data_tail += pheader->size;
 
-	return evt;
+	return res;
 }
-
-template <typename T, typename Func>
-void event_reader::read_loop(Func f) {
-	using namespace std::chrono_literals;
-	int page_size = getpagesize();
-	const int pc = get_nprocs();
-	while (running) {
-		std::vector<pollfd> pfd(perf_data.pfd.size());
-		for (size_t i = 0; i < pfd.size(); i++) {
-			pfd[i].fd = perf_data.pfd[i];
-			pfd[i].events = POLLIN;
-		}
-
-		int res = poll(pfd.data(), pfd.size(), 500);
-		if (res < 0) {
-			LOG_ERROR("poll error {} event exit", res);
-			running = false;
-			break;
-		} else if (res == 0) {
-			continue;
-		}
-
-		read_state rstate{};
-		static std::vector<T> events(pc);
-		events.clear();
-		for (int cpu = 0; cpu < pc; cpu++) {
-			bool is_result = true;
-			while (is_result) {
-				auto res = perf_event_read<T>(perf_data.page_count, page_size, &rstate, perf_data.header[cpu]);
-				is_result = std::visit(
-						overload{
-								[&](perf_event_sample<T>& sample) {
-									T* evt = (T*)&(sample.data);
-									events.emplace_back(*evt);
-									return true;
-								},
-								[](perf_event_lost) {
-									LOG_DEBUG("event lost");
-									return false;
-								},
-								[](std::monostate) { return false; }},
-						res);
-			}
-		}
-
-		std::sort(events.begin(), events.end(), [](T const& a, T const& b) { return a.timestamp < b.timestamp; });
-		std::for_each(events.begin(), events.end(), f);
-	}
-}
-
-template <typename T, typename Func>
-void event_reader::start(bpf::map_data& m, Func f) {
-	perf_data = m;
-	running = true;
-	std::thread t(&event_reader::read_loop<T, Func>, this, f);
-	reader.swap(t);
-}
-
-void event_reader::stop() {
-	if (running) {
-		running = false;
-		reader.join();
-	}
 }

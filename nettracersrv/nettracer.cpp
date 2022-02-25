@@ -1,7 +1,8 @@
 #include "bpf_generic/src/bpf_loading.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
-#include "bpf_generic/src/perf_event.h"
+#include "bpf_events.h"
+
 #include "proc_tcp.h"
 #include "connections_printing.h"
 #include "netstat.h"
@@ -187,13 +188,15 @@ int main(int argc, char* argv[]) {
 
 	bool monitorIPv6 = isIPv6MonitoringPossible(status_fd, mapsWrapper);
 
-	netstat::NetStat netst{exitCtrl, vm.count("incremental"), vm.count("header")};
+	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"));
 	netst.init();
-
+    bpf_events bevents;
+    
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
-	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update = [](const tcp_ipv6_event_t&) {}; // it stays a dummy function if monitoring of IPv6 is disabled
+	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
 	std::function<void(const bpf_log_event_t&)> bpf_log_event_update;
 	std::function<void()> map_reading;
+
 	if (stdoutlog) {
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst.event<ipv4_tuple_t>(evt); };
 		if (monitorIPv6) {
@@ -205,17 +208,12 @@ int main(int argc, char* argv[]) {
 		static ConnectionsState<ipv6_tuple_t> ipv6Connections;
 		bpf_log_event_update = [](const bpf_log_event_t& evt) { unifyBPFLog(evt); };
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) {
-			std::string etype = name_of_evt[evt.type];
-			LOG_INFO("event {} {}", etype, to_string(evt));
 			updateConnectionsAfterEvent(evt, ipv4Connections);
 		};
 		if (monitorIPv6) {
-			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) {
-				std::string etype = name_of_evt[evt.type];
-				LOG_INFO("event {} {}", etype, to_string(evt));
-				updateConnectionsAfterEvent(evt, ipv6Connections);
-			};
-		}
+		ipv6_event_update = [&](const tcp_ipv6_event_t& evt) {
+			updateConnectionsAfterEvent(evt, ipv6Connections);
+		};}
 		map_reading = [&](){
 			while (exitCtrl.running) {
 				updateConnectionsFromMaps(ipv4Connections, ipv4_fds, mapsWrapper);
@@ -230,39 +228,30 @@ int main(int argc, char* argv[]) {
 	}
 
 	auto log_pmap = ebpf.get_perf_map("bpf_logs");
-	event_reader log_evnts;
 	if (!log_pmap.pfd.empty() && !stdoutlog) {
 		LOG_INFO("Starting BPF log events");
-		log_evnts.start<bpf_log_event_t>(log_pmap, bpf_log_event_update);
+		bevents.add_observer({ log_pmap,bpf_log_event_update});
 	}
 
-	auto ipv4_pmap = ebpf.get_perf_map("tcp_event_ipv4");
-	event_reader ipv4_evnts;
+    auto ipv4_pmap = ebpf.get_perf_map("tcp_event_ipv4");
 	if (!ipv4_pmap.pfd.empty()) {
 		LOG_INFO("Starting TCP IPv4 events");
-		ipv4_evnts.start<tcp_ipv4_event_t>(ipv4_pmap, ipv4_event_update);
+		bevents.add_observer({ipv4_pmap, ipv4_event_update});
 	}
 
 	auto ipv6_pmap = ebpf.get_perf_map("tcp_event_ipv6");
-	event_reader ipv6_evnts;
 	if (!ipv6_pmap.pfd.empty() && monitorIPv6) {
 		LOG_INFO("Starting TCP IPv6 events");
-		ipv6_evnts.start<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
+		bevents.add_observer({ipv6_pmap, ipv6_event_update});
 	}
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
+    bevents.start();
 	auto map_reader = std::thread{map_reading};
 
 	if (map_reader.joinable()) {
 		map_reader.join();
 	};
-	ipv4_evnts.stop();
-	if (monitorIPv6) {
-		ipv6_evnts.stop();
-	}
-	log_evnts.stop();
-
+    bevents.stop();
 	LOG_INFO("Events stopped");
 
 	return 0;

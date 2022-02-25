@@ -1,4 +1,5 @@
 set(SOURCES
+    bpf_events.cpp
 	connections_printing.cpp
 	localsock.cpp
 	localsock6.cpp
@@ -9,6 +10,7 @@ set(SOURCES
 )
 
 set(HEADERS
+    bpf_events.h
 	connections_printing.h
 	localsock.h
 	localsock6.h
