@@ -54,6 +54,7 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 			("clear_probes,c", "Clear all probes on start")
 			("debug,d", "Enable debug logs")
 			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
+			("no_file_log", "Disable logging to a file")
 			("log,l", po::value<std::string>()->default_value("./log"), "Logger path")
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
 			("incremental,i", "Enable incremental data")
