@@ -53,6 +53,9 @@ public:
 bool initialize_perf_maps(maps_config& pmaps, BPFMapsWrapper& mapsWrapper) {
 	bool all_success = true;
 	int page_size = getpagesize();
+	constexpr int any_pid = -1;
+	constexpr int any_group_fd = -1;
+
 	for (auto& pmap : pmaps) {
 		pmap.page_count = 8;
 		const int pc = get_nprocs();
@@ -60,8 +63,8 @@ bool initialize_perf_maps(maps_config& pmaps, BPFMapsWrapper& mapsWrapper) {
 		if (pmap.def.type != BPF_MAP_TYPE_PERF_EVENT_ARRAY)
 			continue;
 
-		for (int cpuC = 0; cpuC < pc; cpuC++) {
-			int pfd = perf_event_open_map(-1 /* pid */, cpuC /* cpu */, -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
+		for (int cpuC = 0; cpuC < pc; ++cpuC) {
+			int pfd = perf_event_open_map(any_pid, cpuC, any_group_fd, PERF_FLAG_FD_CLOEXEC);
 			if (pfd < 0) {
 				std::string msg{fmt::format("perf_event_open_map for pfd {:d} failed: {} ({:d})", pfd, strerror(errno), errno)};
 				if (errno == EACCES || errno == EPERM) {
@@ -318,7 +321,7 @@ void bpf_subsystem::load_programs_from_sections(std::vector<elf_section>& allSec
 
 void bpf_subsystem::set_maps_max_entries(uint32_t map_max_entries) {
 	for (auto& m : maps) {
-		if (m.def.max_entries == 1024) {
+		if (m.def.max_entries == 1024) { // only change size of maps with traffic data, not logs or configuration
 			m.def.max_entries = map_max_entries;
 		}
 	}
