@@ -1,13 +1,17 @@
 #include "unified_log.h"
 #include <filesystem>
 #include <string>
+#include <utility>
 
 bool setUpLogging(const boost::program_options::variables_map& vm) {
 	std::string logger_path = vm["log"].as<std::string>();
 	bool noStdoutLog = vm.count("no_stdout_log");
+	bool noFileLog = vm.count("no_file_log");
 
-	std::filesystem::create_directory(logger_path);
-	logging::setUpLogger(logger_path, !noStdoutLog);
+	if (!noFileLog) {
+		std::filesystem::create_directory(logger_path);
+	}
+	logging::setUpLogger(logger_path, !noStdoutLog, !noFileLog);
 
 	if (areDebugLogsEnabled(vm)) {
 		logging::getLogger()->set_level(spdlog::level::debug);
