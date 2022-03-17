@@ -321,7 +321,7 @@ uint32_t readNetNS(const fs::path& p) {
 
 		s = fs::read_symlink(p).string();
 	} catch (fs::filesystem_error& e) {
-		LOG_INFO("Couldn't read  namespace file: " + p.string());
+		LOG_DEBUG("Couldn't read namespace file: " + p.string());
 		return 0;
 	}
 	auto pos = s.find("net");
@@ -350,6 +350,9 @@ tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file) {
 		}
 	}
 
+	unsigned netNSReadFails = 0;
+	unsigned allNetNSReads = 0;
+
 	for (auto& p : fs::directory_iterator(root)) {
 		std::string pid = p.path().filename();
 
@@ -360,14 +363,16 @@ tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file) {
 		uint32_t npid = std::stoul(pid);
 
 		currnet_ns = readNetNS(p.path() / "ns" / "net");
+		++allNetNSReads;
 		if (!currnet_ns) {
+			++netNSReadFails;
 			continue;
 		}
 		if (!std::any_of(visited.begin(), visited.end(), [currnet_ns](auto& i) { return i == currnet_ns; })) {
 			if (!readTcpFile<IPTYPE>(table, p.path() / "net" / file, currnet_ns))
 				continue;
 
-			LOG_INFO("tcptable for nondeafult ns : {} read", currnet_ns);
+			LOG_DEBUG("tcptable for nondeafult ns: {} read", currnet_ns);
 			visited.push_back(currnet_ns);
 		}
 		auto fdDir = p.path() / "fd";
@@ -405,6 +410,12 @@ tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file) {
 			is->second.pid = npid;
 		}
 	}
+
+	constexpr float readFailsWarningThreshold = 0.5;
+	if (netNSReadFails > readFailsWarningThreshold * allNetNSReads) {
+		LOG_WARN("Out of {:d}, {:d} net namespace files couldn't be read. Maybe CAP_SYS_PTRACE capability is missing?", allNetNSReads, netNSReadFails);
+	}
+
 	return table;
 }
 }

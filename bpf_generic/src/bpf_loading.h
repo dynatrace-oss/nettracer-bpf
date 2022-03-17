@@ -35,7 +35,7 @@ class bpf_subsystem {
 
 public:
 	explicit bpf_subsystem(const ISystemCalls& sysCalls = SystemCalls::getInstance());
-	void load_bpf_file(const std::string& path, uint32_t map_max_entries);
+	bool load_bpf_file(const std::string& path, uint32_t map_max_entries);
 	int get_map_fd(const std::string& name);
 	map_data get_perf_map(const std::string& name);
 	void clear_all_probes();

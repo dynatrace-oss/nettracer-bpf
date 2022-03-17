@@ -1,5 +1,6 @@
 #include "bpf_generic/src/bpf_loading.h"
 #include "bpf_generic/src/bpf_wrapper.h"
+#include "bpf_generic/src/errors.h"
 #include "bpf_generic/src/log.h"
 #include "bpf_events.h"
 
@@ -133,6 +134,12 @@ bool isIPv6MonitoringPossible(int status_fd, bpf::BPFMapsWrapper& mapsWrapper) {
 	return mapsWrapper.lookupElement(status_fd, &zero, &status) && status.offset_daddr_ipv6 != 0;
 }
 
+enum ReturnCodes {
+	Success,
+	InsufficientCapabilities,
+	GenericError
+};
+
 int main(int argc, char* argv[]) {
 	setUpExitBehavior();
 
@@ -141,14 +148,14 @@ int main(int argc, char* argv[]) {
 	const std::string nettracerVersionStr{fmt::format("{}.{}.{}", NETTRACER_VERSION_MAJOR, NETTRACER_VERSION_MINOR, NETTRACER_VERSION_PATCH)};
 	if (vm.count("version")) {
 		std::cout << "version: " << nettracerVersionStr << std::endl;
-		return 0;
+		return ReturnCodes::Success;
 	}
 
 	bool noStdoutLog{setUpLogging(vm)};
 	LOG_INFO("Starting NetTracer v{}", nettracerVersionStr);
 
 	if (!increaseMemoryLimit()) {
-		return 1;
+		return ReturnCodes::InsufficientCapabilities;
 	}
 
 	unsigned time_interval = vm["time_interval"].as<unsigned>();
@@ -163,43 +170,48 @@ int main(int argc, char* argv[]) {
 
 	try {
 		uint32_t nn_entries = vm["map_size"].as<uint32_t>();
-		ebpf.load_bpf_file(vm["program"].as<std::string>(), nn_entries);
-	} catch (std::exception& e) {
+		if (!ebpf.load_bpf_file(vm["program"].as<std::string>(), nn_entries)) {
+			return ReturnCodes::GenericError;
+		}
+	} catch (const InsufficientCapabilitiesError& e) {
 		LOG_ERROR(e.what());
-		return 1;
+		return ReturnCodes::InsufficientCapabilities;
+	} catch (const std::exception& e) {
+		LOG_ERROR(e.what());
+		return ReturnCodes::GenericError;
 	}
 	LOG_INFO("BPF program loaded");
 
 	if (!setUpBPFConfig(vm, ebpf, mapsWrapper)) {
-		return 1;
+		return ReturnCodes::InsufficientCapabilities;
 	}
 
 	int status_fd = ebpf.get_map_fd("nettracer_status");
 	if (status_fd < 0) {
 		LOG_ERROR("no fd for status map");
-		return 1;
+		return ReturnCodes::GenericError;
 	}
 
 	bpf_fds ipv4_fds{getIPv4Fds(ebpf)};
 	if (ipv4_fds.isInvalid()){
 		LOG_ERROR("invalid fds for ipv4 maps");
-		return 1;
+		return ReturnCodes::GenericError;
 	}
 
 	bpf_fds ipv6_fds{getIPv6Fds(ebpf)};
 	if (ipv6_fds.isInvalid()) {
 		LOG_ERROR("invalid fds for ipv6 maps");
-		return 1;
+		return ReturnCodes::GenericError;
 	}
 
 	if (vm.count("test")) {
 	    LOG_INFO("All checks passed, stopping NetTracer");
-	    return 0;
+	    return ReturnCodes::Success;
 	}
 
 	if (!doOffsetGuessing(status_fd)) {
 		LOG_ERROR("Offset guessing failed");
-		return 1;
+		return ReturnCodes::GenericError;
 	}
 
 	bool monitorIPv6 = isIPv6MonitoringPossible(status_fd, mapsWrapper);
@@ -270,5 +282,5 @@ int main(int argc, char* argv[]) {
     bevents.stop();
 	LOG_INFO("Events stopped");
 
-	return 0;
+	return ReturnCodes::Success;
 }

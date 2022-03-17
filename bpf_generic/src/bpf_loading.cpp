@@ -2,6 +2,7 @@
 
 #include "bpf_wrapper.h"
 #include "elf_utils.h"
+#include "errors.h"
 #include "kernel_version.h"
 #include "log.h"
 #include "maps_loading.h"
@@ -62,9 +63,14 @@ bool initialize_perf_maps(maps_config& pmaps, BPFMapsWrapper& mapsWrapper) {
 		for (int cpuC = 0; cpuC < pc; cpuC++) {
 			int pfd = perf_event_open_map(-1 /* pid */, cpuC /* cpu */, -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
 			if (pfd < 0) {
-				LOG_ERROR("perf_event_open for map error: {:d}", pfd);
-				all_success = false;
-				continue;
+				std::string msg{fmt::format("perf_event_open_map for pfd {:d} failed: {} ({:d})", pfd, strerror(errno), errno)};
+				if (errno == EACCES || errno == EPERM) {
+					throw InsufficientCapabilitiesError{msg};
+				} else {
+					LOG_ERROR(msg);
+					all_success = false;
+					continue;
+				}
 			}
 
 			int mmap_size = page_size * (pmap.page_count + 1);
@@ -183,7 +189,7 @@ void bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 	int insns_cnt = probe.size / sizeof(bpf_insn);
 	probe.fd = bpf::loadProgram(BPF_PROG_TYPE_KPROBE, probe.insn, insns_cnt, license, debug_print, kernVersion, sysCallBPF);
 	if (probe.fd < 0) {
-		throw std::runtime_error{fmt::format("loadProgram() failed for {} with err={:d} ({}), logs: {}", probe.fname, errno, strerror(errno), getLogBuffer())};
+		throw std::runtime_error{fmt::format("loadProgram() failed for {} with error: {:d} ({}), logs: {}", probe.fname, errno, strerror(errno), getLogBuffer())};
 	}
 
 	std::string name_prefix;
@@ -198,7 +204,7 @@ void bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 
 	probe.efd = install_kprobe_fs(name_prefix, std::string{name}, isKprobe, probe.fd);
 	if (probe.efd < 0) {
-		throw std::runtime_error{fmt::format("Cannot write probe {} {} {}", name, errno, strerror(errno))};
+		throw InsufficientCapabilitiesError{fmt::format("Cannot write probe {}: {:d} ({})", name, errno, strerror(errno))};
 	}
 
 	probes.push_back(probe);
@@ -270,7 +276,8 @@ ElfFileContent scanElfSections(Elf* elf, GElf_Ehdr* ehdr) {
 	return fileContent;
 }
 
-void processReloSections(Elf* elf, GElf_Ehdr* ehdr, std::vector<elf_section>& allSections, Elf_Data* symbols, maps_config& maps) {
+bool processReloSections(Elf* elf, GElf_Ehdr* ehdr, std::vector<elf_section>& allSections, Elf_Data* symbols, maps_config& maps) {
+	bool all_ok = true;
 	for (auto& sec : allSections) {
 		if (sec.processed)
 			continue;
@@ -287,9 +294,13 @@ void processReloSections(Elf* elf, GElf_Ehdr* ehdr, std::vector<elf_section>& al
 			bpf_insn* insns = (bpf_insn*)prog_scn.data->d_buf;
 			sec.processed = true;
 
-			readAndApplyRelocations(sec.data, symbols, &sec.shdr, insns, maps);
+			if (!readAndApplyRelocations(sec.data, symbols, &sec.shdr, insns, maps)) {
+				LOG_ERROR("Relocations for section {:d} failed", sec.indx);
+				all_ok = false;
+			}
 		}
 	}
+	return all_ok;
 }
 
 void bpf_subsystem::load_programs_from_sections(std::vector<elf_section>& allSections, const char* license, int kernVersion) {
@@ -316,38 +327,46 @@ void bpf_subsystem::set_maps_max_entries(uint32_t map_max_entries) {
 bpf_subsystem::bpf_subsystem(const ISystemCalls& sysCalls)
 	: sysCalls(sysCalls) {}
 
-void bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entries) {
+bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entries) {
 	if (elf_version(EV_CURRENT) == EV_NONE)
-		throw std::runtime_error{"cannot read elf version"};
+		throw std::runtime_error{"Cannot read elf version"};
 
 	LOG_DEBUG("Loading BPF program from {}", path);
 	file_fd bpf_file_fd{path};
 	Elf* elf = elf_begin(bpf_file_fd.fd, ELF_C_READ, nullptr);
 
 	if (!elf)
-		throw std::runtime_error{"cannot read elf"};
+		throw std::runtime_error{"Cannot read elf"};
 
 	GElf_Ehdr ehdr;
 	if (gelf_getehdr(elf, &ehdr) != &ehdr)
-		throw std::runtime_error{"cannot read elf header"};
+		throw std::runtime_error{"Cannot read elf header"};
 
 	ElfFileContent content{scanElfSections(elf, &ehdr)};
 	if (!content.isOk()) {
 		LOG_ERROR("Scanning Elf sections failed");
-		return;
+		return false;
 	}
 
 	maps = MapsSectionLoader{content.sections[content.mapsShndx], elf, content.symbols, content.strtabidx}.load();
 	BPFMapsWrapper mapsWrapper;
 	set_maps_max_entries(map_max_entries);
-	loadMaps(maps, mapsWrapper);
+	if (!loadMaps(maps, mapsWrapper)) {
+		LOG_ERROR("Cannot load BPF maps");
+		return false;
+	}
 
 	content.sections[content.mapsShndx].processed = true;
 
-	if (!initialize_perf_maps(maps, mapsWrapper))
+	if (!initialize_perf_maps(maps, mapsWrapper)) {
 		LOG_ERROR("Cannot initialize perf maps");
+		return false;
+	}
 
-	processReloSections(elf, &ehdr, content.sections, content.symbols, maps);
+	if (!processReloSections(elf, &ehdr, content.sections, content.symbols, maps)) {
+		LOG_ERROR("Processing relocations failed");
+		return false;
+	}
 
 	auto kernelVersion{getKernelVersion(sysCalls)};
 	if (!kernelVersion) {
@@ -355,9 +374,11 @@ void bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 	}
 	if (!isKernelSupported(*kernelVersion)) {
 		LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(*kernelVersion));
+		// don't return, see what happens
 	}
 
 	load_programs_from_sections(content.sections, content.license, *kernelVersion);
+	return true;
 }
 
 void bpf_subsystem::close_all_probes() {
