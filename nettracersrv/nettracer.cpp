@@ -49,12 +49,21 @@ void setUpExitBehavior() {
 
 po::variables_map parseOptions(int argc, char* argv[]) {
 	po::options_description desc{"Options"};
-	desc.add_options()("help,h", "Help screen")("clear_probes,c", "Clear all probes")("debug,d", "Debug logs")(
-			"no_stdout_log,n", "Log only to file")("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval")(
-			"log,l", po::value<std::string>()->default_value("./log"), "Logger path")("incremental,i", "Incremental data")(
-			"program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")("header,s", "Add header size")(
-			"test", "Check if NetTracer can start properly and exit")("version,v", "")("map_size,m",
-			po::value<uint32_t>()->default_value(4096), "Number of entries BPF maps");
+	// clang-format off
+	desc.add_options()
+			("clear_probes,c", "Clear all probes on start")
+			("debug,d", "Enable debug logs")
+			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
+			("log,l", po::value<std::string>()->default_value("./log"), "Logger path")
+			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
+			("incremental,i", "Enable incremental data")
+			("program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")
+			("header,s", "Add average header size to traffic")
+			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
+			("test", "Check if NetTracer can start properly, then exit")
+			("version,v", "Print version")
+			("help,h", "Print this help screen");
+	// clang-format on
 	po::variables_map vm;
 	try {
 		po::store(po::parse_command_line(argc, argv, desc), vm);
