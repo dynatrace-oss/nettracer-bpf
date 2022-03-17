@@ -2,12 +2,12 @@
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/errors.h"
 #include "bpf_generic/src/log.h"
-#include "bpf_events.h"
 
-#include "proc_tcp.h"
+#include "bpf_events.h"
 #include "connections_printing.h"
 #include "netstat.h"
 #include "offsetguess.h"
+#include "proc_tcp.h"
 #include "tuple_utils.h"
 #include "unified_log.h"
 
