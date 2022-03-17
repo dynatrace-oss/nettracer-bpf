@@ -35,7 +35,7 @@ struct map_data {
 
 using maps_config = std::vector<map_data>;
 
-void loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper);
+bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper);
 
 class MapsSectionLoader {
 public:

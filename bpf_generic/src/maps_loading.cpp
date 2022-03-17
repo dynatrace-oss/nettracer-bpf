@@ -1,6 +1,7 @@
 #include "maps_loading.h"
 
 #include "elf_utils.h"
+#include "errors.h"
 #include "log.h"
 
 #include <algorithm>
@@ -29,14 +30,21 @@ std::string to_string(bpf_map_type type) {
 
 }
 
-void loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper) {
+bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper) {
+	bool all_ok = true;
 	for (auto& map : maps) {
 		int numa_node = map.def.map_flags & BPF_F_NUMA_NODE ? map.def.numa_node : -1;
 
 		int fd = mapsWrapper.createNode(map.def.type, map.name, map.def.key_size, map.def.value_size, map.def.max_entries, map.def.map_flags, numa_node);
 		if (fd < 0) {
-			LOG_ERROR("Failed to create map {}: {}({:d})", map.name, strerror(errno), errno);
-			continue;
+			std::string msg{fmt::format("Failed to create map {}: {:d} ({})", map.name, errno, strerror(errno))};
+			if (errno == EPERM) {
+				throw InsufficientCapabilitiesError{msg};
+			} else {
+				LOG_ERROR(msg);
+				all_ok = false;
+				continue;
+			}
 		}
 		map.fd = fd;
 
@@ -47,6 +55,7 @@ void loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper) {
 			map.def.key_size,
 			map.def.value_size);
 	}
+	return all_ok;
 }
 
 maps_config MapsSectionLoader::load() {
