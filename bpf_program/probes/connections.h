@@ -234,7 +234,6 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 			LOG_DEBUG_BPF(ctx, "Missing tuplepid entry: {:d}:{:d} {:d}:{:d}", t.saddr, t.sport, t.daddr, t.dport);
 		} else {
 			pp->state = CONN_CLOSED;
-			bpf_map_update_elem(&tuplepid_ipv4, &t, pp, BPF_ANY);
 		}
 
 		struct tcp_ipv4_event_t evt = convert_ipv4_tuple_to_event(t, cpu, TCP_EVENT_TYPE_CLOSE, pid >> 32);
@@ -254,7 +253,6 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 				LOG_DEBUG_BPF(ctx, "Missing tuplepid entry: {:d}:{:d} {:d}:{:d}", t4.saddr, t4.sport, t4.daddr, t4.dport);
 			} else {
 				pp->state = CONN_CLOSED;
-				bpf_map_update_elem(&tuplepid_ipv4, &t4, pp, BPF_ANY);
 			}
 
 			struct tcp_ipv4_event_t evt4 = convert_ipv4_tuple_to_event(t4, cpu, TCP_EVENT_TYPE_CLOSE, pid >> 32);
@@ -267,7 +265,6 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 				LOG_DEBUG_BPF(ctx, "Missing tuplepid entry: {:d}{:d}:{:d} {:d}{:d}:{:d}", t.saddr_h, t.saddr_l, t.sport, t.daddr_h, t.daddr_l, t.dport);
 			} else {
 				pp->state = CONN_CLOSED;
-				bpf_map_update_elem(&tuplepid_ipv6, &t, pp, BPF_ANY);
 			}
 
 			struct tcp_ipv6_event_t evt = convert_ipv6_tuple_to_event(t, cpu, TCP_EVENT_TYPE_CLOSE, pid >> 32);

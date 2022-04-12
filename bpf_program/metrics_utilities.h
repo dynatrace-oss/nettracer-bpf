@@ -66,7 +66,6 @@ static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_stat
 		stats->rtt_var = rtt_var >> 2;
 	}
 
-	bpf_map_update_elem(map, tuple, stats, BPF_ANY);
 }
 
 __attribute__((always_inline))
