@@ -57,6 +57,8 @@ protected:
 	bool add_header_mode_ = false;
 	bpf::BPFMapsWrapper* mapsWrapper;
 	std::ostream* os;
+    int field_width  = 22;
+    bool interactive;
 
 	template<typename IPTYPE>
 	inline auto& connections(); // no default instantiation
@@ -73,9 +75,12 @@ protected:
 	template<typename IPTYPE, typename T, typename F>
 	void process_bpf_map(int fd, F func);
 
+	void printHeader();
 	template<typename IPTYPE>
 	void print();
-	void print_endl();
+	template<typename IPTYPE>
+	void printI();
+	void flush();
 	template <typename IPTYPE>
 	void clean();
 
@@ -86,7 +91,7 @@ protected:
 	virtual steady_clock::time_point getCurrentTimeFromSteadyClock() const;
 
 public:
-	explicit NetStat(ExitCtrl& e, bool deltaMode, bool headerMode);
+	explicit NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive);
 	virtual ~NetStat();
 
 	void init();

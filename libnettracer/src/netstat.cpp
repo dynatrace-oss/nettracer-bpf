@@ -2,6 +2,7 @@
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
 #include "proc_tcp.h"
+#include <sys/ioctl.h>
 #include <iomanip>
 #include <iostream>
 #include <poll.h>
@@ -26,7 +27,15 @@ constexpr uint64_t addAvgHeaderSize<ipv6_tuple_t>(uint64_t pkts, bool count) {
 	return count ? 77 * pkts : 0;
 }
 
-template<typename IPTYPE, typename T, typename F>
+static int getWindowWidth() {
+	winsize sz{};
+	if (ioctl(0, TIOCGWINSZ, &sz) < 0) {
+		LOG_DEBUG("cannot get window size");
+	}
+	return sz.ws_col;
+}
+
+template <typename IPTYPE, typename T, typename F>
 void NetStat::process_bpf_map(int fd, F func) {
 	IPTYPE previousKey{};
 	IPTYPE currentKey{};
@@ -79,6 +88,7 @@ void NetStat::update(const bpf_fds& fds) {
 void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 	unsigned counter = 0;
 	unsigned factor = exitCtrl.wait_time * INTERVAL_DIVIDER;
+	printHeader();
 	while (exitCtrl.running) {
 		update<ipv4_tuple_t>(fdsIPv4);
 		update<ipv6_tuple_t>(fdsIPv6);
@@ -86,9 +96,14 @@ void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 		clean_bpf<ipv6_tuple_t>(fdsIPv6);
 
 		if (kbhit || ((counter % factor) == 0)) {
-			print<ipv4_tuple_t>();
-			print<ipv6_tuple_t>();
-			print_endl();
+			if (interactive) {
+				printI<ipv4_tuple_t>();
+				printI<ipv6_tuple_t>();
+			} else {
+				print<ipv4_tuple_t>();
+				print<ipv6_tuple_t>();
+			}
+			flush();
 			clean<ipv4_tuple_t>();
 			clean<ipv6_tuple_t>();
 			counter = 0;
@@ -169,15 +184,27 @@ const unsigned PROTO_BIT_IPV4{0};
 const unsigned PROTO_BIT_IPV6{1};
 
 static std::ostream& operator<<(std::ostream& os, const ipv4_tuple_t& tup) {
-	os << ' ' << PROTO_BIT_IPV4 << ' ' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << tup.saddr << ' ' << std::setw(4) << tup.sport
-	   << ' ' << PROTO_BIT_IPV4 << ' ' << std::setw(8) << tup.daddr << ' ' << std::setw(4) << tup.dport << std::dec << ' ' << std::setfill(' ');
+	os << ' ' << PROTO_BIT_IPV4 << ' ' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << tup.saddr << ' '
+	   << std::setw(4) << tup.sport << ' ' << PROTO_BIT_IPV4 << ' ' << std::setw(8) << tup.daddr << ' ' << std::setw(4) << tup.dport
+	   << std::dec << ' ' << std::setfill(' ');
 	return os;
 }
 
 static std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup) {
-	os << ' ' << PROTO_BIT_IPV6 << ' ' << std::uppercase << std::hex << std::setfill('0') << std::setw(16) << tup.saddr_h << std::setw(16) << tup.saddr_l << ' ' << std::setw(4) << tup.sport
-	   << ' ' << PROTO_BIT_IPV6 << ' ' << std::setw(16) << tup.daddr_h << std::setw(16) << tup.daddr_l << ' ' <<  std::setw(4) << tup.dport << std::setfill(' ') << std::dec << ' ';
+	os << ' ' << PROTO_BIT_IPV6 << ' ' << std::uppercase << std::hex << std::setfill('0') << std::setw(16) << tup.saddr_h << std::setw(16)
+	   << tup.saddr_l << ' ' << std::setw(4) << tup.sport << ' ' << PROTO_BIT_IPV6 << ' ' << std::setw(16) << tup.daddr_h << std::setw(16)
+	   << tup.daddr_l << ' ' << std::setw(4) << tup.dport << std::setfill(' ') << std::dec << ' ';
 	return os;
+}
+
+static void printAddr(std::ostream& os, const ipv4_tuple_t& tup, int field_width) {
+	os << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.saddr), tup.sport)
+	   << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.daddr), tup.dport);
+}
+
+static void printAddr(std::ostream& os, const ipv6_tuple_t& tup, int field_width) {
+	os << std::setw(24) << ipv6_to_string(tup.saddr_h, tup.saddr_l) << ':' << tup.sport << ' ' << std::setw(24)
+	   << ipv6_to_string(tup.daddr_h, tup.daddr_l) << ':' << tup.dport;
 }
 
 static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
@@ -193,7 +220,7 @@ static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
 	return result;
 }
 
-void NetStat::print_endl() {
+void NetStat::flush() {
 	*os << " " << std::endl;
 }
 
@@ -208,7 +235,7 @@ void NetStat::print() {
 
 		*os << std::right
 			  << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
-			  << it->first
+              << it->first
 			  << std::setw(12) << it->second.pid
 			  << std::setw(12) << it->first.netns << it->second.state
 			  << std::setw(22) << subtract( it->second.bytes_sent, it->second.bytes_sent_prev, 0, incremental) + addAvgHeaderSize<IPTYPE>( pkts_sent, add_header_mode_)
@@ -227,6 +254,26 @@ void NetStat::print() {
 		}
 		*os << "\n";
 	}
+}
+
+void NetStat::printHeader() {
+	if (!interactive)
+		return;
+
+	*os << std::left << std::setw(field_width) << "local address" << std::setw(field_width) << "remote address" << std::setw(field_width) << "pid"
+		<< std::setw(field_width) << "bytes sent" << std::setw(field_width) << "bytes received " << std::setw(field_width) << "rtt" << std::endl;
+}
+
+template <typename IPTYPE>
+void NetStat::printI() {
+	std::unique_lock<std::mutex> l(mx);
+	auto& aggr{connections<IPTYPE>()};
+    for (auto it = aggr.begin(); it != aggr.end(); ++it) {
+		printAddr(*os, it->first, field_width);
+		*os << std::setw(field_width) << it->second.pid <<  std::setw(field_width) << it->second.bytes_sent
+			<< std::setw(field_width) << it->second.bytes_received << std::setw(field_width) << it->second.rtt << "\n";
+	}
+	*os << std::flush;
 }
 
 template<typename IPTYPE>
@@ -265,8 +312,16 @@ steady_clock::time_point NetStat::getCurrentTimeFromSteadyClock() const {
 	return steady_clock::now();
 }
 
-NetStat::NetStat(ExitCtrl& e, bool deltaMode, bool headerMode)
+NetStat::NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive)
 		: exitCtrl(e), incremental(deltaMode), add_header_mode_(headerMode), os(&std::cout) {
+            interactive = ((isatty(STDIN_FILENO) == 1) && !nonInteractive);
+			if (interactive) {
+				int window_width = getWindowWidth();
+				field_width = window_width / 6;
+				if (field_width < 22) {
+					field_width = 22;
+				}
+			}
 }
 
 NetStat::~NetStat() {

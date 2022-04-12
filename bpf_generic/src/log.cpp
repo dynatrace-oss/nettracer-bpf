@@ -11,7 +11,7 @@ namespace logging {
 constexpr std::size_t max_size = 10 * 1024 * 1024;
 constexpr std::size_t max_files = 3;
 
-void setUpLogger(const std::string& logDir, bool logToStdout, bool logToFile) {
+void setUpLogger(const std::string& logDir, bool logToStdout) {
 	namespace fs = std::filesystem;
 
 	std::vector<spdlog::sink_ptr> sinks;
@@ -19,7 +19,7 @@ void setUpLogger(const std::string& logDir, bool logToStdout, bool logToFile) {
 		sinks.emplace_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 	}
 
-	if (logToFile && !logDir.empty()) {
+	if (!logDir.empty()) {
 		fs::path logPath;
 		if (!fs::is_directory(logDir)) {
 			spdlog::warn("{} doesn't exist or is not a directory.", logDir);
