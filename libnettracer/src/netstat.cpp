@@ -5,6 +5,8 @@
 #include <iomanip>
 #include <iostream>
 #include <poll.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 namespace netstat {
 
@@ -275,6 +277,14 @@ NetStat::~NetStat() {
 	}
 }
 
+static void checkExitCondition(){
+	pid_t ppid = getppid();
+	if( ppid == 1){
+		LOG_INFO("orphaned");
+		exit(-1);
+	}
+}
+
 // kbhit should enforce refersh data display
 void NetStat::kbhit_check() {
 	char tmp[128];
@@ -290,6 +300,7 @@ void NetStat::kbhit_check() {
 			continue;
 		}
 
+		checkExitCondition();
 		std::cin.read(tmp, std::min(128, res));
 		std::unique_lock<std::mutex> ul(exitCtrl.m);
 		kbhit = true;
