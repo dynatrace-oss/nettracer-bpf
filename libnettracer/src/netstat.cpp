@@ -345,7 +345,9 @@ void NetStat::kbhit_check() {
 			continue;
 		}
 
-		std::cin.read(tmp, std::min(128, res));
+		if (!std::cin.read(tmp, std::min(128, res))) {
+			exit(1);
+		}
 		std::unique_lock<std::mutex> ul(exitCtrl.m);
 		kbhit = true;
 		ul.unlock();
