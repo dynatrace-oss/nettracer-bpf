@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <poll.h>
+#include <unistd.h>
 
 namespace netstat {
 
