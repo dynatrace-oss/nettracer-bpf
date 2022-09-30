@@ -12,6 +12,7 @@ namespace netstat {
 
 constexpr auto INACTIVE_TIMEOUT = minutes(1);
 constexpr unsigned INTERVAL_DIVIDER = 10;
+constexpr int MIN_FIELD_WIDTH = 22;
 
 template <class IPTYPE>
 constexpr uint64_t addAvgHeaderSize(uint64_t pkts, bool count) {
@@ -98,8 +99,8 @@ void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 
 		if (kbhit || ((counter % factor) == 0)) {
 			if (interactive) {
-				printI<ipv4_tuple_t>();
-				printI<ipv6_tuple_t>();
+				print_human_readable<ipv4_tuple_t>();
+				print_human_readable<ipv6_tuple_t>();
 			} else {
 				print<ipv4_tuple_t>();
 				print<ipv6_tuple_t>();
@@ -204,8 +205,8 @@ static void printAddr(std::ostream& os, const ipv4_tuple_t& tup, int field_width
 }
 
 static void printAddr(std::ostream& os, const ipv6_tuple_t& tup, int field_width) {
-	os << std::setw(24) << ipv6_to_string(tup.saddr_h, tup.saddr_l) << ':' << tup.sport << ' ' << std::setw(24)
-	   << ipv6_to_string(tup.daddr_h, tup.daddr_l) << ':' << tup.dport;
+	os << std::setw(field_width) << fmt::format("{}:{}", ipv6_to_string(tup.saddr_h, tup.saddr_l), tup.sport)
+	   << std::setw(field_width) << fmt::format("{}:{}", ipv6_to_string(tup.daddr_h, tup.daddr_l), tup.dport);
 }
 
 static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
@@ -236,7 +237,7 @@ void NetStat::print() {
 
 		*os << std::right
 			  << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
-              << it->first
+			  << it->first
 			  << std::setw(12) << it->second.pid
 			  << std::setw(12) << it->first.netns << it->second.state
 			  << std::setw(22) << subtract( it->second.bytes_sent, it->second.bytes_sent_prev, 0, incremental) + addAvgHeaderSize<IPTYPE>( pkts_sent, add_header_mode_)
@@ -261,20 +262,20 @@ void NetStat::printHeader() {
 	if (!interactive)
 		return;
 
-	*os << std::left << std::setw(field_width) << "local address" << std::setw(field_width) << "remote address" << std::setw(field_width) << "pid"
-		<< std::setw(field_width) << "bytes sent" << std::setw(field_width) << "bytes received " << std::setw(field_width) << "rtt" << std::endl;
+	*os << std::left << std::setw(field_width) << "local address" << std::setw(field_width) << "remote address"
+		<< std::setw(field_width) << "pid" << std::setw(field_width) << "bytes sent" << std::setw(field_width)
+		<< "bytes received " << std::setw(field_width) << "rtt" << "\n";
 }
 
 template <typename IPTYPE>
-void NetStat::printI() {
+void NetStat::print_human_readable() {
 	std::unique_lock<std::mutex> l(mx);
 	auto& aggr{connections<IPTYPE>()};
-    for (auto it = aggr.begin(); it != aggr.end(); ++it) {
-		printAddr(*os, it->first, field_width);
-		*os << std::setw(field_width) << it->second.pid <<  std::setw(field_width) << it->second.bytes_sent
-			<< std::setw(field_width) << it->second.bytes_received << std::setw(field_width) << it->second.rtt << "\n";
+	for (const auto& it : aggr) {
+		printAddr(*os, it.first, field_width);
+		*os << std::setw(field_width) << it.second.pid <<  std::setw(field_width) << it.second.bytes_sent
+			<< std::setw(field_width) << it.second.bytes_received << std::setw(field_width) << it.second.rtt << "\n";
 	}
-	*os << std::flush;
 }
 
 template<typename IPTYPE>
@@ -315,14 +316,14 @@ steady_clock::time_point NetStat::getCurrentTimeFromSteadyClock() const {
 
 NetStat::NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive)
 		: exitCtrl(e), incremental(deltaMode), add_header_mode_(headerMode), os(&std::cout) {
-            interactive = ((isatty(STDIN_FILENO) == 1) && !nonInteractive);
-			if (interactive) {
-				int window_width = getWindowWidth();
-				field_width = window_width / 6;
-				if (field_width < 22) {
-					field_width = 22;
-				}
-			}
+	interactive = ((isatty(STDIN_FILENO) == 1) && !nonInteractive);
+	if (interactive) {
+		int window_width = getWindowWidth();
+		field_width = window_width / 6;
+		if (field_width < MIN_FIELD_WIDTH) {
+			field_width = MIN_FIELD_WIDTH;
+		}
+	}
 }
 
 NetStat::~NetStat() {

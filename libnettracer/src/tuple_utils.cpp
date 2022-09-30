@@ -12,14 +12,13 @@ constexpr std::array<const char*, 3> directionSigns = {"--", "<-", "->"};
 }
 
 std::string ipv6_to_string(uint64_t h, uint64_t l) {
-    uint64_t addr[] = {h, l};
+	uint64_t addr[] = {h, l};
 	char buff[48];
-    return std::string(inet_ntop(AF_INET6, &addr, buff, sizeof(buff)));
+	return std::string(inet_ntop(AF_INET6, &addr, buff, sizeof(buff)));
 }
 
-
 std::string ipv4_to_string(uint32_t ip) {
-    char buff[16];
+	char buff[16];
 	return std::string(inet_ntop(AF_INET, &ip, buff, sizeof(buff)));
 }
 

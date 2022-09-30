@@ -57,10 +57,10 @@ protected:
 	bool add_header_mode_ = false;
 	bpf::BPFMapsWrapper* mapsWrapper;
 	std::ostream* os;
-    int field_width  = 22;
-    bool interactive;
+	int field_width;
+	bool interactive;
 
-	template<typename IPTYPE>
+	template <typename IPTYPE>
 	inline auto& connections(); // no default instantiation
 
 	void kbhit_check();
@@ -79,12 +79,12 @@ protected:
 	template<typename IPTYPE>
 	void print();
 	template<typename IPTYPE>
-	void printI();
+	void print_human_readable();
 	void flush();
 	template <typename IPTYPE>
 	void clean();
 
-	template <typename IPTYPE>
+	template<typename IPTYPE>
 	void clean_bpf(const bpf_fds& fds);
 
 	virtual system_clock::time_point getCurrentTimeFromSystemClock() const;
