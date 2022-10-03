@@ -13,7 +13,7 @@ inline std::shared_ptr<spdlog::logger> getLogger() {
 	return spdlog::get(LOGGER_NAME);
 }
 
-void setUpLogger(const std::string& logDir, bool logToStdout, bool logToFile);
+void setUpLogger(const std::string& logDir, bool logToStdout);
 
 } // namespace logging
 

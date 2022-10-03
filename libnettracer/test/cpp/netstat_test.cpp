@@ -13,7 +13,7 @@ using testing::Return;
 class TestNetStat : public NetStat {
 public:
 	explicit TestNetStat(ExitCtrl& e, bool inc, bpf::BPFMapsWrapper* mapsWrapper, std::ostream* os)
-		: NetStat(e, inc, false) {
+		: NetStat(e, inc, false, false) {
 		this->mapsWrapper = mapsWrapper;
 		this->os = os;
 	}

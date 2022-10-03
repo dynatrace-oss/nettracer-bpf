@@ -80,6 +80,7 @@ std::ostream& operator<<(std::ostream& os, const tcp_ipv4_event_t& evt);
 
 // format ipv6 address - h and l are 64 bit and in network byte order
 std::string ipv6_to_string(uint64_t h, uint64_t l);
+std::string ipv4_to_string(uint32_t addr);
 
 std::string to_string(const std::pair<ipv4_tuple_t, ConnectionDirection>& tupleWithDirection);
 std::string to_string(const std::pair<ipv6_tuple_t, ConnectionDirection>& tupleWithDirection);
