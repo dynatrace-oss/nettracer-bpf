@@ -303,7 +303,6 @@ void NetStat::init() {
 	static bpf::BPFMapsWrapper wrapper;
 	mapsWrapper = &wrapper;
 
-	kbhit_t = std::thread(&NetStat::kbhit_check, this);
 }
 
 system_clock::time_point NetStat::getCurrentTimeFromSystemClock() const {
@@ -327,34 +326,13 @@ NetStat::NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteracti
 }
 
 NetStat::~NetStat() {
-	if (kbhit_t.joinable()) {
-		kbhit_t.join();
-	}
 }
 
-// kbhit should enforce refersh data display
-void NetStat::kbhit_check() {
-	char tmp[128];
-	std::vector<pollfd> pfd(1);
-	while (exitCtrl.running) {
-		pfd[0].fd = 0;
-		pfd[0].events = POLLIN;
-
-		int res = poll(pfd.data(), pfd.size(), 200);
-		if (res < 0) {
-			break;
-		} else if (res == 0) {
-			continue;
-		}
-
-		if (!std::cin.read(tmp, std::min(128, res))) {
-			exit(1);
-		}
-		std::unique_lock<std::mutex> ul(exitCtrl.m);
-		kbhit = true;
-		ul.unlock();
-		exitCtrl.cv.notify_all();
-	}
+void NetStat::set_kbhit() {
+	std::unique_lock<std::mutex> ul(exitCtrl.m);
+	kbhit = true;
+	ul.unlock();
+	exitCtrl.cv.notify_all();
 }
 
 } // namespace netstat

@@ -50,7 +50,6 @@ protected:
 	ConnectionsIPv6 aggr6_;
 	std::mutex mx;
 	bool kbhit;
-	std::thread kbhit_t;
 	const int max_map_size = 1024;
 	ExitCtrl& exitCtrl;
 	bool incremental;
@@ -62,8 +61,6 @@ protected:
 
 	template <typename IPTYPE>
 	inline auto& connections(); // no default instantiation
-
-	void kbhit_check();
 
 	template<typename IPTYPE>
 	void initConnection(const tcpTable<IPTYPE>&);
@@ -93,7 +90,7 @@ protected:
 public:
 	explicit NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive);
 	virtual ~NetStat();
-
+	void set_kbhit();
 	void init();
 
 	void map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6);
