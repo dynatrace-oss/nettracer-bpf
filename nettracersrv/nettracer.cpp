@@ -219,6 +219,7 @@ int main(int argc, char* argv[]) {
 	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"));
 	netst.init();
     bpf_events bevents;
+    bevents.set_kbhit_observer( std::bind(&netstat::NetStat::set_kbhit, &netst));
     
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
@@ -258,22 +259,22 @@ int main(int argc, char* argv[]) {
 	auto log_pmap = ebpf.get_perf_map("bpf_logs");
 	if (!log_pmap.pfd.empty() && !noStdoutLog) {
 		LOG_INFO("Starting BPF log events");
-		bevents.add_observer({ log_pmap,bpf_log_event_update});
+		bevents.add_observer<bpf_log_event_t>(log_pmap, bpf_log_event_update);
 	}
 
-    auto ipv4_pmap = ebpf.get_perf_map("tcp_event_ipv4");
+	auto ipv4_pmap = ebpf.get_perf_map("tcp_event_ipv4");
 	if (!ipv4_pmap.pfd.empty()) {
 		LOG_INFO("Starting TCP IPv4 events");
-		bevents.add_observer({ipv4_pmap, ipv4_event_update});
+		bevents.add_observer<tcp_ipv4_event_t>(ipv4_pmap, ipv4_event_update);
 	}
 
 	auto ipv6_pmap = ebpf.get_perf_map("tcp_event_ipv6");
 	if (!ipv6_pmap.pfd.empty() && monitorIPv6) {
 		LOG_INFO("Starting TCP IPv6 events");
-		bevents.add_observer({ipv6_pmap, ipv6_event_update});
+		bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
 	}
 
-    bevents.start();
+	bevents.start();
 	auto map_reader = std::thread{map_reading};
 
 	if (map_reader.joinable()) {
