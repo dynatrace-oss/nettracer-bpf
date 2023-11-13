@@ -8,16 +8,7 @@
 
 __attribute__((always_inline))
 static void update_stats(void *tuple, enum protocol proto, uint64_t sent, uint64_t received) {
-	void *map = NULL;
-	if (proto == IPV4) {
-		map = &stats_ipv4;
-	}
-	else if (proto == IPV6) {
-		map = &stats_ipv6;
-	}
-	else {
-		return;
-	}
+	void *map = (proto == IPV4) ? &stats_ipv4 : &stats_ipv6;
 
 	struct stats_t empty = { 0 };
 	bpf_map_update_elem(map, tuple, &empty, BPF_NOEXIST);
@@ -37,17 +28,7 @@ static void update_stats(void *tuple, enum protocol proto, uint64_t sent, uint64
 
 __attribute__((always_inline))
 static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_status_t *status, struct sock *sk) {
-	void *map = NULL;
-	if (proto == IPV4) {
-		map = &tcp_stats_ipv4;
-	}
-	else if (proto == IPV6) {
-		map = &tcp_stats_ipv6;
-	}
-	else {
-		return;
-	}
-
+	void *map = (proto == IPV4) ? &tcp_stats_ipv4 : &tcp_stats_ipv6;
 	struct tcp_stats_t empty = { 0 };
 	bpf_map_update_elem(map, tuple, &empty, BPF_NOEXIST);
 	struct tcp_stats_t* stats = bpf_map_lookup_elem(map, tuple);
@@ -70,18 +51,9 @@ static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_stat
 
 __attribute__((always_inline))
 static void maybe_fix_missing_connection_tuple(enum protocol proto, void* tuple) {
-	void *map = NULL;
-	if (proto == IPV4) {
-		map = &tuplepid_ipv4;
-	}
-	else if (proto == IPV6) {
-		map = &tuplepid_ipv6;
-	}
-	else {
-		return;
-	}
-
+	void *map = (proto == IPV4) ? &tuplepid_ipv4 : &tuplepid_ipv6;
 	uint64_t pid = bpf_get_current_pid_tgid();
+
 	if ((pid >> 32) <= 10) { // probe activated with insufficient context
 		return;
 	}

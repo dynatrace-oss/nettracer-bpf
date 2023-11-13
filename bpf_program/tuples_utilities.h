@@ -91,7 +91,7 @@ static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct guess_status_t *st
 
 	tuple->saddr = saddr;
 	tuple->daddr = daddr;
-	tuple->sport = sport; // TODO pjuszczyk Check if sport doesn't need to be flipped in some cases
+	tuple->sport = sport;
 	tuple->dport = ntohs(dport);
 	tuple->netns = net_ns_inum;
 
