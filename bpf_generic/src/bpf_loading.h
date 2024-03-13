@@ -25,7 +25,7 @@ class bpf_subsystem {
 	bool debug_print = true;
 	const ISystemCalls& sysCalls;
 
-	void load_and_attach(kprobe& prgrm, const char* license, int kernVersion);
+	bool load_and_attach(kprobe& prgrm, const char* license, int kernVersion);
 	void load_programs_from_sections(std::vector<elf_section>& allSections, const char* license, int kernVersion);
 	int install_kprobe_fs(const std::string& prefix, const std::string& name, bool is_kprobe, int fd);
 	int uninstall_kprobe_fs(const std::string& cmd);

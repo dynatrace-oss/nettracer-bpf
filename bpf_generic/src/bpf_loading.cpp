@@ -174,10 +174,11 @@ int bpf_subsystem::install_kprobe_fs(const std::string& prefix, const std::strin
 	return ret;
 }
 
-void bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kernVersion) {
+bool bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kernVersion) {
 	auto nameSepPos{probe.fname.find("/")};
 	if (nameSepPos == std::string::npos) {
-		throw std::runtime_error{"Invalid event name: " + probe.fname};
+		LOG_ERROR("Invalid event name: " + probe.fname);
+		return false;
 	}
 	std::string_view type{probe.fname.c_str(), nameSepPos};
 	std::string_view name{probe.fname.c_str() + nameSepPos + 1};
@@ -186,13 +187,15 @@ void bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 	bool isKretprobe{type == "kretprobe"};
 
 	if (!isKprobe && !isKretprobe) {
-		throw std::runtime_error{"Unknown event " + probe.fname};
+		LOG_ERROR("Unknown event " + probe.fname);
+		return false;
 	}
 
 	int insns_cnt = probe.size / sizeof(bpf_insn);
 	probe.fd = bpf::loadProgram(BPF_PROG_TYPE_KPROBE, probe.insn, insns_cnt, license, debug_print, kernVersion, sysCallBPF);
 	if (probe.fd < 0) {
-		throw std::runtime_error{fmt::format("loadProgram() failed for {} with error: {:d} ({}), logs: {}", probe.fname, errno, strerror(errno), getLogBuffer())};
+		LOG_ERROR(fmt::format("loadProgram() failed for {} with error: {:d} ({}), logs: {}", probe.fname, errno, strerror(errno), getLogBuffer()));
+		return false;
 	}
 
 	std::string name_prefix;
@@ -202,15 +205,18 @@ void bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 	name_prefix += KPROBE_NAME_PREFIX;
 
 	if (name.empty()) {
-		throw std::runtime_error{"Event name cannot be empty"};
+		LOG_ERROR("Event name cannot be empty");
+		return false;
 	}
 
 	probe.efd = install_kprobe_fs(name_prefix, std::string{name}, isKprobe, probe.fd);
 	if (probe.efd < 0) {
-		throw InsufficientCapabilitiesError{fmt::format("Cannot write probe {}: {:d} ({})", name, errno, strerror(errno))};
+		LOG_ERROR({fmt::format("Cannot write probe {}: {:d} ({})", name, errno, strerror(errno))});
+		return false;
 	}
 
 	probes.push_back(probe);
+	return true;
 }
 
 struct ElfFileContent {
@@ -307,15 +313,20 @@ bool processReloSections(Elf* elf, GElf_Ehdr* ehdr, std::vector<elf_section>& al
 }
 
 void bpf_subsystem::load_programs_from_sections(std::vector<elf_section>& allSections, const char* license, int kernVersion) {
+	bool allFailed = true;
 	for (auto& sec : allSections) {
 		if (sec.processed)
 			continue;
 
 		if (sec.shname.compare(0, 7, "kprobe/") == 0 || sec.shname.compare(0, 10, "kretprobe/") == 0) {
 			kprobe probe{.fname = sec.shname, .insn = (bpf_insn*)sec.data->d_buf, .size = sec.data->d_size, .fd = -1, .efd = -1};
-			load_and_attach(probe, license, kernVersion);
+			allFailed &= !load_and_attach(probe, license, kernVersion);
 			sec.processed = true;
 		}
+	}
+
+	if(allFailed){
+		throw InsufficientCapabilitiesError{"Failed to load all probes"};
 	}
 }
 
