@@ -59,6 +59,7 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
 			("incremental,i", "Enable incremental data")
 			("noninteractive,r", "Hex output")
+			("with_loopback,f", "With loopback")
 			("program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")
 			("header,s", "Add average header size to traffic")
 			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
@@ -216,7 +217,7 @@ int main(int argc, char* argv[]) {
 
 	bool monitorIPv6 = isIPv6MonitoringPossible(status_fd, mapsWrapper);
 
-	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"));
+	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"), vm.count("with_loopback") == 0);
 	netst.init();
     bpf_events bevents;
     bevents.set_kbhit_observer( std::bind(&netstat::NetStat::set_kbhit, &netst));

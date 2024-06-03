@@ -85,6 +85,8 @@ std::string ipv4_to_string(uint32_t addr);
 std::string to_string(const std::pair<ipv4_tuple_t, ConnectionDirection>& tupleWithDirection);
 std::string to_string(const std::pair<ipv6_tuple_t, ConnectionDirection>& tupleWithDirection);
 
+uint64_t swap_uint32_t(uint64_t addrpart);
+
 inline std::string to_string(const ipv4_tuple_t& tuple) {
 	return to_string(std::make_pair(tuple, ConnectionDirection::Unknown));
 }

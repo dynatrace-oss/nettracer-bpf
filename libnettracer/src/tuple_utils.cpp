@@ -106,3 +106,9 @@ ipv6_tuple_t eventToTuple(const tcp_ipv6_event_t& evt) {
 	tup.netns = evt.netns;
 	return tup;
 }
+
+uint64_t swap_uint32_t(uint64_t addrpart) {
+	uint64_t hpart = static_cast<uint32_t>(addrpart >> 32);
+	uint64_t lpart = static_cast<uint32_t>(addrpart);
+	return uint64_t{(hpart) | (lpart << 32)};
+}
