@@ -1,9 +1,9 @@
 [requires]
 fmt/8.0.1
 spdlog/1.9.2
-boost/1.70.0
+boost/1.85.0
 elfutils/0.180
-gtest/1.11.0
+gtest/1.13.0
 
 [generators]
 cmake
@@ -20,12 +20,8 @@ boost:without_fiber=True
 boost:without_type_erasure=True
 boost:without_stacktrace=True
 boost:without_chrono=True
-boost:without_system=True
 boost:without_date_time=True
-boost:without_atomic=True
-boost:without_container=True
 boost:without_coroutine=True
-boost:without_filesystem=True
 boost:without_log=True
 boost:without_math=True
 boost:without_random=True

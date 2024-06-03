@@ -106,40 +106,36 @@ std::optional<std::pair<ipv6_tuple_t, ConnectionDetails>> parseProcIPv6Connectio
     iss >> hex >> remoteAddress[0] >> remoteAddress[1];
 
     if (state == TCP_ESTABLISHED) {
-        ipv6_tuple_t conn{
-            localAddress[0],
-            localAddress[1],
-            remoteAddress[0],
-            remoteAddress[1],
-            localPort,
-            remotePort,
-            0
-        };
-        ConnectionDetails details{
+		ipv6_tuple_t conn{
+				swap_uint32_t(localAddress[0]),
+				swap_uint32_t(localAddress[1]),
+				swap_uint32_t(remoteAddress[0]),
+				swap_uint32_t(remoteAddress[1]),
+				localPort,
+				remotePort,
+				0};
+		ConnectionDetails details{
             0,
             ConnectionDirection::Outgoing
         };
         return {std::make_pair(conn, details)};
-    }
-    else if (state == TCP_LISTEN) {
-        ipv6_tuple_t conn{
-            remoteAddress[0],
-            remoteAddress[1],
-            localAddress[0],
-            localAddress[1],
-            remotePort,
-            localPort,
-            0
-        };
-        ConnectionDetails details{
+	} else if (state == TCP_LISTEN) {
+		ipv6_tuple_t conn{
+				swap_uint32_t(remoteAddress[0]),
+				swap_uint32_t(remoteAddress[1]),
+				swap_uint32_t(localAddress[0]),
+				swap_uint32_t(localAddress[1]),
+				remotePort,
+				localPort,
+				0};
+		ConnectionDetails details{
             0,
             ConnectionDirection::Incoming
         };
         return {std::make_pair(conn, details)};
-    }
-    else { // connection is probably closing
-        return std::nullopt;
-    }
+	} else { // connection is probably closing
+		return std::nullopt;
+	}
 }
 
 namespace {
@@ -273,10 +269,10 @@ std::pair<iNode, Connection<ipv6_tuple_t>> parseLine(const std::string& line, ui
 	localIp2[16] = 0;
 	remoteIp2[16] = 0;
 	remoteIp2[16] = 0;
-	localAddress[0] = std::strtoull(localIp1, nullptr, 16);
-	localAddress[1] = std::strtoull(localIp2, nullptr, 16);
-	remoteAddress[0] = std::strtoull(remoteIp1, nullptr, 16);
-	remoteAddress[1] = std::strtoull(remoteIp2, nullptr, 16);
+	localAddress[0] = swap_uint32_t(std::strtoull(localIp1, nullptr, 16));
+	localAddress[1] = swap_uint32_t(std::strtoull(localIp2, nullptr, 16));
+	remoteAddress[0] = swap_uint32_t(std::strtoull(remoteIp1, nullptr, 16));
+	remoteAddress[1] = swap_uint32_t(std::strtoull(remoteIp2, nullptr, 16));
 
 	Connection<ipv6_tuple_t> conn;
 	conn.ep = ipv6_tuple_t{localAddress[0], localAddress[1], remoteAddress[0], remoteAddress[1], localPort, remotePort, ns};

@@ -2,10 +2,10 @@
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
 #include "proc_tcp.h"
-#include <sys/ioctl.h>
 #include <iomanip>
 #include <iostream>
 #include <poll.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 namespace netstat {
@@ -91,9 +91,11 @@ void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 	unsigned counter = 0;
 	unsigned factor = exitCtrl.wait_time * INTERVAL_DIVIDER;
 	printHeader();
+
 	while (exitCtrl.running) {
 		update<ipv4_tuple_t>(fdsIPv4);
 		update<ipv6_tuple_t>(fdsIPv6);
+
 		clean_bpf<ipv4_tuple_t>(fdsIPv4);
 		clean_bpf<ipv6_tuple_t>(fdsIPv6);
 
@@ -226,16 +228,50 @@ void NetStat::flush() {
 	*os << " " << std::endl;
 }
 
+static bool shouldFilter(const uint32_t key) {
+	constexpr uint32_t loopback = 0x0000007f;
+	return ((key & loopback) == loopback);
+}
+
+static bool shouldFilter(const ipv4_tuple_t key) {
+	return shouldFilter(key.saddr);
+}
+
+static bool isIpv4MappedIpv6(uint64_t addr_l) {
+	uint64_t mask = 0x00000000ff00;
+	return (addr_l && mask) == mask;
+}
+
+static bool shouldFilter(const ipv6_tuple_t key) {
+	if (key.saddr_h != 0) {
+		return false;
+	}
+	if (isIpv4MappedIpv6(key.saddr_l)) {
+		uint32_t ipv4 = static_cast<uint32_t>(key.saddr_l);
+		return shouldFilter(ipv4);
+	}
+	constexpr uint64_t loopback = 0xffffffff00000000;
+	return ((key.saddr_l & loopback) == key.saddr_l);
+}
+
 template<typename IPTYPE>
 void NetStat::print() {
 	std::unique_lock<std::mutex> l(mx);
 	auto& aggr{connections<IPTYPE>()};
+	std::stringstream buf;
+
 	for (auto it = aggr.begin(); it != aggr.end(); ++it) {
+
+		if (filter_loopback && shouldFilter(it->first)) {
+			continue;
+		}
+
+		buf.str("");
 		auto wall_now = getCurrentTimeFromSystemClock();
 		uint64_t pkts_sent = subtract(it->second.pkts_sent, it->second.pkts_sent_prev, 2, incremental);
 		uint64_t pkts_received = subtract(it->second.pkts_received, it->second.pkts_received_prev, 3, incremental);
 
-		*os << std::right
+		buf << std::right
 			  << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
 			  << it->first
 			  << std::setw(12) << it->second.pid
@@ -251,10 +287,11 @@ void NetStat::print() {
 		if (it->second.state.Established) {
 			auto end = (it->second.end != system_clock::time_point{}) ? it->second.end : getCurrentTimeFromSystemClock();
 			auto duration = duration_cast<seconds>(end - it->second.start);
-			*os << std::setw(16) << duration_cast<seconds>(it->second.start.time_since_epoch()).count() << std::setw(9)
+			buf << std::setw(16) << duration_cast<seconds>(it->second.start.time_since_epoch()).count() << std::setw(9)
 					  << duration.count();
 		}
-		*os << "\n";
+		*os << buf.str() << std::endl;
+		LOG_DEBUG(buf.str());
 	}
 }
 
@@ -272,6 +309,11 @@ void NetStat::print_human_readable() {
 	std::unique_lock<std::mutex> l(mx);
 	auto& aggr{connections<IPTYPE>()};
 	for (const auto& it : aggr) {
+
+		if (filter_loopback && shouldFilter(it.first)) {
+			continue;
+		}
+
 		printAddr(*os, it.first, field_width);
 		*os << std::setw(field_width) << it.second.pid <<  std::setw(field_width) << it.second.bytes_sent
 			<< std::setw(field_width) << it.second.bytes_received << std::setw(field_width) << it.second.rtt << "\n";
@@ -313,8 +355,8 @@ steady_clock::time_point NetStat::getCurrentTimeFromSteadyClock() const {
 	return steady_clock::now();
 }
 
-NetStat::NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive)
-		: exitCtrl(e), incremental(deltaMode), add_header_mode_(headerMode), os(&std::cout) {
+NetStat::NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback)
+		: exitCtrl(e), incremental(deltaMode), add_header_mode_(headerMode), os(&std::cout), filter_loopback(filterLoopback) {
 	interactive = ((isatty(STDIN_FILENO) == 1) && !nonInteractive);
 	if (interactive) {
 		int window_width = getWindowWidth();

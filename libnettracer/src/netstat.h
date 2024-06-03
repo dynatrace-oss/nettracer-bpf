@@ -58,6 +58,7 @@ protected:
 	std::ostream* os;
 	int field_width;
 	bool interactive;
+	bool filter_loopback;
 
 	template <typename IPTYPE>
 	inline auto& connections(); // no default instantiation
@@ -88,7 +89,7 @@ protected:
 	virtual steady_clock::time_point getCurrentTimeFromSteadyClock() const;
 
 public:
-	explicit NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive);
+	explicit NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
 	virtual ~NetStat();
 	void set_kbhit();
 	void init();
