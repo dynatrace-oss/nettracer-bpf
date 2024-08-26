@@ -226,6 +226,7 @@ static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
 
 void NetStat::flush() {
 	*os << " " << std::endl;
+	logging::getLogger()->flush();
 }
 
 static bool shouldFilter(const uint32_t key) {
