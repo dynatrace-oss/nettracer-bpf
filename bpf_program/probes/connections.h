@@ -118,17 +118,6 @@ int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
 
 	struct pid_comm_t p = {.pid = pid, .state = CONN_ACTIVE };
 	uint32_t cpu = bpf_get_smp_processor_id();
-	if (is_ipv4_mapped_ipv6_tuple(t)) {
-		struct ipv4_tuple_t t4 = convert_ipv4_mapped_ipv6_tuple_to_ipv4(t);
-
-		if (bpf_map_update_elem(&tuplepid_ipv4, &t4, &p, BPF_ANY) < 0) {
-			LOG_DEBUG_BPF(ctx, "Connect missed, reached max conns?: {:d}:{:d} {:d}:{:d} {:d}", t4.saddr, t4.sport, t4.daddr, t4.dport, pid >> 32);
-		}
-
-		struct tcp_ipv4_event_t evt4 = convert_ipv4_tuple_to_event(t4, cpu, TCP_EVENT_TYPE_CONNECT, pid >> 32);
-		bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt4, sizeof(evt4));
-		return 0;
-	}
 
 	if (bpf_map_update_elem(&tuplepid_ipv6, &t, &p, BPF_ANY) < 0) {
 		LOG_DEBUG_BPF(ctx, "Connect v6 missed, reached max conns?: {:d}{:d}:{:d} {:d}{:d}:{:d} {:d}", t.saddr_h, t.saddr_l, t.sport, t.daddr_h, t.daddr_l, t.dport, pid >> 32);
@@ -178,20 +167,6 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 			return 0;
 		}
 
-		if (is_ipv4_mapped_ipv6_tuple(t)) {
-			struct ipv4_tuple_t t4 = convert_ipv4_mapped_ipv6_tuple_to_ipv4(t);
-			struct tcp_ipv4_event_t evt4 = convert_ipv4_tuple_to_event(t4, cpu, TCP_EVENT_TYPE_ACCEPT, pid >> 32);
-
-			// do not send event if IP address is 0.0.0.0 or port is 0
-			if (evt4.saddr != 0 && evt4.daddr != 0 && evt4.sport != 0 && evt4.dport != 0) {
-				struct pid_comm_t p = {.pid = pid, .state = CONN_ACTIVE};
-				if (bpf_map_update_elem(&tuplepid_ipv4, &t4, &p, BPF_ANY) < 0) {
-					LOG_DEBUG_BPF(ctx, "Accept missed, reached max conns?: {:d}:{:d} {:d}:{:d} {:d}", t4.saddr, t4.sport, t4.daddr, t4.dport, pid >> 32);
-				}
-				bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt4, sizeof(evt4));
-			}
-		}
-		else {
 			struct tcp_ipv6_event_t evt = convert_ipv6_tuple_to_event(t, cpu, TCP_EVENT_TYPE_ACCEPT, pid >> 32);
 
 			// do not send event if IP address is :: or port is 0
@@ -202,7 +177,6 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 				}
 				bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt));
 			}
-		}
 	}
 	return 0;
 }
@@ -244,21 +218,6 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 			return 0;
 		}
 
-		if (is_ipv4_mapped_ipv6_tuple(t)) {
-			struct ipv4_tuple_t t4 = convert_ipv4_mapped_ipv6_tuple_to_ipv4(t);
-
-			struct pid_comm_t* pp;
-			pp = bpf_map_lookup_elem(&tuplepid_ipv4, &t4);
-			if (pp == NULL) {
-				LOG_DEBUG_BPF(ctx, "Missing tuplepid entry: {:d}:{:d} {:d}:{:d}", t4.saddr, t4.sport, t4.daddr, t4.dport);
-			} else {
-				pp->state = CONN_CLOSED;
-			}
-
-			struct tcp_ipv4_event_t evt4 = convert_ipv4_tuple_to_event(t4, cpu, TCP_EVENT_TYPE_CLOSE, pid >> 32);
-			bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt4, sizeof(evt4));
-		}
-		else {
 			struct pid_comm_t* pp;
 			pp = bpf_map_lookup_elem(&tuplepid_ipv6, &t);
 			if (pp == NULL) {
@@ -269,7 +228,6 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 
 			struct tcp_ipv6_event_t evt = convert_ipv6_tuple_to_event(t, cpu, TCP_EVENT_TYPE_CLOSE, pid >> 32);
 			bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt));
-		}
 	}
 	return 0;
 }

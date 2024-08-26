@@ -12,50 +12,6 @@ enum protocol {
 	IPV6
 };
 
-/* http://stackoverflow.com/questions/1001307/detecting-endianness-programmatically-in-a-c-program */
-__attribute__((always_inline))
-static bool is_big_endian(void)
-{
-	union {
-		uint32_t i;
-		char c[4];
-	} bint = {0x01020304};
-
-	return bint.c[0] == 1;
-}
-
-/* check if IPs are IPv4 mapped to IPv6 ::ffff:xxxx:xxxx
- * https://tools.ietf.org/html/rfc4291#section-2.5.5
- * the addresses are stored in network byte order so IPv4 adddress is stored
- * in the most significant 32 bits of part saddr_l and daddr_l.
- * Meanwhile the end of the mask is stored in the least significant 32 bits.
- */
-__attribute__((always_inline))
-static bool is_ipv4_mapped_ipv6(uint64_t saddr_h, uint64_t saddr_l, uint64_t daddr_h, uint64_t daddr_l) {
-	if (is_big_endian()) {
-		return ((saddr_h == 0 && ((uint32_t)(saddr_l >> 32) == 0x0000FFFF)) ||
-                        (daddr_h == 0 && ((uint32_t)(daddr_l >> 32) == 0x0000FFFF)));
-	} else {
-		return ((saddr_h == 0 && ((uint32_t)saddr_l == 0xFFFF0000)) ||
-                        (daddr_h == 0 && ((uint32_t)daddr_l == 0xFFFF0000)));
-	}
-}
-__attribute__((always_inline))
-static bool is_ipv4_mapped_ipv6_tuple(struct ipv6_tuple_t tuple) {
-	return is_ipv4_mapped_ipv6(tuple.saddr_h, tuple.saddr_l, tuple.daddr_h, tuple.daddr_l);
-}
-
-__attribute__((always_inline))
-static struct ipv4_tuple_t convert_ipv4_mapped_ipv6_tuple_to_ipv4(struct ipv6_tuple_t tuple) {
-	struct ipv4_tuple_t t4 = {
-		.saddr = (uint32_t)(tuple.saddr_l >> 32),
-		.daddr = (uint32_t)(tuple.daddr_l >> 32),
-		.sport = tuple.sport,
-		.dport = tuple.dport,
-		.netns = tuple.netns
-	};
-	return t4;
-}
 
 __attribute__((always_inline))
 static bool check_family(struct sock *sk, uint16_t expected_family) {

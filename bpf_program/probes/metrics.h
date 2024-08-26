@@ -38,17 +38,9 @@ static int send_metric(struct sock* sk, int32_t bytes_sent) {
 			return 0;
 		}
 
-		if (is_ipv4_mapped_ipv6_tuple(ipv6_tuple)) {
-			struct ipv4_tuple_t ipv4_tuple = convert_ipv4_mapped_ipv6_tuple_to_ipv4(ipv6_tuple);
-
-			maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
-			update_stats(&ipv4_tuple, IPV4, bytes_sent, 0);
-			update_tcp_stats(&ipv4_tuple, IPV4, status, sk);
-		} else {
-			maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
-			update_stats(&ipv6_tuple, IPV6, bytes_sent, 0);
-			update_tcp_stats(&ipv6_tuple, IPV6, status, sk);
-		}
+		maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
+		update_stats(&ipv6_tuple, IPV6, bytes_sent, 0);
+		update_tcp_stats(&ipv6_tuple, IPV6, status, sk);
 	}
 	return 0;
 }
@@ -116,18 +108,9 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
 			return 0;
 		}
 
-		if (is_ipv4_mapped_ipv6_tuple(ipv6_tuple)) {
-			struct ipv4_tuple_t ipv4_tuple = convert_ipv4_mapped_ipv6_tuple_to_ipv4(ipv6_tuple);
-
-			maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
-			update_stats(&ipv4_tuple, IPV4, 0, bytes_received);
-			update_tcp_stats(&ipv4_tuple, IPV4, status, sk);
-		}
-		else {
-			maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
-			update_stats(&ipv6_tuple, IPV6, 0, bytes_received);
-			update_tcp_stats(&ipv6_tuple, IPV6, status, sk);
-		}
+		maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
+		update_stats(&ipv6_tuple, IPV6, 0, bytes_received);
+		update_tcp_stats(&ipv6_tuple, IPV6, status, sk);
 	}
 	return 0;
 }
@@ -169,17 +152,9 @@ int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
 		struct tcp_stats_t empty = { 0 };
 		struct tcp_stats_t *stats = NULL;
 
-		if (is_ipv4_mapped_ipv6_tuple(ipv6_tuple)) {
-			struct ipv4_tuple_t ipv4_tuple = convert_ipv4_mapped_ipv6_tuple_to_ipv4(ipv6_tuple);
-			maybe_fix_missing_connection_tuple(IPV4, &ipv4_tuple);
-			bpf_map_update_elem(&tcp_stats_ipv4, &ipv4_tuple, &empty, BPF_NOEXIST);
-			stats = bpf_map_lookup_elem(&tcp_stats_ipv4, &ipv4_tuple);
-		}
-		else {
-			maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
-			bpf_map_update_elem(&tcp_stats_ipv6, &ipv6_tuple, &empty, BPF_NOEXIST);
-			stats = bpf_map_lookup_elem(&tcp_stats_ipv6, &ipv6_tuple);
-		}
+		maybe_fix_missing_connection_tuple(IPV6, &ipv6_tuple);
+		bpf_map_update_elem(&tcp_stats_ipv6, &ipv6_tuple, &empty, BPF_NOEXIST);
+		stats = bpf_map_lookup_elem(&tcp_stats_ipv6, &ipv6_tuple);
 		if (stats == NULL) {
 			return 0;
 		}
