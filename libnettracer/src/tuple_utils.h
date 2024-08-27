@@ -99,3 +99,5 @@ std::string to_string(const tcp_ipv6_event_t& tuple);
 
 ipv4_tuple_t eventToTuple(const tcp_ipv4_event_t& evt);
 ipv6_tuple_t eventToTuple(const tcp_ipv6_event_t& evt);
+bool shouldFilter(const ipv4_tuple_t key);
+bool shouldFilter(const ipv6_tuple_t key);

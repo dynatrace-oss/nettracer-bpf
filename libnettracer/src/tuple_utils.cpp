@@ -112,3 +112,30 @@ uint64_t swap_uint32_t(uint64_t addrpart) {
 	uint64_t lpart = static_cast<uint32_t>(addrpart);
 	return uint64_t{(hpart) | (lpart << 32)};
 }
+
+static bool shouldFilter(const uint32_t key) {
+	constexpr uint32_t loopback = 0x0000007f;
+	return ((key & loopback) == loopback);
+}
+
+bool shouldFilter(const ipv4_tuple_t key) {
+	return shouldFilter(key.saddr);
+}
+
+static bool isIpv4MappedIpv6(uint64_t addr_l) {
+	uint64_t mask = 0x00000000ffff0000;
+	return (addr_l && mask) == mask;
+}
+
+bool shouldFilter(const ipv6_tuple_t key) {
+	if (key.saddr_h != 0) {
+		return false;
+	}
+	if (isIpv4MappedIpv6(key.saddr_l)) {
+		uint32_t ipv4 = static_cast<uint32_t>(key.saddr_l);
+		return shouldFilter(ipv4);
+	}
+	constexpr uint64_t loopback = 0xffffffff00000000;
+	return ((key.saddr_l & loopback) == key.saddr_l);
+}
+
