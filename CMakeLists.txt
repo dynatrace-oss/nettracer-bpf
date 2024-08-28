@@ -67,6 +67,7 @@ endif()
 
 if(ARCHITECTURE STREQUAL "x86_64")
 	set(ARCH "x86")
+	add_definitions(-D__TARGET_ARCH_x86)
 elseif(ARCHITECTURE STREQUAL "aarch64")
 	set(ARCH "arm64")
 else()
