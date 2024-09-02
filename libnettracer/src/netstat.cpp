@@ -218,23 +218,6 @@ static std::ostream& operator<<(std::ostream& os, const netstat::State& s) {
 	return os;
 }
 
-const unsigned PROTO_BIT_IPV4{0};
-const unsigned PROTO_BIT_IPV6{1};
-
-static std::ostream& operator<<(std::ostream& os, const ipv4_tuple_t& tup) {
-	os << ' ' << PROTO_BIT_IPV4 << ' ' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << tup.saddr << ' '
-	   << std::setw(4) << tup.sport << ' ' << PROTO_BIT_IPV4 << ' ' << std::setw(8) << tup.daddr << ' ' << std::setw(4) << tup.dport
-	   << std::dec << ' ' << std::setfill(' ');
-	return os;
-}
-
-static std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup) {
-	os << ' ' << PROTO_BIT_IPV6 << ' ' << std::uppercase << std::hex << std::setfill('0') << std::setw(16) << tup.saddr_h << std::setw(16)
-	   << tup.saddr_l << ' ' << std::setw(4) << tup.sport << ' ' << PROTO_BIT_IPV6 << ' ' << std::setw(16) << tup.daddr_h << std::setw(16)
-	   << tup.daddr_l << ' ' << std::setw(4) << tup.dport << std::setfill(' ') << std::dec << ' ';
-	return os;
-}
-
 static void printAddr(std::ostream& os, const ipv4_tuple_t& tup, int field_width) {
 	os << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.saddr), tup.sport)
 	   << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.daddr), tup.dport);

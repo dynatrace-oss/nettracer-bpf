@@ -39,21 +39,6 @@ struct hash<ipv4_tuple_t> {
 	}
 };
 
-/* TODO pjuszczyk
-The following function is not used currently because events are not printed to OS Agent yet.
-
-template <>
-struct hash<tcp_ipv4_event_t> {
-	std::size_t operator()(const tcp_ipv4_event_t& t) const noexcept {
-		std::size_t h1 = std::hash<decltype(t.saddr)>{}(t.saddr);
-		std::size_t h2 = std::hash<decltype(t.daddr)>{}(t.daddr);
-		std::size_t h3 = std::hash<decltype(t.sport)>{}(t.sport);
-		std::size_t h4 = std::hash<decltype(t.dport)>{}(t.dport);
-		return h1 ^ (h2 << 1) ^ (h3 << 1) ^ h4; // or use boost::hash_combine
-	}
-};
-*/
-
 template <>
 struct hash<ipv6_tuple_t> {
 	std::size_t operator()(const ipv6_tuple_t& t) const noexcept {
@@ -72,11 +57,6 @@ struct hash<ipv6_tuple_t> {
 enum class LineId { Connection = 1, Event, Metrics };
 enum class EventType { Accept = 1, Connect, Close };
 
-/* TODO pjuszczyk
-The following function is not used currently because events are not printed to OS Agent yet.
-
-std::ostream& operator<<(std::ostream& os, const tcp_ipv4_event_t& evt);
-*/
 
 // format ipv6 address - h and l are 64 bit and in network byte order
 std::string ipv6_to_string(uint64_t h, uint64_t l);
@@ -84,6 +64,8 @@ std::string ipv4_to_string(uint32_t addr);
 
 std::string to_string(const std::pair<ipv4_tuple_t, ConnectionDirection>& tupleWithDirection);
 std::string to_string(const std::pair<ipv6_tuple_t, ConnectionDirection>& tupleWithDirection);
+std::ostream& operator<<(std::ostream& os, const ipv4_tuple_t& tup);
+std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup);
 
 uint64_t swap_uint32_t(uint64_t addrpart);
 
@@ -99,5 +81,8 @@ std::string to_string(const tcp_ipv6_event_t& tuple);
 
 ipv4_tuple_t eventToTuple(const tcp_ipv4_event_t& evt);
 ipv6_tuple_t eventToTuple(const tcp_ipv6_event_t& evt);
+
 bool shouldFilter(const ipv4_tuple_t key);
 bool shouldFilter(const ipv6_tuple_t key);
+bool isIpv4MappedIpv6(uint64_t addr_l, uint64_t addr_h);
+ipv4_tuple_t convertMappedIpv6Tuple(const ipv6_tuple_t ipv6);
