@@ -289,7 +289,7 @@ std::pair<iNode, Connection<ipv6_tuple_t>> parseLine(const std::string& line, ui
 }
 
 template <typename IPTYPE>
-bool readTcpFile(tcpTable<IPTYPE> & table, const fs::path& fileName, uint32_t ns) {
+bool readTcpFile(tcpTable<IPTYPE> & table, const fs::path& fileName, uint32_t ns, bool filter) {
 	if (!fs::is_regular_file(fileName)) {
 		LOG_INFO("Couldn't read /proc connection table: " + fileName.string());
 		return false;
@@ -300,6 +300,9 @@ bool readTcpFile(tcpTable<IPTYPE> & table, const fs::path& fileName, uint32_t ns
 	std::getline(input, line); // skip header
 	while (std::getline(input, line)) {
 		auto conn = parseLine<IPTYPE>(line, ns);
+		if (filter && shouldFilter(conn.second.ep)) {
+			continue;
+		}
 		if (conn.second.ep.dport && conn.first) {
 			table.insert(conn);
 		}
@@ -335,13 +338,13 @@ uint32_t readNetNS(const fs::path& p) {
 }
 
 template <typename IPTYPE>
-tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file) {
+tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file, bool filter) {
 	tcpTable<IPTYPE> table;
 	std::vector<uint32_t> visited;
 	uint32_t currnet_ns = 0;
 	currnet_ns = readNetNS(root / "self" / "ns" / "net");
 	if (currnet_ns) {
-		if (readTcpFile<IPTYPE>(table, root / "net" / file, currnet_ns)) {
+		if (readTcpFile<IPTYPE>(table, root / "net" / file, currnet_ns, filter)) {
 			visited.push_back(currnet_ns);
 		}
 	}
@@ -365,7 +368,7 @@ tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file) {
 			continue;
 		}
 		if (!std::any_of(visited.begin(), visited.end(), [currnet_ns](auto& i) { return i == currnet_ns; })) {
-			if (!readTcpFile<IPTYPE>(table, p.path() / "net" / file, currnet_ns))
+			if (!readTcpFile<IPTYPE>(table, p.path() / "net" / file, currnet_ns, filter))
 				continue;
 
 			LOG_DEBUG("tcptable for nondeafult ns: {} read", currnet_ns);
@@ -416,12 +419,12 @@ tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file) {
 }
 }
 
-tcpTable<ipv4_tuple_t> readTcpTable(const char* root) {
-	return readTcpTableImpl<ipv4_tuple_t>(root, "tcp");
+tcpTable<ipv4_tuple_t> readTcpTable(const char* root, bool filter) {
+	return readTcpTableImpl<ipv4_tuple_t>(root, "tcp", filter);
 }
 
-tcpTable<ipv6_tuple_t> readTcpTable6(const char* root) {
-	return readTcpTableImpl<ipv6_tuple_t>(root, "tcp6");
+tcpTable<ipv6_tuple_t> readTcpTable6(const char* root, bool filter) {
+	return readTcpTableImpl<ipv6_tuple_t>(root, "tcp6", filter);
 }
 
 namespace test {

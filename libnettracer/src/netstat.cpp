@@ -87,9 +87,36 @@ void NetStat::update(const bpf_fds& fds) {
 	});
 }
 
+struct TimeGuard {
+	unsigned long counter{};
+	unsigned ticks_per_wait_time;
+
+	TimeGuard(unsigned time){
+		counter = ticks_per_wait_time = time * INTERVAL_DIVIDER;
+	}
+
+	bool time_elapsed() {
+		if (counter >= ticks_per_wait_time) {
+			counter = 0;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	void bump() {
+		counter++;
+	}
+
+	void reset() {
+		counter = 0;
+	}
+};
+
 void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
-	unsigned counter = 0;
-	unsigned factor = exitCtrl.wait_time * INTERVAL_DIVIDER;
+	using namespace std::literals::chrono_literals;
+
+	TimeGuard outputCtr(exitCtrl.wait_time), logCtr(seconds(5min).count());
 	printHeader();
 
 	while (exitCtrl.running) {
@@ -99,21 +126,28 @@ void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 		clean_bpf<ipv4_tuple_t>(fdsIPv4);
 		clean_bpf<ipv6_tuple_t>(fdsIPv6);
 
-		if (kbhit || ((counter % factor) == 0)) {
+		if (kbhit || outputCtr.time_elapsed()) {
+			const auto tcpSessions =
+					fmt::format("Total tcp sessions: {}", connections<ipv4_tuple_t>().size() + connections<ipv6_tuple_t>().size());
 			if (interactive) {
 				print_human_readable<ipv4_tuple_t>();
 				print_human_readable<ipv6_tuple_t>();
+				std::cout << tcpSessions;
 			} else {
 				print<ipv4_tuple_t>();
 				print<ipv6_tuple_t>();
+				if (logCtr.time_elapsed()) {
+					LOG_INFO(tcpSessions);
+				}
 			}
+			outputCtr.reset();
 			flush();
 			clean<ipv4_tuple_t>();
 			clean<ipv6_tuple_t>();
-			counter = 0;
 		}
 
-		++counter;
+		outputCtr.bump();
+		logCtr.bump();
 		std::unique_lock<std::mutex> lk(exitCtrl.m);
 		kbhit = false;
 		exitCtrl.cv.wait_for(lk, milliseconds(1000 / INTERVAL_DIVIDER), [this] { return !exitCtrl.running || kbhit; });
@@ -226,32 +260,7 @@ static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
 
 void NetStat::flush() {
 	*os << " " << std::endl;
-}
-
-static bool shouldFilter(const uint32_t key) {
-	constexpr uint32_t loopback = 0x0000007f;
-	return ((key & loopback) == loopback);
-}
-
-static bool shouldFilter(const ipv4_tuple_t key) {
-	return shouldFilter(key.saddr);
-}
-
-static bool isIpv4MappedIpv6(uint64_t addr_l) {
-	uint64_t mask = 0x00000000ff00;
-	return (addr_l && mask) == mask;
-}
-
-static bool shouldFilter(const ipv6_tuple_t key) {
-	if (key.saddr_h != 0) {
-		return false;
-	}
-	if (isIpv4MappedIpv6(key.saddr_l)) {
-		uint32_t ipv4 = static_cast<uint32_t>(key.saddr_l);
-		return shouldFilter(ipv4);
-	}
-	constexpr uint64_t loopback = 0xffffffff00000000;
-	return ((key.saddr_l & loopback) == key.saddr_l);
+	logging::getLogger()->flush();
 }
 
 template<typename IPTYPE>
@@ -261,10 +270,6 @@ void NetStat::print() {
 	std::stringstream buf;
 
 	for (auto it = aggr.begin(); it != aggr.end(); ++it) {
-
-		if (filter_loopback && shouldFilter(it->first)) {
-			continue;
-		}
 
 		buf.str("");
 		auto wall_now = getCurrentTimeFromSystemClock();
@@ -332,10 +337,8 @@ void NetStat::initConnection(const tcpTable<IPTYPE> &tbl){
 }
 
 void NetStat::initConnections() {
-	tcpTable<ipv4_tuple_t> initTcp = readTcpTable("/proc");
-	tcpTable<ipv6_tuple_t> initTcp6 = readTcpTable6("/proc");
-	initConnection<ipv4_tuple_t>(initTcp);
-	initConnection<ipv6_tuple_t>(initTcp6);
+	initConnection<ipv4_tuple_t>(readTcpTable("/proc", filter_loopback));
+	initConnection<ipv6_tuple_t>(readTcpTable6("/proc", filter_loopback));
 }
 
 void NetStat::init() {

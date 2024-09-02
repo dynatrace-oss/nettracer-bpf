@@ -61,3 +61,45 @@ static void maybe_fix_missing_connection_tuple(enum protocol proto, void* tuple)
 	struct pid_comm_t p = {.pid = pid, .state = CONN_ACTIVE};
 	bpf_map_update_elem(map, tuple, &p, BPF_NOEXIST);
 }
+
+__attribute__((always_inline))
+static bool filter_loopback(const int32_t ip) {
+#ifdef __TARGET_ARCH_x86
+	const uint32_t loopback = 0x0000007f;
+	return (ip & loopback) == loopback;
+#else
+	const uint32_t loopback = 0x7f000000;
+	return (htonl(ip) & loopback) == loopback;
+#endif
+}
+
+__attribute__((always_inline))
+static bool filter_ipv4(struct ipv4_tuple_t* ipv4) {
+	return filter_loopback(ipv4->saddr);
+}
+
+__attribute__((always_inline))
+static bool isipv4ipv6(uint64_t addr_l, uint64_t addr_h) {
+	if (addr_h != 0) {
+		return false;
+	}
+
+#ifdef __TARGET_ARCH_x86
+	uint64_t mask = 0x00000000ffff0000;
+	uint64_t res = addr_l & mask;
+#else
+	uint64_t mask = 0xffff;
+	uint64_t res = htonl(addr_l) & mask;
+#endif
+	return res  == mask;
+}
+
+__attribute__((always_inline))
+static bool filter_ipv6(const struct ipv6_tuple_t* key) {
+	if (isipv4ipv6(key->saddr_l, key->daddr_h)) {
+		uint32_t ipv4 = (uint32_t)(key->saddr_l >> 32);
+		return filter_loopback(ipv4);
+	}
+	const uint64_t loopback = 0xffffffff00000000;
+	return ((key->saddr_l & loopback) == key->saddr_l);
+}

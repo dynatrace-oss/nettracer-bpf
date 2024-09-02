@@ -36,8 +36,8 @@ using iNode = unsigned long;
 template<typename IPTYPE>
 using tcpTable = std::unordered_map<iNode,Connection<IPTYPE>>;
 
-tcpTable<ipv4_tuple_t> readTcpTable(const char* root);
-tcpTable<ipv6_tuple_t> readTcpTable6(const char* root);
+tcpTable<ipv4_tuple_t> readTcpTable(const char* root, bool filter);
+tcpTable<ipv6_tuple_t> readTcpTable6(const char* root, bool filter);
 
 namespace test {
 std::pair<iNode, Connection<ipv6_tuple_t>> parseLine6(const std::string& line, uint32_t ns);
