@@ -113,6 +113,16 @@ struct TimeGuard {
 	}
 };
 
+std::pair<unsigned, unsigned> NetStat::countTcpSessions() {
+	const auto& container4 = connections<ipv4_tuple_t>();
+	unsigned incoming =
+			std::count_if(std::begin(container4), std::end(container4), [](const auto& it) { return it.second.state.Direction == 1; });
+
+	const auto& container6 = connections<ipv6_tuple_t>();
+	incoming += std::count_if(std::begin(container6), std::end(container6), [](const auto& it) { return it.second.state.Direction == 1; });
+	return std::pair<unsigned, unsigned>{incoming, container4.size() + container6.size() - incoming};
+}
+
 void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 	using namespace std::literals::chrono_literals;
 
@@ -127,17 +137,17 @@ void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 		clean_bpf<ipv6_tuple_t>(fdsIPv6);
 
 		if (kbhit || outputCtr.time_elapsed()) {
-			const auto tcpSessions =
-					fmt::format("Total tcp sessions: {}", connections<ipv4_tuple_t>().size() + connections<ipv6_tuple_t>().size());
+			const auto tcpSessions = countTcpSessions();
+			const auto tcpSessionsStr =	fmt::format("Number of passive tcp sessions: {}, active: {}", tcpSessions.first, tcpSessions.second);
 			if (interactive) {
 				print_human_readable<ipv4_tuple_t>();
 				print_human_readable<ipv6_tuple_t>();
-				std::cout << tcpSessions;
+				std::cout << tcpSessionsStr;
 			} else {
 				print<ipv4_tuple_t>();
 				print<ipv6_tuple_t>();
 				if (logCtr.time_elapsed()) {
-					LOG_INFO(tcpSessions);
+					LOG_INFO(tcpSessionsStr);
 				}
 			}
 			outputCtr.reset();

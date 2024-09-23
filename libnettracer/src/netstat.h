@@ -67,6 +67,7 @@ protected:
 	void initConnection(const tcpTable<IPTYPE>&);
 	void initConnections();
 
+	std::pair<unsigned, unsigned> countTcpSessions();
 	template<typename IPTYPE>
 	void update(const bpf_fds& fds);
 
