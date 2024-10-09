@@ -8,9 +8,6 @@ bool setUpLogging(const boost::program_options::variables_map& vm) {
 	bool noStdoutLog = vm.count("no_stdout_log");
 	bool noFileLog =  logger_path.empty();
 
-	if (!noFileLog) {
-		std::filesystem::create_directory(logger_path);
-	}
 	logging::setUpLogger(logger_path, !noStdoutLog);
 	if (areDebugLogsEnabled(vm)) {
 		logging::getLogger()->set_level(spdlog::level::debug);

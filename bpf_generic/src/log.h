@@ -2,6 +2,7 @@
 
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
 #include <spdlog/spdlog.h>
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -13,7 +14,7 @@ inline std::shared_ptr<spdlog::logger> getLogger() {
 	return spdlog::get(LOGGER_NAME);
 }
 
-void setUpLogger(const std::string& logDir, bool logToStdout);
+void setUpLogger(const std::filesystem::path logDir, bool logToStdout);
 
 } // namespace logging
 

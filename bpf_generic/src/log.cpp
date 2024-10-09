@@ -2,7 +2,7 @@
 
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <filesystem>
+#include <system_error>
 #include <unistd.h>
 #include <vector>
 
@@ -11,22 +11,23 @@ namespace logging {
 constexpr std::size_t max_size = 10 * 1024 * 1024;
 constexpr std::size_t max_files = 3;
 
-void setUpLogger(const std::string& logDir, bool logToStdout) {
-	namespace fs = std::filesystem;
+namespace fs = std::filesystem;
 
+void setUpLogger(const fs::path logDir, bool logToStdout) {
 	std::vector<spdlog::sink_ptr> sinks;
+
 	if (logToStdout){
 		sinks.emplace_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 	}
 
 	if (!logDir.empty()) {
-		fs::path logPath;
-		if (!fs::is_directory(logDir)) {
-			spdlog::warn("{} doesn't exist or is not a directory.", logDir);
-		}
-		else {
-			std::string logFile = fmt::format("{}/oneagent_nettracer_{:d}.log", logDir, getpid());
-			sinks.emplace_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logFile, max_size, max_files));
+		std::error_code ec;
+		bool dirExists = fs::exists(logDir, ec);
+		if (!dirExists || ec || !fs::is_directory(logDir)) {
+			exit(5);
+		} else {
+			auto  logFile = logDir / fmt::format("oneagent_nettracer_{:d}.log", getpid());
+			sinks.emplace_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logFile.string(), max_size, max_files));
 		}
 	}
 
