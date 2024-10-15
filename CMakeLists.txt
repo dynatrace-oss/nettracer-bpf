@@ -170,5 +170,5 @@ add_custom_target(run-tests COMMAND ${CMAKE_CTEST_COMMAND} -T Test --no-compress
 add_subdirectory(bpf_program)
 add_subdirectory(bpf_generic)
 add_subdirectory(libnettracer)
-add_subdirectory(nettracer)
+#add_subdirectory(nettracer)
 add_subdirectory(nettracersrv)

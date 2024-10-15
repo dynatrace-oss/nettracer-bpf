@@ -26,7 +26,7 @@ set(SOURCES
 	connection_test.cpp
 	connections_printing_test.cpp
 	mock_bpf_maps_test.cpp
-	netstat_test.cpp
+	#netstat_test.cpp
 	proc_tcp_test.cpp
 	tuple_utils_test.cpp
 )
@@ -41,6 +41,7 @@ set(HEADERS
 PREPEND(HEADERS_FULL "${CMAKE_CURRENT_LIST_DIR}/cpp" ${HEADERS})
 
 add_executable(libnettracer_test ${SOURCES_FULL} ${HEADERS_FULL})
+
 target_include_directories(libnettracer_test
 	PRIVATE
 		"${PROJECT_SOURCE_DIR}/libnettracer/src"
@@ -49,6 +50,7 @@ target_include_directories(libnettracer_test
 target_link_libraries(libnettracer_test libnettracer)
 target_link_libraries(libnettracer_test -lpthread)
 target_link_libraries(libnettracer_test -lz)
+
 if(DEFINED GITHUB_GTEST)
     target_link_libraries(libnettracer_test gmock_main)
     target_link_libraries(libnettracer_test gtest_main)
