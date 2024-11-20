@@ -53,7 +53,7 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 	// clang-format off
 	desc.add_options()
 			("clear_probes,c", "Clear all probes on start")
-			("debug,d", "Enable debug logs")
+			("debug,d", po::value<std::string>()->default_value("info"), "Enable debug logs")
 			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
 			("log,l", po::value<std::string>()->default_value(""), "Logger path")
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
@@ -104,7 +104,7 @@ bool setUpBPFConfig(const po::variables_map& vm, bpf::bpf_subsystem& ebpf, bpf::
 	nettracer_config_t config{};
 	(void)mapsWrapper.lookupElement(configFd, &zero, &config);
 
-	config.log_level = areDebugLogsEnabled(vm) ? BPF_LOG_LEVEL_DEBUG : BPF_LOG_LEVEL_INFO;
+	config.log_level = loglevelFromConfig(vm) <= spdlog::level::debug ? BPF_LOG_LEVEL_DEBUG : BPF_LOG_LEVEL_INFO;
 
 	if (!mapsWrapper.updateElement(configFd, &zero, &config)) {
 		LOG_ERROR("Could not set up BPF config");

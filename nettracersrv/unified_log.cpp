@@ -3,15 +3,26 @@
 #include <string>
 #include <utility>
 
+spdlog::level::level_enum loglevelFromConfig(const boost::program_options::variables_map& vm) {
+	std::string level = vm["debug"].as<std::string>();
+	if (level == "debug") {
+		return spdlog::level::debug;
+	} else if (level == "trace") {
+		return spdlog::level::trace;
+	} else {
+		return spdlog::level::info;
+	}
+}
+
 bool setUpLogging(const boost::program_options::variables_map& vm) {
 	std::string logger_path = vm["log"].as<std::string>();
 	bool noStdoutLog = vm.count("no_stdout_log");
 	bool noFileLog =  logger_path.empty();
 
 	logging::setUpLogger(logger_path, !noStdoutLog);
-	if (areDebugLogsEnabled(vm)) {
-		logging::getLogger()->set_level(spdlog::level::debug);
-	}
+	auto level = loglevelFromConfig(vm);
+	logging::getLogger()->set_level(level);
+
 
 	return noStdoutLog;
 }
