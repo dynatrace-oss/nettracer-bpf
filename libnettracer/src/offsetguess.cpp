@@ -214,7 +214,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 template<typename T>
 void OffsetGuessing::guessSimpleField(T& statusValue, const T& expectedValue, uint16_t& offset, guess_status_t& status, const std::string& fieldStr, const guess_field& next) {
 	if (statusValue == expectedValue) {
-		logger->debug("{} offset: {:#010x}", fieldStr, offset);
+		logger->info("{} offset: {:#010x}", fieldStr, offset);
 		status.what = next;
 	}
 	else {
@@ -264,10 +264,10 @@ bool OffsetGuessing::guessRTT(unsigned& currentAttempts, unsigned& currentReps, 
 	const unsigned maxAttempts = 10; // that many offsets may be verified
 	const unsigned requiredReps = 3; // value at an offset must match with the expected value at least that many times in a row
 
-	if (status.rtt == expected.rtt && status.rtt_var == expected.rtt_var) {
+	if (status.rtt == expected.rtt) {
 		if (++currentReps == requiredReps) {
-			logger->debug("RTT offset: {:#010x}", status.offset_rtt);
-			logger->debug("RTT var offset: {:#010x}", status.offset_rtt_var);
+			logger->info("RTT offset: {:#010x}", status.offset_rtt);
+			logger->info("RTT var offset: {:#010x}", status.offset_rtt_var);
 			status.state = GUESS_STATE_READY;
 		} else {
 			// reload expected RTT
