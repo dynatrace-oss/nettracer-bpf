@@ -64,7 +64,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	// which in turn are called in kretprobe tcp_v(4|6)_connect
 
 	uint64_t pid_tgid = (uint64_t)getpid() << 32 | syscall(SYS_gettid);
-	logger->debug("guess thread pid: {:d}", pid_tgid);
+	logger->trace("guess thread pid: {:d}", pid_tgid);
 
 	// prepare server ipv4 and client ipv6 on this thread
 	localsock = startLocalSock();
@@ -107,7 +107,6 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 
 	// limit how many failed attempts at communicating with the BPF side are accepted
 	int maxRetries = 100;
-
 	unsigned rttCurrentAttempts = 0;
 	unsigned rttCurrentReps = 0;
 
@@ -208,6 +207,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 			return false;
 		}
 	}
+	logger->debug("offsets status: {:d}", status.what);
 	return true;
 }
 
@@ -275,17 +275,12 @@ bool OffsetGuessing::guessRTT(unsigned& currentAttempts, unsigned& currentReps, 
 				logger->error("Couldn't restart client for RTT guessing");
 				return false;
 			}
-			try {
-				auto expectedOpt{getExpectedValues(skipIPv6)};
-				if (!expectedOpt) {
-					return false;
-				}
-				expected = *expectedOpt;
-			}
-			catch (const std::runtime_error& ex) {
-				logger->error(ex.what());
+			auto expectedOpt{getExpectedValues(skipIPv6)};
+			if (!expectedOpt) {
 				return false;
 			}
+			logger->debug("Updating expected RTT: {:d},{:d} -> {:d},{:d} ", expected.rtt, expected.rtt_var, expectedOpt->rtt, expectedOpt->rtt_var);
+			expected = *expectedOpt;
 			status.rtt = expected.rtt;
 			status.rtt_var = expected.rtt_var;
 			status.state = GUESS_STATE_CHECKING;
@@ -307,6 +302,7 @@ bool OffsetGuessing::guessRTT(unsigned& currentAttempts, unsigned& currentReps, 
 		status.rtt = expected.rtt;
 		status.rtt_var = expected.rtt_var;
 		status.state = GUESS_STATE_CHECKING;
+		logger->trace("current RTT offset: {:d}", status.offset_rtt);
 	}
 	return true;
 }
