@@ -19,7 +19,7 @@ static int send_metric(struct sock* sk, int32_t bytes_sent) {
 	struct guess_status_t* status;
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
-	if (status == NULL || status->state != GUESS_STATE_READY) {
+	if (status == NULL) {
 		return 0;
 	}
 
@@ -96,7 +96,7 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
 	struct guess_status_t *status;
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
-	if (status == NULL || status->state != GUESS_STATE_READY) {
+	if (status == NULL) {
 		return 0;
 	}
 
@@ -137,7 +137,7 @@ int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
 	struct guess_status_t *status;
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
-	if (status == NULL || status->state != GUESS_STATE_READY) {
+	if (status == NULL) {
 		return 0;
 	}
 
