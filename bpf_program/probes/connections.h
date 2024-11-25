@@ -47,7 +47,7 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
 	}
 
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
-	if (status == NULL || status->state != GUESS_STATE_READY) {
+	if (status == NULL) {
 		return 0;
 	}
 
@@ -151,7 +151,7 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 		return 0;
 
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
-	if (status == NULL || status->state != GUESS_STATE_READY) {
+	if (status == NULL) {
 		return 0;
 	}
 
@@ -219,7 +219,7 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 	sk = (struct sock *) PT_REGS_PARM1(ctx);
 
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
-	if (status == NULL || status->state != GUESS_STATE_READY) {
+	if (status == NULL) {
 		return 0;
 	}
 

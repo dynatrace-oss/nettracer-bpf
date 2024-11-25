@@ -21,7 +21,7 @@ static bool check_family(struct sock *sk, uint16_t expected_family) {
 	family = 0;
 
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
-	if (status == NULL || status->state != GUESS_STATE_READY) {
+	if (status == NULL) {
 		return 0;
 	}
 
