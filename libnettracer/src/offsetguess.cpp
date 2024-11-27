@@ -1,7 +1,6 @@
 #include "offsetguess.h"
 
 #include "bpf_generic/src/bpf_loading.h"
-#include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
 #include "localsock.h"
 #include "localsock6.h"
@@ -41,6 +40,7 @@ OffsetGuessing::OffsetGuessing() = default;
 OffsetGuessing::~OffsetGuessing() = default;
 
 bool OffsetGuessing::guess(int status_fd) {
+	statusFd = status_fd;
 	const unsigned maxAttempts = 3;
 	for (unsigned i = 0; i < maxAttempts; ++i) {
 		if (makeGuessingAttempt(status_fd)) {
@@ -53,12 +53,21 @@ bool OffsetGuessing::guess(int status_fd) {
 	return false;
 }
 
+bool OffsetGuessing::updateStatus(){
+	if (!mapsWrapper.updateElement(statusFd, &zero, &status)) {
+		logger->error("failed to set tracer status, errno: {:d}", errno);
+		return false;
+	}
+	return true;
+
+}
+
 #define GUESS_SIMPLE_FIELD(field, str, next) guessSimpleField(status.field, expected.field, status.offset_##field, status, str, next)
 
 bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	logger = logging::getLogger();
 
-	logger->debug("guess enter fd: {:d}", status_fd);
+	logger->trace("guess enter fd: {:d}", status_fd);
 	// nettracer_status map holds only one entry with key zero which is
 	// created (and updated) in bpf program inside call are_offsets_ready_v(4|6)
 	// which in turn are called in kretprobe tcp_v(4|6)_connect
@@ -81,13 +90,10 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	}
 
 	// create or update status entry in map - signal that we are starting guessing
-	bpf::BPFMapsWrapper mapsWrapper;
-	const uint32_t zero = 0;
 	status = {};
 	status.state = GUESS_STATE_CHECKING;
 	status.pid_tgid = pid_tgid;
-	if (!mapsWrapper.updateElement(status_fd, &zero, &status)) {
-		logger->error("failed to set tracer status, errno: {:d}", errno);
+	if (!updateStatus()) {
 		return false;
 	}
 	logger->debug("guess status, set state: {:d}", status.state);
@@ -112,7 +118,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 
 	// in loop below we need a swich to select connect trigger from IPv4 to IPv6 - we start with IPv4
 	bool guessIPv6 = false;
-	while (true) {
+	while (status.state != GUESS_STATE_READY) {
 		logger->trace("guess status, poking {:s} with state:{:d} what:{:d}",
 			(guessIPv6?"ipv6":"ipv4"),
 			status.state, status.what
@@ -182,7 +188,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 			break;
 		case GUESS_FIELD_RTT:
 			if (!guessRTT(rttCurrentAttempts, rttCurrentReps, skipIPv6Guessing)) {
-				return false;
+				status.state = GUESS_STATE_READY;
 			}
 			break;
 		default:
@@ -190,24 +196,28 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 			return false;
 		}
 
-		if (!mapsWrapper.updateElement(status_fd, &zero, &status)) {
-			logger->error("failed to set tracer status, errno: {:d}", errno);
-			return false;
-		}
-		if (status.state == GUESS_STATE_READY) {
-			break;
-		}
+
 		if (overflowOccurred()) {
 			logger->error("overflow while guessing {:d}, bailing out", status.what);
 			if (status.what == GUESS_FIELD_RTT) {
 				// allow failure for RTT
 				status.offset_rtt = status.offset_rtt_var = 0;
-				return true;
+				status.state = GUESS_STATE_READY;
+			}else{
+				status.state = GUESS_STATE_UNINITIALIZED;
 			}
+		}
+
+		if (!updateStatus()){
+			logger->error("failed to set tracer status, errno: {:d}", errno);
+			return false;
+		}
+
+		if (status.state == GUESS_STATE_UNINITIALIZED){
+			logger->error("failed to unitialize offsets");
 			return false;
 		}
 	}
-	logger->debug("offsets status: {:d}", status.what);
 	return true;
 }
 

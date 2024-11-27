@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bpf_program/nettracer-bpf.h"
+#include "bpf_generic/src/bpf_wrapper.h"
 #include <spdlog/fwd.h>
 #include <cstdint>
 #include <memory>
@@ -37,6 +38,7 @@ private:
 	std::optional<field_values> getExpectedValues(bool skipIPv6);
 	template<typename T>
 	void guessSimpleField(T& statusValue, const T& expectedValue, uint16_t& offset, guess_status_t& status, const std::string& fieldStr, const guess_field& next);
+	bool updateStatus();
 	void guessNetns();
 	void guessDAddrIPv6();
 	bool guessRTT(unsigned& currentAttempts, unsigned& currentReps, bool skipIPv6);
@@ -47,6 +49,9 @@ private:
 	std::unique_ptr<ClientSock6> client6;
 	guess_status_t status;
 	field_values expected;
+	const uint32_t zero = 0;
+	int statusFd;
+	bpf::BPFMapsWrapper mapsWrapper;
 };
 
 std::unique_ptr<LocalSock> startLocalSock();
