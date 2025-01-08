@@ -7,6 +7,8 @@
 #include <variant>
 #include <vector>
 
+class config_watcher;
+
 struct pollfd;
 
 template <typename T>
@@ -25,8 +27,12 @@ class bpf_events {
 	std::vector<evt_descr> observers;
 	std::vector<pollfd> create_pfds();
 	std::function<void()> kbhit_observer;
+	std::function<void()> config_change_observer;
+	config_watcher& cw;
 
 public:
+	bpf_events(config_watcher& cw) : cw(cw) {}
+
 	template <typename T>
 	void add_observer(const bpf::map_data md, f_ac<T> ac) {
 		evt_descr tmp;
@@ -38,6 +44,11 @@ public:
 	void set_kbhit_observer(std::function<void()>&& f) {
 		kbhit_observer = f;
 	}
+
+	void set_config_change_observer(std::function<void()>&& f) {
+		config_change_observer = f;
+	}
+
 	void start();
 	void stop();
 	void loop();

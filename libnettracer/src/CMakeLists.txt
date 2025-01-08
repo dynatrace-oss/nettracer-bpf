@@ -1,6 +1,8 @@
 set(SOURCES
     bpf_events.cpp
+	config_watcher.cpp
 	connections_printing.cpp
+	inotify_watcher.cpp
 	localsock.cpp
 	localsock6.cpp
 	offsetguess.cpp
@@ -11,7 +13,9 @@ set(SOURCES
 
 set(HEADERS
     bpf_events.h
+	config_watcher.h
 	connections_printing.h
+	inotify_watcher.h
 	localsock.h
 	localsock6.h
 	offsetguess.h
