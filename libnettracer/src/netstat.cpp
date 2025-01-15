@@ -123,13 +123,13 @@ std::pair<unsigned, unsigned> NetStat::countTcpSessions() {
 	return std::pair<unsigned, unsigned>{incoming, container4.size() + container6.size() - incoming};
 }
 
-void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
+bool NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 	using namespace std::literals::chrono_literals;
 
 	TimeGuard outputCtr(exitCtrl.wait_time), logCtr(seconds(5min).count());
 	printHeader();
 
-	while (exitCtrl.running) {
+	while (exitCtrl.running && !config_changed) {
 		update<ipv4_tuple_t>(fdsIPv4);
 		update<ipv6_tuple_t>(fdsIPv6);
 
@@ -160,8 +160,9 @@ void NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 		logCtr.bump();
 		std::unique_lock<std::mutex> lk(exitCtrl.m);
 		kbhit = false;
-		exitCtrl.cv.wait_for(lk, milliseconds(1000 / INTERVAL_DIVIDER), [this] { return !exitCtrl.running || kbhit; });
+		exitCtrl.cv.wait_for(lk, milliseconds(1000 / INTERVAL_DIVIDER), [this] { return !exitCtrl.running || kbhit || config_changed; });
 	}
+	return exitCtrl.running;
 }
 
 template<typename IPTYPE>
@@ -369,6 +370,13 @@ NetStat::~NetStat() {
 void NetStat::set_kbhit() {
 	std::unique_lock<std::mutex> ul(exitCtrl.m);
 	kbhit = true;
+	ul.unlock();
+	exitCtrl.cv.notify_all();
+}
+
+void NetStat::on_config_change() {
+	std::unique_lock<std::mutex> ul(exitCtrl.m);
+	config_changed = true;
 	ul.unlock();
 	exitCtrl.cv.notify_all();
 }

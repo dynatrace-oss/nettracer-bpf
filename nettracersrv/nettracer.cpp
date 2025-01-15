@@ -4,6 +4,7 @@
 #include "bpf_generic/src/log.h"
 
 #include "bpf_events.h"
+#include "config_watcher.h"
 #include "connections_printing.h"
 #include "netstat.h"
 #include "offsetguess.h"
@@ -19,6 +20,7 @@
 #include <ctime>
 #include <filesystem>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <mutex>
 #include <signal.h>
@@ -48,7 +50,7 @@ void setUpExitBehavior() {
 	sigaction(SIGPIPE, &action, nullptr);
 }
 
-po::variables_map parseOptions(int argc, char* argv[]) {
+po::options_description getOptionsDescription() {
 	po::options_description desc{"Options"};
 	// clang-format off
 	desc.add_options()
@@ -63,9 +65,23 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 			("program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")
 			("header,s", "Add average header size to traffic")
 			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
+			("args_file", po::value<std::filesystem::path>(), "Arguments file")
 			("test", "Check if NetTracer can start properly, then exit")
 			("version,v", "Print version")
 			("help,h", "Print this help screen");
+	return desc;
+}
+
+po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath) {
+	po::variables_map vm;
+	po::options_description desc{getOptionsDescription()};
+	po::store(po::parse_config_file<char>(argsFilePath.c_str(), desc), vm);
+	po::notify(vm);
+	return vm;
+}
+
+std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char* argv[]) {
+	po::options_description desc{getOptionsDescription()};
 	// clang-format on
 	po::variables_map vm;
 	try {
@@ -77,8 +93,14 @@ po::variables_map parseOptions(int argc, char* argv[]) {
 			exit(0);
 		}
 
-		return vm;
+		if (vm.count("args_file")) {
+			auto fname = vm["args_file"].as<std::filesystem::path>();
+			return {parseArgsFile(fname), std::move(fname)};
+		}
+
+		return {vm, ""};
 	} catch (const po::error& ex) {
+		std::cout << ex.what() << '\n';
 		std::cout << desc << '\n';
 		exit(1);
 	} catch (const std::exception& ex) {
@@ -138,14 +160,11 @@ bool isIPv6MonitoringPossible(int status_fd, bpf::BPFMapsWrapper& mapsWrapper) {
 enum ReturnCodes {
 	Success,
 	InsufficientCapabilities,
-	GenericError
+	GenericError,
+	Reconfigure
 };
 
-int main(int argc, char* argv[]) {
-	setUpExitBehavior();
-
-	auto vm{parseOptions(argc, argv)};
-
+ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables_map& vm) {
 	const std::string nettracerVersionStr{fmt::format("{}.{}.{}", NETTRACER_VERSION_MAJOR, NETTRACER_VERSION_MINOR, NETTRACER_VERSION_PATCH)};
 	if (vm.count("version")) {
 		std::cout << "version: " << nettracerVersionStr << std::endl;
@@ -219,20 +238,24 @@ int main(int argc, char* argv[]) {
 
 	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"), vm.count("with_loopback") == 0);
 	netst.init();
-    bpf_events bevents;
+    bpf_events bevents(cw);
     bevents.set_kbhit_observer( std::bind(&netstat::NetStat::set_kbhit, &netst));
     
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
 	std::function<void(const bpf_log_event_t&)> bpf_log_event_update;
-	std::function<void()> map_reading;
+	std::function<void(std::promise<bool>&&)> map_reading;
 
 	if (noStdoutLog) {
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst.event<ipv4_tuple_t>(evt); };
 		if (monitorIPv6) {
 			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
 		}
-		map_reading = [&]() { netst.map_loop(ipv4_fds, ipv6_fds); };
+		bevents.set_config_change_observer(std::bind(&netstat::NetStat::on_config_change, &netst));
+		map_reading = [&](std::promise<bool>&& promise) {
+			auto ret = netst.map_loop(ipv4_fds, ipv6_fds);
+			promise.set_value(ret);
+		};
 	} else {
 		static ConnectionsState<ipv4_tuple_t> ipv4Connections;
 		static ConnectionsState<ipv6_tuple_t> ipv6Connections;
@@ -244,8 +267,13 @@ int main(int argc, char* argv[]) {
 		ipv6_event_update = [&](const tcp_ipv6_event_t& evt) {
 			updateConnectionsAfterEvent(evt, ipv6Connections);
 		};}
-		map_reading = [&](){
+		map_reading = [&](std::promise<bool>&& promise){
 			while (exitCtrl.running) {
+				cw.on_pollin();
+				if (cw.is_config_changed()) {
+					break;
+				}
+
 				updateConnectionsFromMaps(ipv4Connections, ipv4_fds, mapsWrapper);
 				if (monitorIPv6) {
 					updateConnectionsFromMaps(ipv6Connections, ipv6_fds, mapsWrapper);
@@ -254,6 +282,8 @@ int main(int argc, char* argv[]) {
 				std::unique_lock<std::mutex> lk{exitCtrl.m};
 				exitCtrl.cv.wait_for(lk, std::chrono::seconds(exitCtrl.wait_time), [] { return !exitCtrl.running; });
 			}
+
+			promise.set_value(exitCtrl.running);
 		};
 	}
 
@@ -276,7 +306,9 @@ int main(int argc, char* argv[]) {
 	}
 
 	bevents.start();
-	auto map_reader = std::thread{map_reading};
+	std::promise<bool> map_reader_promise;
+	auto map_reader_future = map_reader_promise.get_future();
+	auto map_reader = std::thread{map_reading, std::move(map_reader_promise)};
 
 	if (map_reader.joinable()) {
 		map_reader.join();
@@ -284,5 +316,21 @@ int main(int argc, char* argv[]) {
     bevents.stop();
 	LOG_INFO("Events stopped");
 
-	return ReturnCodes::Success;
+	return map_reader_future.get() ? ReturnCodes::Reconfigure : ReturnCodes::Success;
+}
+
+int main(int argc, char* argv[]) {
+	setUpExitBehavior();
+	ReturnCodes rc;
+	config_watcher cw{};
+	do {
+		auto [vm, argsFilePath]{parseOptions(argc, argv)};
+		if (!cw) {
+			cw.init(argsFilePath);
+		}
+		cw.reset();
+		rc = startNetTracer(cw, vm);
+		LOG_INFO("NetTracer stop reason {}", rc);
+	} while (rc == ReturnCodes::Reconfigure);
+	return rc;
 }

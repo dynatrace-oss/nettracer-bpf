@@ -1,5 +1,6 @@
 #include "bpf_events.h"
 #include "bpf_generic/src/perf_event.h"
+#include "config_watcher.h"
 #include <algorithm>
 #include <exception>
 #include <iostream>
@@ -25,6 +26,9 @@ std::vector<pollfd> bpf_events::create_pfds() {
 	fds.push_back(pollfd{STDIN_FILENO, POLLIN, 0});
 	for (const auto& ito : observers) {
 		std::transform(ito.md.pfd.begin(), ito.md.pfd.end(), std::back_inserter(fds), [](auto& it) { return pollfd{it, POLLIN, 0}; });
+	}
+	if (cw) {
+		fds.push_back(pollfd{cw.get_poll_fd(), POLLIN, 0});
 	}
 	return fds;
 }
@@ -53,6 +57,11 @@ void bpf_events::loop() {
 					exit(1);
 				}
 				kbhit_observer();
+			} else if (fd.fd == cw.get_poll_fd()) {
+				cw.on_pollin();
+				if (cw.is_config_changed()) {
+					config_change_observer();
+				}
 			} else {
 
 				auto ac = fd_to_evtype(fd.fd);

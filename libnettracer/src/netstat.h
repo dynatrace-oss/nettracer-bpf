@@ -50,6 +50,7 @@ protected:
 	ConnectionsIPv6 aggr6_;
 	std::mutex mx;
 	bool kbhit;
+	bool config_changed{false};
 	const int max_map_size = 1024;
 	ExitCtrl& exitCtrl;
 	bool incremental;
@@ -93,9 +94,10 @@ public:
 	explicit NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
 	virtual ~NetStat();
 	void set_kbhit();
+	void on_config_change();
 	void init();
 
-	void map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6);
+	bool map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6);
 
 	template<typename IPTYPE, typename EventIPTYPE>
 	void event(const EventIPTYPE& evt);
