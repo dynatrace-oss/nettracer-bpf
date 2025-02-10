@@ -51,7 +51,20 @@ spdlog::level::level_enum bpfLogLevelToSpdlogLevel(const bpf_log_level& level) {
 void unifyBPFLog(const bpf_log_event_t& evt) {
 	spdlog::level::level_enum level{bpfLogLevelToSpdlogLevel(evt.severity)};
 	// some of the message content args may be empty but that's alright, they won't be used then
-	std::string messageContent{fmt::format(evt.format, evt.args[0], evt.args[1], evt.args[2], evt.args[3], evt.args[4], evt.args[5], evt.args[6], evt.args[7], evt.args[8], evt.args[9])};
-	std::string message{fmt::format("[BPF][{:d}][{:d}][{:d}] {}", evt.timestamp, evt.cpu, evt.pid, messageContent)};
+	std::string message{fmt::format(
+			"[BPF][{}][{}][{}] {} {} {} {} {} {} {} {} {} {}",
+			evt.timestamp,
+			evt.cpu,
+			evt.pid,
+			evt.args[0],
+			evt.args[1],
+			evt.args[2],
+			evt.args[3],
+			evt.args[4],
+			evt.args[5],
+			evt.args[6],
+			evt.args[7],
+			evt.args[8],
+			evt.args[9])};
 	logging::getLogger()->log(level, message);
 }

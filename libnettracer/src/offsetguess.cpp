@@ -96,7 +96,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	if (!updateStatus()) {
 		return false;
 	}
-	logger->debug("guess status, set state: {:d}", status.state);
+	logger->debug("guess status, set state: {}", std::underlying_type_t<guess_state>(status.state));
 
 	// prepare values used to verify that we are at right offset
 	try {
@@ -119,10 +119,9 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 	// in loop below we need a swich to select connect trigger from IPv4 to IPv6 - we start with IPv4
 	bool guessIPv6 = false;
 	while (status.state != GUESS_STATE_READY) {
-		logger->trace("guess status, poking {:s} with state:{:d} what:{:d}",
+		logger->trace("guess status, poking {} with state:{} what:{}",
 			(guessIPv6?"ipv6":"ipv4"),
-			status.state, status.what
-		);
+			std::underlying_type_t<guess_state>(status.state), std::underlying_type_t<guess_field>(status.what));
 		if (guessIPv6) {
 			client6->pokeRemoteServerAndPort();
 		} else {
@@ -132,9 +131,8 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 		if (!mapsWrapper.lookupElement(status_fd, &zero, &status)) {
 			logger->error("Couldn't look up tracer status");
 		}
-		logger->trace("guess got status - state:{:d} what:{:d}",
-			status.state, status.what
-		);
+		logger->trace("guess got status - state:{} what:{}",
+			std::underlying_type_t<guess_field>(status.state), std::underlying_type_t<guess_field>(status.what));
 		if (status.state != GUESS_STATE_CHECKED) {
 			if (maxRetries == 0) {
 				logger->error("max retries of communicating with kernel side exhausted");
@@ -192,13 +190,13 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 			}
 			break;
 		default:
-			logger->error("unexpected status.what:{:d}", status.what);
+			logger->error("unexpected status.what:{}", std::underlying_type_t<guess_field>(status.what));
 			return false;
 		}
 
 
 		if (overflowOccurred()) {
-			logger->error("overflow while guessing {:d}, bailing out", status.what);
+			logger->error("overflow while guessing bailing out {}", std::underlying_type_t<guess_field>(status.what));
 			if (status.what == GUESS_FIELD_RTT) {
 				// allow failure for RTT
 				status.offset_rtt = status.offset_rtt_var = 0;
@@ -209,7 +207,7 @@ bool OffsetGuessing::makeGuessingAttempt(int status_fd) {
 		}
 
 		if (!updateStatus()){
-			logger->error("failed to set tracer status, errno: {:d}", errno);
+			logger->error("failed to set tracer status, errno: {}", errno);
 			return false;
 		}
 

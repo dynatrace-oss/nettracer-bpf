@@ -28,6 +28,7 @@
 #include <sys/resource.h>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace po = boost::program_options;
@@ -330,7 +331,7 @@ int main(int argc, char* argv[]) {
 		}
 		cw.reset();
 		rc = startNetTracer(cw, vm);
-		LOG_INFO("NetTracer stop reason {}", rc);
+		LOG_INFO("NetTracer stop reason {}", std::underlying_type_t<ReturnCodes>(rc));
 	} while (rc == ReturnCodes::Reconfigure);
 	return rc;
 }

@@ -2,15 +2,15 @@
 
 #include "inotify_watcher.h"
 
-#include <boost/noncopyable.hpp>
 #include <filesystem>
 #include <functional>
 #include <string>
 
-class config_watcher : private boost::noncopyable {
+class config_watcher {
 public:
     config_watcher() = default;
     ~config_watcher() = default;
+	config_watcher& operator=(const config_watcher&) = delete;
 
     void init(const std::filesystem::path file_path);
 

@@ -62,7 +62,7 @@ bool readAndApplyRelocations(Elf_Data* data, Elf_Data* symbols, GElf_Shdr* shdr,
 		gelf_getsym(symbols, GELF_R_SYM(rel.r_info), &sym);
 
 		if (insn[insn_idx].code != (BPF_LD | BPF_IMM | BPF_DW)) {
-			LOG_ERROR("Invalid relo for insn[{:d}], code {0:#010x}", insn_idx, insn[insn_idx].code);
+			LOG_ERROR("Invalid relo for insn[{}], code {}", insn_idx, insn[insn_idx].code);
 			return false;
 		}
 		insn[insn_idx].src_reg = BPF_PSEUDO_MAP_FD;
