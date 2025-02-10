@@ -16,7 +16,7 @@ foreach(dir ${KERNEL_HEADERS})
 	list(APPEND ISYSTEM_KERNEL_HEADERS "-isystem" "${dir}")
 endforeach()
 
-set(CLANG_COMMAND clang
+set(CLANG_COMMAND ${LLVM_BINDIR}/clang
 	-D__KERNEL__ -D__TARGET_ARCH_${ARCH}
 	-D${BUILD_TYPE_MACRO}
 	-fno-jump-tables -fno-builtin
@@ -25,12 +25,12 @@ set(CLANG_COMMAND clang
 	-c "${CMAKE_CURRENT_LIST_DIR}/nettracer-bpf.c"
 	-nostdinc
 	-I "${CMAKE_CURRENT_LIST_DIR}"
-	-isystem ${LLVM_HEADERS}
+	-isystem ${LLVM_INCLUDE}
 	${ISYSTEM_KERNEL_HEADERS}
 	-o nettracer-bpf.c.o
 )
 
-set(LLC_COMMAND llc
+set(LLC_COMMAND ${LLVM_BINDIR}/llc
 	nettracer-bpf.c.o
 	-march=bpf -filetype=obj
 	-o "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nettracer-bpf.o"

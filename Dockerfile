@@ -1,39 +1,33 @@
 FROM ubuntu:18.04
 
 ARG KERNEL_VERSION=4.15.0-101-generic
+ARG BUILD_TYPE=Release
+ARG LLVM_VERSION=16
 ENV KERNEL_VERSION=$KERNEL_VERSION
+
 RUN apt update -y && \
-	apt install -y \
+    apt-get install -y software-properties-common && \
+	add-apt-repository ppa:ubuntu-toolchain-r/test -y && \
+	apt update -y && \
+	apt install -y --fix-missing \
+	wget lsb-release gpg  python3-pip git libelf-dev \
+	make gcc-11 g++-11 linux-headers-$KERNEL_VERSION && \
+	pip3 install --upgrade pip && \
+	pip3 install conan==1.62.0 cmake==3.22.3 && \
+	update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-11 100 && \
+	update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-11 100 
 	# for the new clang
-	wget lsb-release gpg software-properties-common \
-	# for preparing dependencies
-	git libelf-dev libboost-program-options-dev \
-	make gcc-8 g++-8 linux-headers-$KERNEL_VERSION cmake && \
-	# update links to use version 8.x of gcc/g++
-	update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8 && \
-	update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 --slave /usr/bin/c++ c++ /usr/bin/g++
-RUN wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - 10
+RUN  wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - $LLVM_VERSION
+	#update-alternatives --install /usr/bin/cc cc /usr/lib/llvm-10/bin/clang 800 && \
+    #update-alternatives --install /usr/bin/c++ c++ /usr/lib/llvm-10/bin/clang++ 800
 
-ARG FMT_VERSION=8.0.1
-ENV FMT_VERSION=$FMT_VERSION
-RUN git clone --depth 1 --branch $FMT_VERSION https://github.com/fmtlib/fmt.git && \
-	cd fmt && mkdir build && cd build && \
-	cmake -DFMT_TEST=OFF .. && make -j && make install
-ARG SPDLOG_VERSION=1.9.2
-ENV SPDLOG_VERSION=$SPDLOG_VERSION
-RUN git clone --depth 1 --branch v$SPDLOG_VERSION https://github.com/gabime/spdlog.git && \
-	cd spdlog && mkdir build && cd build && \
-	cmake -DSPDLOG_BUILD_EXAMPLE=OFF -DSPDLOG_FMT_EXTERNAL=ON .. && make -j && make install
-
+RUN mkdir /nettracer
 WORKDIR /nettracer
 COPY . .
 
-ARG BUILD_TYPE=Release
 
 RUN export PATH=$(dirname `find / -iname clang -type f`):$PATH && \
-	mkdir -p build && \
-	cd build && \
-	cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. \
-		-DCMAKE_INSTALL_PREFIX=./install \
-		-DKERNEL_VERSION=$KERNEL_VERSION  &&\
-	make -j `nproc`
+	cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -S . -B build  \
+		-DCMAKE_INSTALL_PREFIX=./install  -DLLVM_VERSION=$LLVM_VERSION   \
+		-DKERNEL_VERSION=$KERNEL_VERSION && \
+	cmake --build build

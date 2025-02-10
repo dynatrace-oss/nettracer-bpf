@@ -21,32 +21,22 @@ endif(NOT UNIX)
 
 project(nettracer LANGUAGES C CXX DESCRIPTION "")
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_VERBOSE_MAKEFILE TRUE)
-set(CMAKE_CXX_EXTENSIONS FALSE)
+set(CMAKE_CXX_EXTENSIONS TRUE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(DEFINED CONAN_DEPS)
-    include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    conan_basic_setup(TARGETS)
-    set(ignore "${CONAN_DEPS}")
-else()
-    if(NOT TARGET fmt)
-	find_package(fmt 8.0.1 REQUIRED)
-    endif(NOT TARGET fmt)
-    if(NOT TARGET spdlog)
-	find_package(spdlog 1.9.2 REQUIRED)
-    endif(NOT TARGET spdlog)
-
-    set(Boost_USE_STATIC_LIBS ON)
-    find_package(Boost REQUIRED COMPONENTS program_options)
-    if(Boost_FOUND)
-    	include_directories(${CONAN_INCLUDE_LIBS})
-        include_directories(${Boost_INCLUDE_DIRS})
-    endif()
-    set(GITHUB_GTEST 1)
-endif()
+if (CONAN_EXPORTED)
+	include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+	conan_basic_setup(TARGETS)
+else ()
+	include(conan.cmake)
+	conan_cmake_run(CONANFILE conanfile.txt
+			BASIC_SETUP CMAKE_TARGETS UPDATE NO_OUTPUT_DIRS
+			BUILD missing
+	)
+endif ()
 
 if(DEFINED BPF_DEBUG)
 	set(BPF_DEBUG ${BPF_DEBUG})  # suppress CMake's warning about unused variable - it IS used in bpf_program
@@ -56,11 +46,17 @@ if(NOT DEFINED KERNEL_VERSION)
 	execute_process(COMMAND uname -r OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE KERNEL_VERSION)
 endif()
 
-if(NOT DEFINED LLVM_VERSION)
-	execute_process(COMMAND llvm-config  --version OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE LLVM_VERSION)
+
+if(NOT DEFINED LLVM_BINDIR)
+	execute_process(COMMAND llvm-config  --bindir OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE LLVM_BINDIR)
+	message("llvm bindir: ${LLVM_BINDIR}")
 endif()
-find_path( LLVM_HEADERS NAMES stdarg.h PATHS  "/usr/lib64/clang/${LLVM_VERSION}/include" "/usr/lib/clang/${LLVM_VERSION}/include")
-message("llvm headers: ${LLVM_HEADERS}")
+
+if(NOT DEFINED LLVM_INCLUDE)
+	execute_process(COMMAND llvm-config  --version OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE LLVM_VERSION)
+	find_path( LLVM_INCLUDE NAMES stdarg.h PATHS  "/usr/lib64/clang/${LLVM_VERSION}/include" "/usr/lib/clang/${LLVM_VERSION}/include")
+	message("llvm headers: ${LLVM_INCLUDE}")
+endif()
 
 if(NOT DEFINED ARCHITECTURE)
 	execute_process(COMMAND uname -m OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE ARCHITECTURE)
@@ -171,5 +167,4 @@ add_custom_target(run-tests COMMAND ${CMAKE_CTEST_COMMAND} -T Test --no-compress
 add_subdirectory(bpf_program)
 add_subdirectory(bpf_generic)
 add_subdirectory(libnettracer)
-#add_subdirectory(nettracer)
 add_subdirectory(nettracersrv)

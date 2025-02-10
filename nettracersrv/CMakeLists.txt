@@ -23,11 +23,7 @@ target_include_directories(nettracersrv
 )
 
 target_link_libraries(nettracersrv libnettracer)
-if(DEFINED CONAN_DEPS)
-    target_link_libraries(nettracersrv CONAN_PKG::boost)
-else()
-    target_link_libraries(nettracersrv Boost::program_options)
-endif()
+target_link_libraries(nettracersrv CONAN_PKG::boost)
 
 install(TARGETS nettracersrv
 	RUNTIME DESTINATION "bin"
