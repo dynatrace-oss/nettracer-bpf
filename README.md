@@ -34,34 +34,6 @@ the following metrics are collected:
 - Round-Trip Time (in microseconds)
 - Round-Trip Time variance
 
-## Setup
-
-There are two ways of building NetTracer. You can either prepare your environment, installing dependencies on your own, or build it in a Docker container. If you wish to make Docker handle the whole setup, install Docker and run:
-
-```
-make
-```
-
-The project will be built, tested and the resulting binaries will be placed in _build_ directory.
-
-However, if you prefer to use your own environment for building, run these commands:
-
-```
-make build-project
-make test-project
-```
-
-You may want to see the _Dockerfile_ to check what dependencies need to be installed.
-
-Building with conan and cmake:
-
-```
-mkdir build && cd build
-conan install --build=boost ..
-cmake -DCONAN_DEPS=1  -DCMAKE_BUILD_TYPE=Release  -DLLVM_VERSION=10 ..
-cmake --build .
-ctest .
-```
 
 ## Usage
 
