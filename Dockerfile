@@ -13,7 +13,7 @@ RUN apt update -y && \
 	wget lsb-release gpg  python3-pip git libelf-dev \
 	make gcc-11 g++-11 linux-headers-$KERNEL_VERSION && \
 	pip3 install --upgrade pip && \
-	pip3 install conan==1.62.0 cmake==3.22.3 && \
+	pip3 install conan==1.62.0 cmake==3.28.4 && \
 	update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-11 100 && \
 	update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-11 100 
 	# for the new clang
