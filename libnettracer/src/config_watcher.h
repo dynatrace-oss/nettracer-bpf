@@ -10,6 +10,7 @@ class config_watcher {
 public:
     config_watcher() = default;
     ~config_watcher() = default;
+	config_watcher(const config_watcher&) = delete;
 	config_watcher& operator=(const config_watcher&) = delete;
 
     void init(const std::filesystem::path file_path);
