@@ -1,27 +1,4 @@
 
-if(DEFINED GITHUB_GTEST)
-#Set up GTest, similarly to how it's proposed in https://github.com/google/googletest/tree/master/googletest#incorporating-into-an-existing-cmake-project
-    configure_file(GoogleTest.cmake.in googletest-download/CMakeLists.txt)
-    message(" ${CMAKE_COMMAND} ${CMAKE_GENERATOR} ${CMAKE_CURRENT_BINARY_DIR}" )
-    execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download
-        )
-    if(result)
-        message(FATAL_ERROR "CMake step for googletest failed: ${result}")
-        endif()
-        execute_process(COMMAND ${CMAKE_COMMAND} --build .
-            RESULT_VARIABLE result
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download)
-        if(result)
-        message(FATAL_ERROR "Build step for googletest failed: ${result}")
-        endif()
-
-        add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
-                     ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
-                     EXCLUDE_FROM_ALL)
-endif()
-
 set(SOURCES
 	connection_test.cpp
 	connections_printing_test.cpp
@@ -50,13 +27,7 @@ target_include_directories(libnettracer_test
 target_link_libraries(libnettracer_test libnettracer)
 target_link_libraries(libnettracer_test -lpthread)
 target_link_libraries(libnettracer_test -lz)
-
-if(DEFINED GITHUB_GTEST)
-    target_link_libraries(libnettracer_test gmock_main)
-    target_link_libraries(libnettracer_test gtest_main)
-else()
-    target_link_libraries(libnettracer_test CONAN_PKG::gtest)
-endif()
+target_link_libraries(libnettracer_test CONAN_PKG::gtest)
 
 include(GoogleTest)
 gtest_discover_tests(libnettracer_test)

@@ -1,4 +1,5 @@
 IMAGE_NAME=registry.lab.dynatrace.org/oneagent/oneagent-nettracer:latest
+CONTAINER_NAME=nettracer-build
 USER=$(shell id -u)
 DEBUG?=0
 
@@ -12,60 +13,27 @@ DOCKER_SUDO=$(shell docker version > /dev/null 2>&1 || echo "sudo")
 
 all: build-image build-project-docker test-project-docker
 
-build-image:
+build-image : Dockerfile conanfile.txt
 	$(DOCKER_SUDO) docker build --network=host \
 		--build-arg BUILD_TYPE=$(BUILD_TYPE) \
 		-t $(IMAGE_NAME) .
+	touch build-image
 
 build-project-docker:
 	$(DOCKER_SUDO) docker run --rm \
-		-v $(shell pwd):/opt/mount:z \
-		$(IMAGE_NAME) \
-		cp -r /nettracer/build /opt/mount
-	$(DOCKER_SUDO) chown -R $(USER):$(USER) build
+		-v $(shell pwd):/opt/mount:z  --name $(CONTAINER_NAME) \
+		$(IMAGE_NAME) bash -c "cp -r build /opt/mount && cd /opt/mount && cmake --build build"
+	#$(DOCKER_SUDO) chown -R $(USER):$(USER) build
 
-test-project-docker:
+test-project-docker: build-project-docker
 	$(DOCKER_SUDO) docker run --rm \
-		-v $(shell pwd):/opt/mount:z \
-		$(IMAGE_NAME) \
-		bash -c 'cd /nettracer/build && make run-tests; \
-			cd /nettracer/build && mkdir -p /opt/mount/build && cp ./Testing/**/Test.xml --parents /opt/mount/build'
-
-dump-bpf-docker:
-	$(DOCKER_SUDO) docker run --rm \
-		-v $(shell pwd):/nettracer:z \
-		--workdir=/nettracer \
-		$(IMAGE_NAME) \
-		bash -c 'export PATH="$$(dirname `find / -iname clang -type f`):$$PATH" && \
-			mkdir -p build && \
-			cd build && \
-			cmake -DCMAKE_BUILD_TYPE=Debug \
-				-DDEBUG_BPF=1
-				-DKERNEL_VERSION=4.15.0-101-generic .. && \
-			make bpf_program && \
-			llvm-objdump -t -S -no-show-raw-insn bin/nettracer-bpf.o'
+		-v $(shell pwd):/opt/mount:z  --name $(CONTAINER_NAME) \
+		$(IMAGE_NAME) bash -c "cd /opt/mount/build && ctest"
 
 delete-image:
 	$(DOCKER_SUDO) docker rmi -f $(IMAGE_NAME)
 
-clean-docker: delete-image clean
-
-build-project:
-	mkdir -p build && \
-	cd build && \
-	cmake -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) .. && \
-	make -j `nproc`
-
-test-project:
-	cd build && make run-tests
-
-dump-bpf:
-	mkdir -p build && \
-	cd build && \
-	cmake -DCMAKE_BUILD_TYPE=Debug \
-		-DDEBUG_BPF=1 .. && \
-	make bpf_program && \
-	llvm-objdump -t -S -no-show-raw-insn bin/nettracer-bpf.o
-
 clean:
 	rm -rf build
+
+full-clean: clean delete-image
