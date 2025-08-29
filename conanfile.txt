@@ -12,4 +12,5 @@ CMakeToolchain
 [layout]
 cmake_layout
 
-
+[imports]
+., license* -> ./licenses @ folder=True, ignore_case=True
