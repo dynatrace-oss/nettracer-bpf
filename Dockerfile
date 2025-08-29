@@ -13,9 +13,14 @@ RUN apt update -y && \
 	wget lsb-release gpg  python3-pip git libelf-dev \
 	make gcc-11 g++-11 linux-headers-$KERNEL_VERSION && \
 	pip3 install --upgrade pip && \
-	pip3 install conan==1.62.0 cmake==3.28.4 && \
+	pip3 install conan==1.66.0 cmake==3.28.4 && \
 	update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-11 100 && \
-	update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-11 100 
+	update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-11 100 && \
+    conan profile new default --detect  --force   && \
+    conan profile update settings.compiler.version=11        default  && \
+    conan profile update settings.compiler.libcxx=libstdc++11 default  && \
+    conan profile update  env.CC=/usr/bin/gcc-11  default   && \
+    conan profile update  env.C++=/usr/bin/g++-11  default
 	# for the new clang
 RUN  wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - $LLVM_VERSION
 	#update-alternatives --install /usr/bin/cc cc /usr/lib/llvm-10/bin/clang 800 && \
