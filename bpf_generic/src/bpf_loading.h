@@ -17,6 +17,7 @@
 
 #include "system_calls.h"
 #include <linux/bpf.h>
+#include <cstdint>
 #include <string>
 #include <vector>
 
