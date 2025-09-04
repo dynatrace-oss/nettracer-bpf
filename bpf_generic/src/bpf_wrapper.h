@@ -16,6 +16,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <linux/bpf.h>
 #include <string>

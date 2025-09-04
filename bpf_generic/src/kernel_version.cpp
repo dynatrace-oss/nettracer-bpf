@@ -22,6 +22,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <sys/utsname.h>
+#include <string.h>
 
 namespace {
 
