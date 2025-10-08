@@ -195,6 +195,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 
 	unsigned time_interval = vm["time_interval"].as<unsigned>();
+	LOG_INFO("time_interval: {}", time_interval);
 	exitCtrl.wait_time = time_interval;
 
 	bpf::bpf_subsystem ebpf;
@@ -202,10 +203,12 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 
 	if (vm.count("clear_probes")) {
 		ebpf.clear_all_probes();
+		LOG_INFO("clear_probes");
 	}
 
 	try {
 		uint32_t nn_entries = vm["map_size"].as<uint32_t>();
+		LOG_INFO("map_size: {}", nn_entries);
 		if (!ebpf.load_bpf_file(vm["program"].as<std::string>(), nn_entries)) {
 			return ReturnCodes::GenericError;
 		}
