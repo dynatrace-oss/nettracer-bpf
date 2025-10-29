@@ -201,6 +201,8 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	bpf::bpf_subsystem ebpf;
 	bpf::BPFMapsWrapper mapsWrapper;
 
+	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"), vm.count("with_loopback") == 0);
+
 	if (vm.count("clear_probes")) {
 		ebpf.clear_all_probes();
 		LOG_INFO("clear_probes");
@@ -211,8 +213,8 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		LOG_INFO("map_size: {}", nn_entries);
 		const int MAX_MAP_SIZE = 1024 * 1024;
 		if (nn_entries > MAX_MAP_SIZE) {
-			LOG_ERROR("map_size too large: {}, maximum value allowed: {}", nn_entries, MAX_MAP_SIZE);
-			return ReturnCodes::GenericError;
+			LOG_INFO("map_size too large: {}, using maximum value allowed: {}", nn_entries, MAX_MAP_SIZE);
+			nn_entries = MAX_MAP_SIZE;
 		}
 		netst.set_max_map_size(nn_entries);
 		if (!ebpf.load_bpf_file(vm["program"].as<std::string>(), nn_entries)) {
@@ -261,7 +263,6 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 
 	bool monitorIPv6 = isIPv6MonitoringPossible(status_fd, mapsWrapper);
 
-	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"), vm.count("with_loopback") == 0);
 	netst.init();
     bpf_events bevents(cw);
     bevents.set_kbhit_observer( std::bind(&netstat::NetStat::set_kbhit, &netst));
