@@ -209,6 +209,12 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	try {
 		uint32_t nn_entries = vm["map_size"].as<uint32_t>();
 		LOG_INFO("map_size: {}", nn_entries);
+		const int MAX_MAP_SIZE = 1024 * 1024;
+		if (nn_entries > MAX_MAP_SIZE) {
+			LOG_ERROR("map_size too large: {}, maximum value allowed: {}", nn_entries, MAX_MAP_SIZE);
+			return ReturnCodes::GenericError;
+		}
+		netst.set_max_map_size(nn_entries);
 		if (!ebpf.load_bpf_file(vm["program"].as<std::string>(), nn_entries)) {
 			return ReturnCodes::GenericError;
 		}

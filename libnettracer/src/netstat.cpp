@@ -382,6 +382,10 @@ NetStat::NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteracti
 NetStat::~NetStat() {
 }
 
+void netstat::NetStat::set_max_map_size(uint32_t size) {
+    max_map_size = size;
+}
+
 void NetStat::set_kbhit() {
 	std::unique_lock<std::mutex> ul(exitCtrl.m);
 	kbhit = true;

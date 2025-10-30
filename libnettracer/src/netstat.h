@@ -66,7 +66,7 @@ protected:
 	std::mutex mx;
 	bool kbhit;
 	bool config_changed{false};
-	const int max_map_size = 1024;
+	int max_map_size{1024};
 	ExitCtrl& exitCtrl;
 	bool incremental;
 	bool add_header_mode_ = false;
@@ -109,6 +109,7 @@ public:
 	explicit NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
 	virtual ~NetStat();
 	void set_kbhit();
+	void set_max_map_size(uint32_t size);
 	void on_config_change();
 	void init();
 
