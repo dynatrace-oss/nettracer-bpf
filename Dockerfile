@@ -14,17 +14,15 @@ RUN apt update -y && \
 	make gcc-11 g++-11 linux-headers-$KERNEL_VERSION && \
 	pip3 install --upgrade pip && \
 	pip3 install conan==1.66.0 cmake==3.28.4 && \
-	update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-11 100 && \
-	update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-11 100 && \
     conan profile new default --detect  --force   && \
     conan profile update settings.compiler.version=11        default  && \
     conan profile update settings.compiler.libcxx=libstdc++11 default  && \
-    conan profile update  env.CC=/usr/bin/gcc-11  default   && \
-    conan profile update  env.C++=/usr/bin/g++-11  default
+    conan profile update  env.CC=/usr/lib/llvm-16/bin/clang  default   && \
+    conan profile update  env.C++=/usr/lib/llvm-16/bin/clang++  default
 	# for the new clang
-RUN  wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - $LLVM_VERSION
-	#update-alternatives --install /usr/bin/cc cc /usr/lib/llvm-10/bin/clang 800 && \
-    #update-alternatives --install /usr/bin/c++ c++ /usr/lib/llvm-10/bin/clang++ 800
+RUN  wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - $LLVM_VERSION  && \
+	update-alternatives --install /usr/bin/cc cc /usr/lib/llvm-16/bin/clang 800 && \
+    update-alternatives --install /usr/bin/c++ c++ /usr/lib/llvm-16/bin/clang++ 800
 
 RUN mkdir /nettracer
 WORKDIR /nettracer
@@ -34,5 +32,5 @@ COPY . .
 RUN export PATH=$(dirname `find / -iname clang -type f`):$PATH && \
 	cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -S . -B build  \
 		-DCMAKE_INSTALL_PREFIX=./install  -DLLVM_VERSION=$LLVM_VERSION   \
-		-DKERNEL_VERSION=$KERNEL_VERSION && \
+		-DKERNEL_VERSION=$KERNEL_VERSION   -DCMAKE_CXX_COMPILER=clang++ && \
 	cmake --build build
