@@ -16,6 +16,8 @@ name: "Build and test Debug"
 
 on:
   pull_request:
+  push:
+    branches: master
 
 jobs:
   build-and-test-debug:
