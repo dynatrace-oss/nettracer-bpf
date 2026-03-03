@@ -91,12 +91,14 @@ try_adding_kernel_headers_base_dir("common" MOD_INCLUDE)
 find_path( KERNEL_INCLUDE NAMES kconfig.h PATHS   "${MOD_INCLUDE}"
 						"/usr/src/linux-headers-${KERNEL_VERSION}/include/linux" 
                          "/usr/src/kernels/${KERNEL_VERSION}/include/linux" )
-if(DEFINED KERNEL_INCLUDE)
-    get_filename_component(PARENT_DIR ${KERNEL_INCLUDE} PATH)
-    get_filename_component(PARENT_DIR ${PARENT_DIR} PATH)
-    if(NOT ${KERNEL_HEADERS_BASE} STREQUAL ${PARENT_DIR})
-	    set(KERNEL_HEADERS_BASE "${KERNEL_HEADERS_BASE};${PARENT_DIR}")
-    endif()
+
+message("kernel include path: ${KERNEL_INCLUDE}")
+if(KERNEL_INCLUDE)
+	get_filename_component(PARENT_DIR ${KERNEL_INCLUDE} DIRECTORY)
+	get_filename_component(PARENT_DIR ${PARENT_DIR} DIRECTORY)
+	if(NOT ${KERNEL_HEADERS_BASE} STREQUAL ${PARENT_DIR})
+		set(KERNEL_HEADERS_BASE "${KERNEL_HEADERS_BASE};${PARENT_DIR}")
+	endif()
 endif()
 
 message( "root of kernel headers:  ${KERNEL_HEADERS_BASE}")
