@@ -28,6 +28,6 @@ RUN apt-get update -y && \
     update-alternatives --install /usr/bin/cc cc /usr/lib/llvm-17/bin/clang 800 && \
     update-alternatives --install /usr/bin/c++ c++ /usr/lib/llvm-17/bin/clang++ 800 && \
     pip3 install --upgrade pip && \
-	pip3 install conan==1.66.0 cmake==3.26.1
+	pip3 install conan==1.66.0 cmake==3.28.4
 
 ENV PATH="/usr/lib/llvm-17/bin:$PATH"
