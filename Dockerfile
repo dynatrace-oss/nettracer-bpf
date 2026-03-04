@@ -13,16 +13,18 @@ RUN apt update -y && \
 	wget lsb-release gpg  python3-pip git libelf-dev \
 	make gcc-11 g++-11 linux-headers-$KERNEL_VERSION && \
 	pip3 install --upgrade pip && \
-	pip3 install conan==1.66.0 cmake==3.28.4 && \
-    conan profile new default --detect  --force   && \
-    conan profile update settings.compiler.version=11        default  && \
-    conan profile update settings.compiler.libcxx=libstdc++11 default  && \
-    conan profile update  env.CC=/usr/lib/llvm-16/bin/clang  default   && \
-    conan profile update  env.C++=/usr/lib/llvm-16/bin/clang++  default
+	pip3 install conan==1.66.0 cmake==3.28.4
 	# for the new clang
 RUN  wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - $LLVM_VERSION  && \
 	update-alternatives --install /usr/bin/cc cc /usr/lib/llvm-16/bin/clang 800 && \
-    update-alternatives --install /usr/bin/c++ c++ /usr/lib/llvm-16/bin/clang++ 800
+    update-alternatives --install /usr/bin/c++ c++ /usr/lib/llvm-16/bin/clang++ 800 &&\
+    conan config init   && \
+    conan profile update settings.compiler.version=11        default  && \
+    conan profile update settings.compiler.libcxx=libstdc++11 default  && \
+    conan profile update  env.CC=/usr/lib/llvm-16/bin/clang  default   && \
+    conan profile update  env.C++=/usr/lib/llvm-16/bin/clang++  default && \
+	conan profile update tools.build.compiler_executables={"c": "/usr/lib/llvm-16/bin/clang", "cxx": "/usr/lib/llvm-16/bin/clang++", "llvm": "/usr/lib/llvm-16/bin/llvm"} default && \
+	conan profile show default
 
 RUN mkdir /nettracer
 WORKDIR /nettracer
