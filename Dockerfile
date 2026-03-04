@@ -19,11 +19,11 @@ RUN  wget --timeout=10 --tries=3 -O - https://apt.llvm.org/llvm.sh | bash -s - $
 	update-alternatives --install /usr/bin/cc cc /usr/lib/llvm-16/bin/clang 800 && \
     update-alternatives --install /usr/bin/c++ c++ /usr/lib/llvm-16/bin/clang++ 800 &&\
     conan config init   && \
-    conan profile update settings.compiler.version=11        default  && \
+    conan profile update settings.compiler=clang        default  && \
+    conan profile update settings.compiler.version=16        default  && \
     conan profile update settings.compiler.libcxx=libstdc++11 default  && \
     conan profile update  env.CC=/usr/lib/llvm-16/bin/clang  default   && \
     conan profile update  env.C++=/usr/lib/llvm-16/bin/clang++  default && \
-	conan profile update tools.build.compiler_executables={"c": "/usr/lib/llvm-16/bin/clang", "cxx": "/usr/lib/llvm-16/bin/clang++", "llvm": "/usr/lib/llvm-16/bin/llvm"} default && \
 	conan profile show default
 
 RUN mkdir /nettracer
