@@ -34,5 +34,5 @@ COPY . .
 RUN export PATH=$(dirname `find / -iname clang -type f`):$PATH && \
 	cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -S . -B build  \
 		-DCMAKE_INSTALL_PREFIX=./install  -DLLVM_VERSION=$LLVM_VERSION   \
-		-DKERNEL_VERSION=$KERNEL_VERSION   -DCMAKE_CXX_COMPILER=clang++ && \
+		-DKERNEL_VERSION=$KERNEL_VERSION   && \
 	cmake --build build
