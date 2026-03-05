@@ -26,5 +26,5 @@ add_library(bpf_generic STATIC ${SOURCES} ${HEADERS})
 
 target_link_libraries(bpf_generic CONAN_PKG::spdlog)
 target_link_libraries(bpf_generic CONAN_PKG::fmt)
-target_link_libraries(bpf_generic CONAN_PKG::elfutils)
+target_link_libraries(bpf_generic /usr/lib/${ARCHITECTURE}-linux-gnu/libelf.a)
 target_link_libraries(bpf_generic -lz)
