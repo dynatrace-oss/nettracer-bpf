@@ -19,4 +19,3 @@ conan remote add conancenter https://center.conan.io
 cmake -DCMAKE_BUILD_TYPE=<build type> -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -S . -B <build dir>
 cmake --build <build dir>
 ```
-
