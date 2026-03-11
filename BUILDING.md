@@ -1,9 +1,12 @@
 ## Building
+Building process is verfied on Ubuntu 18.04 and Debian 12 bookworm
 
 **Prerequisites**
-* conan >= 1.62.0
-* cmake >= 3.22.3
+* conan >= 1.66.0  but <= 2.*
+* cmake >= 3.28.4
 * clang >= 16
+* libelf-dev
+* linux-headers-4.15.*
 
 Add a new remote:
 ```
@@ -17,19 +20,3 @@ cmake -DCMAKE_BUILD_TYPE=<build type> -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPI
 cmake --build <build dir>
 ```
 
-
-**Alternate build in docker container**
-
-If you wish to make Docker handle the whole setup, install Docker and run:
-
-```
-make
-```
-
-The project will be built, tested and the resulting binaries will be placed in _build_ directory.
-
-Subsequently you can reuse created container for building and testing by using following commands:
-
-```
-make build-project
-make test-project
