@@ -24,7 +24,7 @@ runs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./dev-docker/Dockerfile
+        file: ./Dockerfile
         cache-from: type=gha
         cache-to: type=gha,mode=max
         push: false
