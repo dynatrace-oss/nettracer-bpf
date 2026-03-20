@@ -13,9 +13,10 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
 #pragma once
 
-#include "bpf_generic/src/maps_loading.h"
+#include "bpf_generic/src/maps_def.h"
 #include "bpf_program/nettracer-bpf.h"
 #include <functional>
 #include <thread>

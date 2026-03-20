@@ -16,10 +16,8 @@
 #include "bpf_loading.h"
 
 #include "bpf_wrapper.h"
-#include "elf_utils.h"
 #include "errors.h"
 #include "kernel_version.h"
-#include "log.h"
 #include "maps_loading.h"
 #include "perf_sys.h"
 
@@ -32,8 +30,6 @@
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
-#include <gelf.h>
-#include <libelf.h>
 #include <stdexcept>
 #include <string_view>
 #include <string>
@@ -43,6 +39,8 @@
 #include <sys/sysinfo.h>
 #include <unistd.h>
 #include <vector>
+#include <llvm/ADT/StringRef.h>
+#include "log.h"
 
 #define DEBUGFS "/sys/kernel/debug/tracing/"
 
@@ -234,110 +232,12 @@ bool bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 	return true;
 }
 
-struct ElfFileContent {
-	std::vector<elf_section> sections;
-	char license[128] = {0};
-	int mapsShndx = -1;
-	int strtabidx = -1;
-	Elf_Data* symbols = nullptr;
-
-	bool isOk() const {
-		if (sections.empty()) {
-			LOG_ERROR("No sections available");
-			return false;
-		}
-		if (*license == '\n') {
-			LOG_ERROR("No license found");
-			return false;
-		}
-		if (mapsShndx == -1) {
-			LOG_ERROR("No maps section found");
-			return false;
-		}
-		if (strtabidx == -1 || !symbols) {
-			LOG_ERROR("No symbols section found");
-			return false;
-		}
-		return true;
-	}
-};
-
-ElfFileContent scanElfSections(Elf* elf, GElf_Ehdr* ehdr) {
-	ElfFileContent fileContent;
-	for (unsigned i = 1; i < ehdr->e_shnum; ++i) {
-		elf_section sec{.indx = i};
-		if (!getSection(elf, ehdr, sec))
-			continue;
-
-		LOG_DEBUG(
-				"section {:2d}: {}",
-				i,
-				to_string(sec));
-
-		if (sec.shname == "license") {
-			sec.processed = true;
-			memcpy(fileContent.license, sec.data->d_buf, sec.data->d_size);
-		}
-		else if (sec.shname ==  "version")  {
-			sec.processed = true;
-			if (sec.data->d_size != sizeof(int)) {
-				throw std::runtime_error{"Invalid size of version, section: " + std::to_string(sec.data->d_size)};
-			}
-			// Actually disregard the kernel version from ELF section
-			// Checking if the version of a probe to be loaded matches the present kernel version didn't work well as a compatibility test anyway
-			// and in kernel 5 the check was removed.
-			// memcpy(&fileContent.kernVersion, sec.data->d_buf, sizeof(int));
-		}
-		else if (sec.shname == "maps") {
-			fileContent.mapsShndx = fileContent.sections.size();
-		}
-		else if (sec.shdr.sh_type == SHT_SYMTAB) {
-			fileContent.strtabidx = sec.shdr.sh_link;
-			fileContent.symbols = sec.data;
-		}
-		fileContent.sections.push_back(std::move(sec));
-	}
-	return fileContent;
-}
-
-bool processReloSections(Elf* elf, GElf_Ehdr* ehdr, std::vector<elf_section>& allSections, Elf_Data* symbols, maps_config& maps) {
-	bool all_ok = true;
-	for (auto& sec : allSections) {
-		if (sec.processed)
-			continue;
-
-		// relocations section
-		if (sec.shdr.sh_type == SHT_REL) {
-			elf_section prog_scn{.indx = sec.shdr.sh_info};
-			if (!getSection(elf, ehdr, prog_scn))
-				continue;
-
-			if (prog_scn.shdr.sh_type != SHT_PROGBITS || !(prog_scn.shdr.sh_flags & SHF_EXECINSTR))
-				continue;
-
-			bpf_insn* insns = (bpf_insn*)prog_scn.data->d_buf;
-			sec.processed = true;
-
-			if (!readAndApplyRelocations(sec.data, symbols, &sec.shdr, insns, maps)) {
-				LOG_ERROR("Relocations for section {:d} failed", sec.indx);
-				all_ok = false;
-			}
-		}
-	}
-	return all_ok;
-}
-
-void bpf_subsystem::load_programs_from_sections(std::vector<elf_section>& allSections, const char* license, int kernVersion) {
+void bpf_subsystem::load_programs_from_sections(const BpfPrograms& bpfPrograms, int kernVersion) {
 	bool allFailed = true;
-	for (auto& sec : allSections) {
-		if (sec.processed)
-			continue;
-
-		if (sec.shname.compare(0, 7, "kprobe/") == 0 || sec.shname.compare(0, 10, "kretprobe/") == 0) {
-			kprobe probe{.fname = sec.shname, .insn = (bpf_insn*)sec.data->d_buf, .size = sec.data->d_size, .fd = -1, .efd = -1};
-			allFailed &= !load_and_attach(probe, license, kernVersion);
-			sec.processed = true;
-		}
+    for (const auto& [name, program]: bpfPrograms) {
+		LOG_DEBUG("loading {} {}", name, program.size());
+		kprobe probe{.fname = name, .insn = (bpf_insn*)program.data(), .size = program.size(), .fd = -1, .efd = -1};
+		allFailed &= !load_and_attach(probe, "GPL", kernVersion);
 	}
 
 	if(allFailed){
@@ -357,27 +257,9 @@ bpf_subsystem::bpf_subsystem(const ISystemCalls& sysCalls)
 	: sysCalls(sysCalls) {}
 
 bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entries) {
-	if (elf_version(EV_CURRENT) == EV_NONE)
-		throw std::runtime_error{"Cannot read elf version"};
 
-	LOG_DEBUG("Loading BPF program from {}", path);
-	file_fd bpf_file_fd{path};
-	Elf* elf = elf_begin(bpf_file_fd.fd, ELF_C_READ, nullptr);
-
-	if (!elf)
-		throw std::runtime_error{"Cannot read elf"};
-
-	GElf_Ehdr ehdr;
-	if (gelf_getehdr(elf, &ehdr) != &ehdr)
-		throw std::runtime_error{"Cannot read elf header"};
-
-	ElfFileContent content{scanElfSections(elf, &ehdr)};
-	if (!content.isOk()) {
-		LOG_ERROR("Scanning Elf sections failed");
-		return false;
-	}
-
-	maps = MapsSectionLoader{content.sections[content.mapsShndx], elf, content.symbols, content.strtabidx}.load();
+	MapsSectionLoader sectionloader(path);
+	maps = sectionloader.load();
 	BPFMapsWrapper mapsWrapper;
 	set_maps_max_entries(map_max_entries);
 	if (!loadMaps(maps, mapsWrapper)) {
@@ -385,14 +267,12 @@ bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 		return false;
 	}
 
-	content.sections[content.mapsShndx].processed = true;
-
 	if (!initialize_perf_maps(maps, mapsWrapper)) {
 		LOG_ERROR("Cannot initialize perf maps");
 		return false;
 	}
 
-	if (!processReloSections(elf, &ehdr, content.sections, content.symbols, maps)) {
+	if (!sectionloader.processReloSections(maps)) {
 		LOG_ERROR("Processing relocations failed");
 		return false;
 	}
@@ -406,7 +286,7 @@ bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 		// don't return, see what happens
 	}
 
-	load_programs_from_sections(content.sections, content.license, *kernelVersion);
+	load_programs_from_sections(sectionloader.getBpfPrograms(), *kernelVersion);
 	return true;
 }
 

@@ -33,3 +33,4 @@ target_include_directories(libnettracer
 
 add_dependencies(libnettracer bpf_program)
 target_link_libraries(libnettracer bpf_generic)
+target_link_libraries(libnettracer -ltinfo)

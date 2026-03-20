@@ -14,8 +14,6 @@
 * limitations under the License.
 */
 #include "maps_loading.h"
-
-#include "elf_utils.h"
 #include "errors.h"
 #include "log.h"
 
@@ -24,6 +22,9 @@
 #include <fmt/core.h>
 #include <stdexcept>
 #include <string>
+
+using namespace llvm;
+using namespace llvm::object;
 
 namespace bpf {
 namespace {
@@ -43,6 +44,48 @@ std::string to_string(bpf_map_type type) {
 	}
 }
 
+bool readAndApplyRelocations(const llvm::object::SectionRef& sec, bpf_insn* insn, maps_config& maps) {
+	for (auto it = sec.relocation_begin(); it != sec.relocation_end(); ++it){
+		unsigned insn_idx = it->getOffset() / sizeof(bpf_insn);
+		if (insn[insn_idx].code != (BPF_LD | BPF_IMM | BPF_DW)) {
+			LOG_ERROR("Invalid relo for insn[{}], code {}", insn_idx, insn[insn_idx].code);
+			return false;
+		}
+
+		insn[insn_idx].src_reg = BPF_PSEUDO_MAP_FD;
+		size_t origOffset = *it->getSymbol()->getAddress();
+
+		auto el = std::find_if(maps.begin(), maps.end(), [&](auto& mit) { return mit.elf_offset == origOffset; });
+		if (el != maps.end()) {
+			insn[insn_idx].imm = el->fd;
+		} else {
+			LOG_ERROR("Invalid relo for insn[{:d}] - no matching map", insn_idx);
+			return false;
+		}
+	}
+
+	return true;
+}
+}
+
+MapsSectionLoader::MapsSectionLoader(const std::string& path){
+
+    auto BufferOrErr = WriteThroughMemoryBuffer::getFile(path.c_str());
+    if (!BufferOrErr) {
+        throw std::runtime_error("Error reading file");
+    }
+
+	memBufffer.swap(*BufferOrErr);
+    Expected<std::unique_ptr<Binary>> BinOrErr = createBinary(memBufffer->getMemBufferRef());
+    if (!BinOrErr) {
+        throw std::runtime_error("Error parsing ELF");
+    }
+
+	binary.swap(*BinOrErr);
+    ELFobj = dyn_cast<ELFObjectFileBase>(binary.get());
+    if (!ELFobj) {
+        throw std::runtime_error("Error ELFObj");
+    }
 }
 
 bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper) {
@@ -74,86 +117,91 @@ bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper) {
 }
 
 maps_config MapsSectionLoader::load() {
-	// Get symbol table entries for maps
-	std::vector<GElf_Sym> sym{getSymTableEntriesForMaps()};
+	auto sym{getSymTableEntriesForMaps()};
 
 	if (sym.empty()) {
-		LOG_ERROR("No maps found in section");
+		LOG_ERROR("No maps found in sections");
 		return {};
 	}
-	LOG_DEBUG("Number of Elf maps: {:d}", sym.size());
+	symbolsMap = sym;
 
-	std::sort(sym.begin(), sym.end(), [](const GElf_Sym& a, const GElf_Sym& b){ return a.st_value < b.st_value; });
-
-	// Size of bpf_load_map_def is known in advance, but we don't know the size of the struct stored in ELF file (which may be different)
-	// To deal with that, we assume all structs in ELF file are of the same size and divide data buffer size by number of symbols
-	Elf_Data* data_maps = section.data;
-	const std::size_t map_sz_elf = data_maps->d_size / sym.size();
+	const std::size_t map_sz_elf = content.size() / sym.size();
 	std::size_t map_sz_copy = sizeof(map_def);
-	bool shouldValidateZeroes = false;
+	LOG_DEBUG("map_sz_elf {} {}" , map_sz_elf, map_sz_copy);
 	if (map_sz_elf < map_sz_copy) {
 		// For backward compatibility - use smaller struct's size
 		map_sz_copy = map_sz_elf;
-	} else if (map_sz_elf > map_sz_copy) {
-		// For forward compatibility - allow loading larger structs with unknown features but make sure that the unknown features are not used (they are set to 0)
-		shouldValidateZeroes = true;
 	}
 
-	return copyElfMapsDataToMapsConfig(sym, static_cast<unsigned char*>(data_maps->d_buf), map_sz_copy, map_sz_elf, shouldValidateZeroes);
+	return copyElfMapsDataToMapsConfig(sym, map_sz_copy);
 }
+ 
+MapsSymbols MapsSectionLoader::getSymTableEntriesForMaps() {
+	MapsSymbols symbols;
 
-std::vector<GElf_Sym> MapsSectionLoader::getSymTableEntriesForMaps() {
-	std::vector<GElf_Sym> sym;
-	sym.reserve(MAX_MAPS + 1);
-	for (std::size_t i = 0; i < symbols->d_size / sizeof(GElf_Sym); ++i) {
-		GElf_Sym nextEntry;
-		if (!gelf_getsym(symbols, i, &nextEntry)) {
-			LOG_DEBUG("gelf_getsym failed for symbol: {:d}", i);
-			continue;
+    for (const SectionRef &sec : ELFobj->sections()){
+		for (auto it = sec.relocation_begin(); it != sec.relocation_end(); ++it){
+			auto ssec =  it->getSymbol()->getSection();
+			if( (*(*ssec)->getName()).str() == "maps" ){
+				symbols.try_emplace(*it->getSymbol()->getAddress(), it->getSymbol()->getName()->str());
+				content =  *(*ssec)->getContents();
+			}
 		}
-		if (nextEntry.st_shndx != section.indx) {
-			// Symbol does not belong to the section we're trying to load
-			continue;
+
+		if(sec.getName()->starts_with("kprobe") || sec.getName()->starts_with("kretprobe")){
+			bpfPrograms[sec.getName()->str()] = *sec.getContents();
 		}
-		sym.push_back(nextEntry);
-	}
-	return sym;
+    }
+	return symbols;
 }
 
-void MapsSectionLoader::validateMapZeroes(const unsigned char* def, std::size_t map_sz_copy, std::size_t map_sz_elf) const {
-	const unsigned char* addr = def + map_sz_copy;
-	const unsigned char* end = def + map_sz_elf;
-	const unsigned char* nonzeroAddr = std::find_if(addr, end, [](auto c){ return c != 0; });
-	if (nonzeroAddr != end) {
-		throw std::runtime_error{fmt::format("Validation failed - unknown Elf feature set at offset {}", std::distance(addr, nonzeroAddr))};
-	}
-}
-
-maps_config MapsSectionLoader::copyElfMapsDataToMapsConfig(const std::vector<GElf_Sym>& sym, unsigned char* elfMapsData, std::size_t map_sz_copy, std::size_t map_sz_elf, bool shouldValidateZeroes) {
+maps_config MapsSectionLoader::copyElfMapsDataToMapsConfig(const MapsSymbols& symbols, std::size_t map_sz_copy) const {
 	maps_config maps;
-	maps.reserve(sym.size());
-	for (const auto& symEntry : sym) {
+	maps.reserve(symbols.size());
+	for (const auto& [offset, name] : symbols) {
 		map_data map;
-		map.name = std::string{elf_strptr(elf, strtabidx, symEntry.st_name)};
+		map.name = name;
 		if (map.name.empty()) {
-			LOG_ERROR("Empty name, skipping map {}: {}({:d})", symEntry.st_name, strerror(errno), errno);
+			LOG_ERROR("Empty name, skipping map {}", name);
 			continue;
 		}
-
-		// Calculate the offset where symbol is stored in maps section data area
-		const std::size_t offset = symEntry.st_value;
-		const map_def* def = reinterpret_cast<map_def*>(elfMapsData + offset);
+		// Calculate the offset where symbol is stored in maps section data area;
+		const map_def* def = reinterpret_cast<const map_def*>(content.data() + offset);
 		map.elf_offset = offset;
+		LOG_DEBUG("name {} offset {} def {:p}  ", map.name, offset, reinterpret_cast<const void*>( def));
 		memset(&map.def, 0, sizeof(map.def));
 		memcpy(&map.def, def, map_sz_copy);
-
-		// Validate that there are no unknown features set
-		if (shouldValidateZeroes) {
-			validateMapZeroes(reinterpret_cast<const unsigned char*>(def), map_sz_copy, map_sz_elf);
-		}
 		maps.push_back(std::move(map));
 	}
 	return maps;
 }
 
+bool MapsSectionLoader::processReloSections(maps_config& maps) {
+	bool all_ok = true;
+    for (const SectionRef &sec : ELFobj->sections()) {
+		if(!sec.getName()) {
+			continue;
+		}
+		if( !sec.getName()->starts_with(".rel")) {
+			continue;
+		}
+		auto secName = sec.getName()->substr(4);
+		if( secName.equals(".eh_frame")) {
+			continue;
+		}
+
+		auto it = bpfPrograms.find(secName.str());
+		if( it == bpfPrograms.end()){
+			LOG_DEBUG("No program for section name {}", secName.str());
+			continue;
+		}
+
+		bpf_insn* insns = (bpf_insn*) it->second.data();
+		if (!readAndApplyRelocations(sec, insns, maps)) {
+			LOG_ERROR("Relocations for section {:d} failed", sec.getIndex());
+			all_ok = false;
+		}
+	}
+	return all_ok;
+}
 } // namespace bpf

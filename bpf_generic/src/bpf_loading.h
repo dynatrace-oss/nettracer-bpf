@@ -18,12 +18,17 @@
 #include "system_calls.h"
 #include <linux/bpf.h>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
+#include <unordered_map>
+
+namespace llvm {
+class StringRef;
+}
 
 namespace bpf {
 
-struct elf_section;
 struct map_data;
 using maps_config = std::vector<map_data>;
 
@@ -42,7 +47,7 @@ class bpf_subsystem {
 	const ISystemCalls& sysCalls;
 
 	bool load_and_attach(kprobe& prgrm, const char* license, int kernVersion);
-	void load_programs_from_sections(std::vector<elf_section>& allSections, const char* license, int kernVersion);
+	void load_programs_from_sections(const std::unordered_map<std::string, llvm::StringRef>& bpfPrograms, int kernVersion);
 	int install_kprobe_fs(const std::string& prefix, const std::string& name, bool is_kprobe, int fd);
 	int uninstall_kprobe_fs(const std::string& cmd);
 	void close_all_probes();
