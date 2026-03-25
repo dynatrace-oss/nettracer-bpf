@@ -16,7 +16,7 @@
 #include "maps_loading.h"
 #include "errors.h"
 #include "log.h"
-
+#include <bit>
 #include <algorithm>
 #include <cstring>
 #include <fmt/core.h>
@@ -168,7 +168,6 @@ maps_config MapsSectionLoader::copyElfMapsDataToMapsConfig(const MapsSymbols& sy
 		// Calculate the offset where symbol is stored in maps section data area;
 		const map_def* def = reinterpret_cast<const map_def*>(content.data() + offset);
 		map.elf_offset = offset;
-		LOG_DEBUG("name {} offset {} def {:p}  ", map.name, offset, reinterpret_cast<const void*>( def));
 		memset(&map.def, 0, sizeof(map.def));
 		memcpy(&map.def, def, map_sz_copy);
 		maps.push_back(std::move(map));
@@ -196,7 +195,7 @@ bool MapsSectionLoader::processReloSections(maps_config& maps) {
 			continue;
 		}
 
-		bpf_insn* insns = (bpf_insn*) it->second.data();
+		bpf_insn* insns = std::bit_cast<bpf_insn*>(it->second.data());
 		if (!readAndApplyRelocations(sec, insns, maps)) {
 			LOG_ERROR("Relocations for section {:d} failed", sec.getIndex());
 			all_ok = false;

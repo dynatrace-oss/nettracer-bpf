@@ -22,7 +22,7 @@
 #include "perf_sys.h"
 
 #include <fmt/core.h>
-
+#include <bit>
 #include <algorithm>
 #include <cerrno>
 #include <cstdio>
@@ -236,7 +236,7 @@ void bpf_subsystem::load_programs_from_sections(const BpfPrograms& bpfPrograms, 
 	bool allFailed = true;
     for (const auto& [name, program]: bpfPrograms) {
 		LOG_DEBUG("loading {} {}", name, program.size());
-		kprobe probe{.fname = name, .insn = (bpf_insn*)program.data(), .size = program.size(), .fd = -1, .efd = -1};
+		kprobe probe{.fname = name, .insn = std::bit_cast<bpf_insn*>(program.data()), .size = program.size(), .fd = -1, .efd = -1};
 		allFailed &= !load_and_attach(probe, "GPL", kernVersion);
 	}
 
