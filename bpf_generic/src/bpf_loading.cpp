@@ -232,12 +232,12 @@ bool bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 	return true;
 }
 
-void bpf_subsystem::load_programs_from_sections(const BpfPrograms& bpfPrograms, int kernVersion) {
+void bpf_subsystem::load_programs_from_sections(const BpfPrograms& bpfPrograms, int kernVersion, const char* license) {
 	bool allFailed = true;
     for (const auto& [name, program]: bpfPrograms) {
 		LOG_DEBUG("loading {} {}", name, program.size());
 		kprobe probe{.fname = name, .insn = std::bit_cast<bpf_insn*>(program.data()), .size = program.size(), .fd = -1, .efd = -1};
-		allFailed &= !load_and_attach(probe, "GPL", kernVersion);
+		allFailed &= !load_and_attach(probe, license, kernVersion);
 	}
 
 	if(allFailed){
@@ -286,7 +286,7 @@ bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 		// don't return, see what happens
 	}
 
-	load_programs_from_sections(sectionloader.getBpfPrograms(), *kernelVersion);
+	load_programs_from_sections(sectionloader.getBpfPrograms(), *kernelVersion, sectionloader.getLicense().c_str());
 	return true;
 }
 

@@ -51,12 +51,18 @@ bool readAndApplyRelocations(const llvm::object::SectionRef& sec, bpf_insn* insn
 			LOG_ERROR("Invalid relo for insn[{}], code {}", insn_idx, insn[insn_idx].code);
 			return false;
 		}
+		if (!it->getSymbol()->getAddress()){
+			continue;
+		}
+		if ( !(*it->getSymbol()->getSection())->getName()->equals("maps")){
+			LOG_ERROR("Relo symbol {} not from map section", it->getSymbol()->getName()->str());
+			return false;
+		}
 
-		insn[insn_idx].src_reg = BPF_PSEUDO_MAP_FD;
 		size_t origOffset = *it->getSymbol()->getAddress();
-
 		auto el = std::find_if(maps.begin(), maps.end(), [&](auto& mit) { return mit.elf_offset == origOffset; });
 		if (el != maps.end()) {
+			insn[insn_idx].src_reg = BPF_PSEUDO_MAP_FD;
 			insn[insn_idx].imm = el->fd;
 		} else {
 			LOG_ERROR("Invalid relo for insn[{:d}] - no matching map", insn_idx);
@@ -142,14 +148,25 @@ MapsSymbols MapsSectionLoader::getSymTableEntriesForMaps() {
     for (const SectionRef &sec : ELFobj->sections()){
 		for (auto it = sec.relocation_begin(); it != sec.relocation_end(); ++it){
 			auto ssec =  it->getSymbol()->getSection();
-			if( (*(*ssec)->getName()).str() == "maps" ){
+			if (!ssec){
+				continue;
+			}
+			if ((*(*ssec)->getName()).str() == "maps" ){
 				symbols.try_emplace(*it->getSymbol()->getAddress(), it->getSymbol()->getName()->str());
 				content =  *(*ssec)->getContents();
 			}
 		}
 
-		if(sec.getName()->starts_with("kprobe") || sec.getName()->starts_with("kretprobe")){
+		if (!sec.getName()){
+			continue;
+		} else if (sec.getName()->starts_with("kprobe") || sec.getName()->starts_with("kretprobe")){
+			if (!sec.getContents()){
+				LOG_DEBUG("No bpf prog in section for: {}", sec.getName()->str());
+				continue;
+			}
 			bpfPrograms[sec.getName()->str()] = *sec.getContents();
+		} else if (sec.getName()->equals("license")){
+			license = *sec.getContents();
 		}
     }
 	return symbols;
@@ -166,7 +183,7 @@ maps_config MapsSectionLoader::copyElfMapsDataToMapsConfig(const MapsSymbols& sy
 			continue;
 		}
 		// Calculate the offset where symbol is stored in maps section data area;
-		const map_def* def = reinterpret_cast<const map_def*>(content.data() + offset);
+		const map_def* def = std::bit_cast<const map_def*>(content.data() + offset);
 		map.elf_offset = offset;
 		memset(&map.def, 0, sizeof(map.def));
 		memcpy(&map.def, def, map_sz_copy);
@@ -178,16 +195,13 @@ maps_config MapsSectionLoader::copyElfMapsDataToMapsConfig(const MapsSymbols& sy
 bool MapsSectionLoader::processReloSections(maps_config& maps) {
 	bool all_ok = true;
     for (const SectionRef &sec : ELFobj->sections()) {
-		if(!sec.getName()) {
+		if (!sec.getName()) {
 			continue;
 		}
-		if( !sec.getName()->starts_with(".rel")) {
+		if (!sec.getName()->starts_with(".rel")) {
 			continue;
 		}
 		auto secName = sec.getName()->substr(4);
-		if( secName.equals(".eh_frame")) {
-			continue;
-		}
 
 		auto it = bpfPrograms.find(secName.str());
 		if( it == bpfPrograms.end()){

@@ -38,11 +38,13 @@ public:
 	maps_config load();
 	bool processReloSections(maps_config& maps);
 	BpfPrograms& getBpfPrograms(){ return bpfPrograms;}
+	std::string getLicense(){ return license.str();}
 private:
 	MapsSymbols getSymTableEntriesForMaps();
 	maps_config copyElfMapsDataToMapsConfig(const MapsSymbols& sym, std::size_t map_sz_copy) const;
 
 	llvm::StringRef content;
+	llvm::StringRef license;
 	std::unique_ptr<llvm::WriteThroughMemoryBuffer> memBufffer;
 	std::unique_ptr<llvm::object::Binary> binary;
 	llvm::object::ELFObjectFileBase *ELFobj;
