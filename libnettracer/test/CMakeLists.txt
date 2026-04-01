@@ -26,7 +26,6 @@ target_include_directories(libnettracer_test
 
 target_link_libraries(libnettracer_test libnettracer)
 target_link_libraries(libnettracer_test -lpthread)
-target_link_libraries(libnettracer_test -lz)
 target_link_libraries(libnettracer_test -ldl)
 target_link_libraries(libnettracer_test CONAN_PKG::gtest)
 
