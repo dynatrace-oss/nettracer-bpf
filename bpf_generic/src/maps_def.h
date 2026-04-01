@@ -15,30 +15,35 @@
 */
 #pragma once
 
-#include <gelf.h>
-#include <libelf.h>
-#include <string>
+#include "bpf_wrapper.h"
+#include <linux/bpf.h>
+#include <linux/perf_event.h>
 #include <vector>
 
-struct bpf_insn;
 
 namespace bpf {
 
-struct map_data;
-using maps_config = std::vector<map_data>;
-
-struct elf_section {
-	std::string shname;
-	GElf_Shdr shdr;
-	Elf_Data* data;
-	unsigned indx;
-	bool processed;
+struct map_def {
+	bpf_map_type type;
+	uint32_t key_size;
+	uint32_t value_size;
+	uint32_t max_entries;
+	uint32_t map_flags;
+	uint32_t inner_map_idx;
+	uint32_t numa_node;
 };
 
-std::string to_string(const elf_section& section);
+struct map_data {
+	std::string name;
+	size_t elf_offset;
+	map_def def;
+	int fd;
+	// perf event part
+	std::vector<int> pfd;
+	int page_count;
+	std::vector<perf_event_mmap_page*> header;
+};
 
-bool getSection(Elf* elf, GElf_Ehdr* ehdr, elf_section& section);
-
-bool readAndApplyRelocations(Elf_Data* data, Elf_Data* symbols, GElf_Shdr* shdr, bpf_insn* insn, maps_config& maps);
+using maps_config = std::vector<map_data>;
 
 } // namespace bpf

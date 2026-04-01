@@ -16,7 +16,7 @@
 #pragma once
 #include "bpf_loading.h"
 #include "log.h"
-#include "maps_loading.h"
+#include "maps_def.h"
 #include <fmt/core.h>
 #include <linux/perf_event.h>
 #include <poll.h>

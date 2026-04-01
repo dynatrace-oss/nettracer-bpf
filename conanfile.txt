@@ -3,7 +3,6 @@ fmt/10.2.1
 spdlog/1.14.0
 boost/1.84.0
 gtest/1.14.0
-elfutils/0.190
 
 [generators]
 CMakeDeps
