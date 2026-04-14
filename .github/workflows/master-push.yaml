@@ -23,6 +23,9 @@ on:
 jobs:
   master-create-tag:
     runs-on: ubuntu-latest
+    concurrency:
+      group: master-push-group
+      cancel-in-progress: true
     steps:
       - name: "Checkout source code of the repository"
         uses: actions/checkout@v4
