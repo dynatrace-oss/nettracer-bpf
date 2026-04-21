@@ -20,6 +20,7 @@
 #include "bpf_generic/src/log.h"
 #include "tuple_utils.h"
 #include "proc_tcp.h"
+#include <chrono>
 #include <unordered_set>
 #include <tuple>
 #include <condition_variable>
@@ -47,7 +48,7 @@ struct ExitCtrl {
 	bool running{true};
 	std::mutex m;
 	std::condition_variable cv;
-	unsigned wait_time;
+	std::chrono::seconds mainLoopTime;
 };
 
 template<typename Tuple>

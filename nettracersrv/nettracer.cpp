@@ -74,7 +74,7 @@ po::options_description getOptionsDescription() {
 			("debug,d", po::value<std::string>()->default_value("info"), "Enable debug logs")
 			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
 			("log,l", po::value<std::string>()->default_value(""), "Logger path")
-			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
+			("time_interval,t", po::value<unsigned>()->default_value(10), "Time interval of printing metrics data")
 			("incremental,i", "Enable incremental data")
 			("noninteractive,r", "Hex output")
 			("with_loopback,f", "With loopback")
@@ -196,7 +196,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 
 	unsigned time_interval = vm["time_interval"].as<unsigned>();
 	LOG_INFO("time_interval: {}", time_interval);
-	exitCtrl.wait_time = time_interval;
+	exitCtrl.mainLoopTime = std::chrono::seconds{time_interval};
 
 	bpf::bpf_subsystem ebpf;
 	bpf::BPFMapsWrapper mapsWrapper;
@@ -306,7 +306,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 				}
 
 				std::unique_lock<std::mutex> lk{exitCtrl.m};
-				exitCtrl.cv.wait_for(lk, std::chrono::seconds(exitCtrl.wait_time), [] { return !exitCtrl.running; });
+				exitCtrl.cv.wait_for(lk, exitCtrl.mainLoopTime, [] { return !exitCtrl.running; });
 			}
 
 			promise.set_value(exitCtrl.running);

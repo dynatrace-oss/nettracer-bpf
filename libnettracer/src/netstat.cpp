@@ -22,12 +22,15 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 namespace netstat {
 
 constexpr auto INACTIVE_TIMEOUT = minutes(1);
 constexpr unsigned INTERVAL_DIVIDER = 10;
 constexpr int MIN_FIELD_WIDTH = 22;
+constexpr auto PIPE_SIZE = 1024 * 1024;
+constexpr auto WRITE_BACKOFF_TIME = 50ms;
 
 template <class IPTYPE>
 constexpr uint64_t addAvgHeaderSize(uint64_t pkts, bool count) {
@@ -106,8 +109,8 @@ struct TimeGuard {
 	unsigned long counter{};
 	unsigned ticks_per_wait_time;
 
-	TimeGuard(unsigned time){
-		counter = ticks_per_wait_time = time * INTERVAL_DIVIDER;
+	explicit TimeGuard(std::chrono::seconds time){
+		counter = ticks_per_wait_time = time.count() * INTERVAL_DIVIDER;
 	}
 
 	bool time_elapsed() {
@@ -141,7 +144,8 @@ std::pair<unsigned, unsigned> NetStat::countTcpSessions() {
 bool NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 	using namespace std::literals::chrono_literals;
 
-	TimeGuard outputCtr(exitCtrl.wait_time), logCtr(seconds(5min).count());
+	TimeGuard outputCtr(exitCtrl.mainLoopTime);
+	TimeGuard logCtr(seconds(5min));
 	printHeader();
 
 	while (exitCtrl.running && !config_changed) {
@@ -157,16 +161,17 @@ bool NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 			if (interactive) {
 				print_human_readable<ipv4_tuple_t>();
 				print_human_readable<ipv6_tuple_t>();
-				std::cout << tcpSessionsStr;
+				std::cout << tcpSessionsStr << std::endl;
 			} else {
-				print<ipv4_tuple_t>();
-				print<ipv6_tuple_t>();
+				std::chrono::milliseconds writeDurationLimit = std::chrono::duration_cast<std::chrono::milliseconds>(exitCtrl.mainLoopTime);
+				print<ipv4_tuple_t>(writeDurationLimit);
+				print<ipv6_tuple_t>(writeDurationLimit);
 				if (logCtr.time_elapsed()) {
 					LOG_INFO(tcpSessionsStr);
 				}
 			}
+			logging::getLogger()->flush();
 			outputCtr.reset();
-			flush();
 			clean<ipv4_tuple_t>();
 			clean<ipv6_tuple_t>();
 		}
@@ -267,19 +272,35 @@ static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
 	return result;
 }
 
-void NetStat::flush() {
-	*os << " " << std::endl;
-	logging::getLogger()->flush();
+static bool writeLine(const char *buf, size_t count, std::chrono::milliseconds& writeDurationLimit) {
+    size_t total_written = 0;
+    const char *ptr = buf;
+
+    while (total_written < count && writeDurationLimit > 0s) {
+        ssize_t n = write(STDOUT_FILENO, ptr + total_written, count - total_written);
+        if (n < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+				std::this_thread::sleep_for(WRITE_BACKOFF_TIME);
+				writeDurationLimit -= WRITE_BACKOFF_TIME;
+                continue;
+            }
+			LOG_INFO("pipe write error: {}", errno);
+            return false;
+        }
+
+        total_written += n;
+    }
+    return writeDurationLimit > 0s ? true : false;
 }
 
 template<typename IPTYPE>
-void NetStat::print() {
+void NetStat::print(std::chrono::milliseconds& writeDurationLimit) {
+	int linesSkipped = 0;
 	std::unique_lock<std::mutex> l(mx);
 	auto& aggr{connections<IPTYPE>()};
 	std::stringstream buf;
 
 	for (auto it = aggr.begin(); it != aggr.end(); ++it) {
-
 		buf.str("");
 		auto wall_now = getCurrentTimeFromSystemClock();
 		uint64_t pkts_sent = subtract(it->second.pkts_sent, it->second.pkts_sent_prev, 2, incremental);
@@ -304,8 +325,18 @@ void NetStat::print() {
 			buf << std::setw(16) << duration_cast<seconds>(it->second.start.time_since_epoch()).count() << std::setw(9)
 					  << duration.count();
 		}
-		*os << buf.str() << std::endl;
-		LOG_DEBUG(buf.str());
+
+		buf << "\n";
+		const auto strf = buf.str();
+		if (!writeLine(strf.c_str(), strf.size(), writeDurationLimit)) {
+			linesSkipped++;
+		}
+
+		LOG_DEBUG(strf);
+	}
+
+	if (linesSkipped > 0) {
+		LOG_INFO("Number of skipped lines {}", linesSkipped);
 	}
 }
 
@@ -357,6 +388,17 @@ void NetStat::init() {
 	static bpf::BPFMapsWrapper wrapper;
 	mapsWrapper = &wrapper;
 
+	if (isatty(STDOUT_FILENO)) {
+		return;
+	}
+	if (fcntl(STDOUT_FILENO, F_SETFL, O_NONBLOCK) < 0) {
+		LOG_INFO("Cannot set stdout nonblock");
+	}
+	if (fcntl(STDOUT_FILENO, F_SETPIPE_SZ, PIPE_SIZE) < 0) {
+		LOG_INFO("Cannot set pipe size");
+	}
+	int size = fcntl(STDOUT_FILENO, F_GETPIPE_SZ);
+	LOG_INFO("Pipe: size {}", size);
 }
 
 system_clock::time_point NetStat::getCurrentTimeFromSystemClock() const {

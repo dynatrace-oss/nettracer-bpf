@@ -92,10 +92,9 @@ protected:
 
 	void printHeader();
 	template<typename IPTYPE>
-	void print();
+	void print(std::chrono::milliseconds& writeDurationLimit);
 	template<typename IPTYPE>
 	void print_human_readable();
-	void flush();
 	template <typename IPTYPE>
 	void clean();
 
