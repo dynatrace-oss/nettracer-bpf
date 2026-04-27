@@ -17,18 +17,26 @@
  */
 #pragma once
 
-#include "bpf_helpers.h"
-#include "maps.h"
 #include "nettracer-bpf.h"
 
+#ifdef LEGACY_BPF
 #include <net/net_namespace.h>
 #include <net/sock.h>
+#include "bpf_helpers.h"
+#include "legacy/maps.h"
+#else
+#include <bpf/bpf_core_read.h>
+#include <bpf/bpf_endian.h>
+#include "vmlinux.h"
+#include "maps.h"
+
+#define ntohs bpf_ntohs
+#endif
 
 enum protocol {
 	IPV4,
 	IPV6
 };
-
 
 __attribute__((always_inline))
 static bool check_family(struct sock *sk, uint16_t expected_family) {
@@ -37,31 +45,47 @@ static bool check_family(struct sock *sk, uint16_t expected_family) {
 	uint16_t family;
 	family = 0;
 
+#ifdef LEGACY_BPF
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
 		return 0;
 	}
 
 	bpf_probe_read(&family, sizeof(uint16_t), ((char *)sk) + status->offset_family);
-
 	return family == expected_family;
+#else
+	bpf_probe_read_kernel(&family, sizeof(family), &sk->__sk_common.skc_family);
+	return false;
+#endif
 }
 
 __attribute__((always_inline))
-static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct guess_status_t *status, struct sock *skp)
+static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct guess_status_t *status, struct sock *sk)
 {
 	uint32_t saddr = 0, daddr = 0, net_ns_inum = 0;
 	uint16_t sport = 0, dport = 0;
 	possible_net_t *skc_net = NULL;
 
+#ifdef LEGACY_BPF
 	bpf_probe_read(&saddr, sizeof(saddr), ((char *)skp) + status->offset_saddr);
 	bpf_probe_read(&daddr, sizeof(daddr), ((char *)skp) + status->offset_daddr);
 	bpf_probe_read(&sport, sizeof(sport), ((char *)skp) + status->offset_sport);
 	bpf_probe_read(&dport, sizeof(dport), ((char *)skp) + status->offset_dport);
-	// Get network namespace id
 	bpf_probe_read(&skc_net, sizeof(void *), ((char *)skp) + status->offset_netns);
 	bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), ((char *)skc_net) + status->offset_ino);
-
+#else
+	bpf_probe_read_kernel(&saddr, sizeof(saddr), &sk->__sk_common.skc_rcv_saddr);
+	bpf_probe_read_kernel(&daddr, sizeof(daddr), &sk->__sk_common.skc_daddr);
+	bpf_probe_read_kernel(&sport, sizeof(sport), &sk->__sk_common.skc_num);
+	bpf_probe_read_kernel(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
+	struct net *net_ptr = NULL;
+	// Read sk_net pointer
+	bpf_probe_read_kernel(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
+	if (net_ptr) {
+		// Read namespace inode number
+		bpf_probe_read_kernel(&net_ns_inum, sizeof(net_ns_inum), &net_ptr->ns.inum);
+	}
+#endif
 	tuple->saddr = saddr;
 	tuple->daddr = daddr;
 	tuple->sport = sport;
@@ -77,22 +101,44 @@ static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct guess_status_t *st
 }
 
 __attribute__((always_inline))
-static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct guess_status_t *status, struct sock *skp)
+static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct guess_status_t *status, struct sock *sk)
 {
 	uint64_t saddr_h = 0, saddr_l = 0, daddr_h = 0, daddr_l = 0;
 	uint32_t net_ns_inum = 0;
 	uint16_t sport = 0, dport = 0;
 	possible_net_t *skc_net = NULL;
+	struct in6_addr saddrs = {};
+    struct in6_addr daddrs = {};
 
+#ifdef LEGACY_BPF
 	bpf_probe_read(&saddr_h, sizeof(saddr_h), ((char *)skp) + status->offset_daddr_ipv6 + 2 * sizeof(uint64_t));
 	bpf_probe_read(&saddr_l, sizeof(saddr_l), ((char *)skp) + status->offset_daddr_ipv6 + 3 * sizeof(uint64_t));
 	bpf_probe_read(&daddr_h, sizeof(daddr_h), ((char *)skp) + status->offset_daddr_ipv6);
 	bpf_probe_read(&daddr_l, sizeof(daddr_l), ((char *)skp) + status->offset_daddr_ipv6 + sizeof(uint64_t));
 	bpf_probe_read(&sport, sizeof(sport), ((char *)skp) + status->offset_sport);
 	bpf_probe_read(&dport, sizeof(dport), ((char *)skp) + status->offset_dport);
-	// Get network namespace id
 	bpf_probe_read(&skc_net, sizeof(void *), ((char *)skp) + status->offset_netns);
 	bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), ((char *)skc_net) + status->offset_ino);
+#else
+	struct inet_sock *inet = (struct inet_sock *)sk;
+    struct ipv6_pinfo *np = inet->pinet6;
+	bpf_probe_read_kernel(&saddrs, sizeof(saddrs), &np->saddr);
+    //bpf_probe_read_kernel(&daddrs, sizeof(daddrs), &np->daddr);
+	//bpf_probe_read_kernel(&daddrs, sizeof(daddrs), &sk->sk_v6_daddr);
+	//struct dst_entry *dst = NULL;
+     //       bpf_probe_read_kernel(&dst, sizeof(dst), &sk->sk_dst_cache);
+     //       if (dst) {
+     //           struct rt6_info *rt = (struct rt6_info *)dst;
+     //           struct in6_addr daddr = {};
+     //           bpf_probe_read_kernel(&daddr, sizeof(daddr), &rt->rt6i_dst.addr);
+	struct net *net_ptr = NULL;
+    // Read sk_net pointer
+    bpf_probe_read_kernel(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
+    if (net_ptr) {
+        // Read namespace inode number
+        bpf_probe_read_kernel(&net_ns_inum, sizeof(net_ns_inum), &net_ptr->ns.inum);
+	}
+#endif
 
 	tuple->saddr_h = saddr_h;
 	tuple->saddr_l = saddr_l;

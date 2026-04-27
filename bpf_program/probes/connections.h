@@ -15,29 +15,45 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-#include "bpf_helpers.h"
-#include "log.h"
-#include "maps.h"
 #include "metrics_utilities.h"
-#include "offset_guessing.h"
 #include "tuples_utilities.h"
 
+#ifdef LEGACY_BPF
 #include <linux/bpf.h>
 #include <linux/ptrace.h>
 #include <net/inet_sock.h>
 #include <net/sock.h>
+#include "legacy/bpf_helpers.h"
+#include "legacy/maps.h"
+#include "log.h"
+#else
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_tracing.h>
+#include <bpf/bpf_core_read.h>
+#include "maps.h"
+#define AF_INET 2
+#define AF_INET6 10
+#define LOG_DEBUG_BPF(...)
+#endif
 
+#ifdef LEGACY_BPF
 SEC("kprobe/tcp_v4_connect")
-int kprobe__tcp_v4_connect(struct pt_regs *ctx)
-{
+int kprobe__tcp_v4_connect( struct pt_regs *ctx) {
 	struct sock *sk;
 	uint64_t pid = bpf_get_current_pid_tgid();
-
 	sk = (struct sock *) PT_REGS_PARM1(ctx);
-
 	bpf_map_update_elem(&connectsock_ipv4, &pid, &sk, BPF_ANY);
 	return 0;
 }
+
+#else
+SEC("kprobe/tcp_v4_connect")
+int kprobe__tcp_v4_connect( struct sock *sk, struct sockaddr *uaddr, int addr_len){
+	uint64_t pid = bpf_get_current_pid_tgid();
+	bpf_map_update_elem(&connectsock_ipv4, &pid, &sk, BPF_ANY);
+	return 0;
+}
+#endif
 
 SEC("kretprobe/tcp_v4_connect")
 int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
@@ -128,11 +144,11 @@ int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
 	if (status == NULL || status->state == GUESS_STATE_UNINITIALIZED) {
 		return 0;
 	}
-
+#ifdef LEGACY_BPF
 	if (!are_offsets_ready_v6(status, skp, pid)) {
 		return 0;
 	}
-
+#endif
 	struct ipv6_tuple_t t = { };
 	if (!read_ipv6_tuple(&t, status, skp)) {
 		return 0;

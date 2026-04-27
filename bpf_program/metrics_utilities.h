@@ -17,11 +17,16 @@
  */
 #pragma once
 
-#include "bpf_helpers.h"
-#include "maps.h"
 #include "tuples_utilities.h"
+#ifdef LEGACY_BPF
 #include <linux/bpf.h>
 #include <net/sock.h>
+#include "legacy/maps.h"
+#else
+#include "maps.h"
+#include <bpf/bpf_core_read.h>
+#endif
+
 
 __attribute__((always_inline))
 static void update_stats(void *tuple, enum protocol proto, uint64_t sent, uint64_t received) {
@@ -49,20 +54,30 @@ static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_stat
 	struct tcp_stats_t empty = { 0 };
 	bpf_map_update_elem(map, tuple, &empty, BPF_NOEXIST);
 	struct tcp_stats_t* stats = bpf_map_lookup_elem(map, tuple);
+	uint32_t rtt, rtt_var;
 
 	if (stats == NULL) {
 		return;
 	}
 
+#ifdef LEGACY_BPG
 	bpf_probe_read(&stats->segs_in, sizeof(stats->segs_in), ((char *)sk) + status->offset_segs_in);
 	bpf_probe_read(&stats->segs_out, sizeof(stats->segs_out), ((char *)sk) + status->offset_segs_out);
 	if (status->offset_rtt != 0) { // if RTT was properly guessed
-		uint32_t rtt, rtt_var;
 		bpf_probe_read(&rtt, sizeof(stats->rtt), ((char *)sk) + status->offset_rtt);
 		bpf_probe_read(&rtt_var, sizeof(stats->rtt_var), ((char *)sk) + status->offset_rtt_var);
 		stats->rtt = rtt >> 3;
 		stats->rtt_var = rtt_var >> 2;
 	}
+#else
+	struct tcp_sock *tp = (struct tcp_sock *)sk;
+	bpf_probe_read_kernel(&stats->segs_in, sizeof(stats->segs_in), &tp->segs_in);
+	bpf_probe_read_kernel(&stats->segs_out, sizeof(stats->segs_out), &tp->segs_out);
+	bpf_probe_read_kernel(&rtt, sizeof(rtt), &tp->srtt_us);
+	bpf_probe_read_kernel(&rtt_var, sizeof(rtt_var), &tp->mdev_us);
+	stats->rtt = rtt >> 3;
+	stats->rtt_var = rtt_var >> 2;
+#endif
 
 }
 
