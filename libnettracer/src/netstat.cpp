@@ -284,7 +284,11 @@ static bool writeLine(const char *buf, size_t count, std::chrono::milliseconds& 
 				writeDurationLimit -= WRITE_BACKOFF_TIME;
                 continue;
             }
-			LOG_INFO("pipe write error: {}", errno);
+			LOG_WARN("pipe write error: {}", errno);
+			if(errno == EPIPE){
+				LOG_WARN("exiting");
+				exit(1);
+			}
             return false;
         }
 
@@ -299,9 +303,14 @@ void NetStat::print(std::chrono::milliseconds& writeDurationLimit) {
 	std::unique_lock<std::mutex> l(mx);
 	auto& aggr{connections<IPTYPE>()};
 	std::stringstream buf;
+	static bool startWithNewLine{false};
 
 	for (auto it = aggr.begin(); it != aggr.end(); ++it) {
 		buf.str("");
+		if(startWithNewLine){
+			buf << "\n";
+			startWithNewLine = false;
+		}
 		auto wall_now = getCurrentTimeFromSystemClock();
 		uint64_t pkts_sent = subtract(it->second.pkts_sent, it->second.pkts_sent_prev, 2, incremental);
 		uint64_t pkts_received = subtract(it->second.pkts_received, it->second.pkts_received_prev, 3, incremental);
@@ -330,6 +339,7 @@ void NetStat::print(std::chrono::milliseconds& writeDurationLimit) {
 		const auto strf = buf.str();
 		if (!writeLine(strf.c_str(), strf.size(), writeDurationLimit)) {
 			linesSkipped++;
+			startWithNewLine = true;
 		}
 
 		LOG_DEBUG(strf);
