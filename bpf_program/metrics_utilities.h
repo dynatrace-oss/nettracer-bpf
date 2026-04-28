@@ -71,10 +71,10 @@ static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_stat
 	}
 #else
 	struct tcp_sock *tp = (struct tcp_sock *)sk;
-	bpf_probe_read_kernel(&stats->segs_in, sizeof(stats->segs_in), &tp->segs_in);
-	bpf_probe_read_kernel(&stats->segs_out, sizeof(stats->segs_out), &tp->segs_out);
-	bpf_probe_read_kernel(&rtt, sizeof(rtt), &tp->srtt_us);
-	bpf_probe_read_kernel(&rtt_var, sizeof(rtt_var), &tp->mdev_us);
+	bpf_core_read(&stats->segs_in, sizeof(stats->segs_in), &tp->segs_in);
+	bpf_core_read(&stats->segs_out, sizeof(stats->segs_out), &tp->segs_out);
+	bpf_core_read(&rtt, sizeof(rtt), &tp->srtt_us);
+	bpf_core_read(&rtt_var, sizeof(rtt_var), &tp->mdev_us);
 	stats->rtt = rtt >> 3;
 	stats->rtt_var = rtt_var >> 2;
 #endif
