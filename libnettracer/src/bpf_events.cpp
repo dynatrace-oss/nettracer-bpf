@@ -63,6 +63,9 @@ void bpf_events::loop() {
 		}
 
 		for (auto& fd : fds) {
+			if (fd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+				exit(1);
+			}
 			if (!(fd.revents & POLLIN)) {
 				continue;
 			}
