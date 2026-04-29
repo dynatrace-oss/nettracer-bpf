@@ -25,16 +25,16 @@ set(HEADERS
 	tuples_utilities.h
 )
 
-if( DEFINED LEAGCY_BPF)
+if( DEFINED LEGACY_BPF)
 	list(APPEND HEADERS
 		legacy/asm_inline.h
 		legacy/bpf_helpers.h
 		legacy/maps.h
-		legacy/offsetguessing.h
+		legacy/offset_guessing.h
 		legacy/other.h
 	)
 	set(CLANG_COMMAND ${LLVM_BINDIR}/clang
-		-D__KERNEL__ -D__TARGET_ARCH_${ARCH}
+		-D__KERNEL__ -D__TARGET_ARCH_${ARCH} -DLEGACY_BPF=1
 		-D${BUILD_TYPE_MACRO}
 		-fno-jump-tables -fno-builtin
 		-Wall -Wpadded -Werror

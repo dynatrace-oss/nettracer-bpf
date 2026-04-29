@@ -3,9 +3,11 @@
  */
 
 #ifdef LEGACY_BPF
+#define KBUILD_MODNAME "nettracer"
+
 #include <linux/kconfig.h>
-#include "asm_inline.h"
 #include <linux/version.h>
+#include "legacy/asm_inline.h"
 #include "legacy/maps.h"
 #include "legacy/other.h"
 #else
@@ -15,7 +17,6 @@
 #include "probes/connections.h"
 #include "probes/metrics.h"
 
-#define KBUILD_MODNAME "nettracer"
 
 char _license[] SEC("license") = "GPL";
 #ifdef LEGACY_BPF

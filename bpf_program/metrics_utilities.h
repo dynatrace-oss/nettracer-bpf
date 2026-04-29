@@ -60,7 +60,7 @@ static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_stat
 		return;
 	}
 
-#ifdef LEGACY_BPG
+#ifdef LEGACY_BPF
 	bpf_probe_read(&stats->segs_in, sizeof(stats->segs_in), ((char *)sk) + status->offset_segs_in);
 	bpf_probe_read(&stats->segs_out, sizeof(stats->segs_out), ((char *)sk) + status->offset_segs_out);
 	if (status->offset_rtt != 0) { // if RTT was properly guessed

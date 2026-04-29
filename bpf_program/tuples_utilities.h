@@ -22,7 +22,7 @@
 #ifdef LEGACY_BPF
 #include <net/net_namespace.h>
 #include <net/sock.h>
-#include "bpf_helpers.h"
+#include "legacy/bpf_helpers.h"
 #include "legacy/maps.h"
 #else
 #include <bpf/bpf_core_read.h>
@@ -64,14 +64,14 @@ static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct guess_status_t *st
 {
 	uint32_t saddr = 0, daddr = 0, net_ns_inum = 0;
 	uint16_t sport = 0, dport = 0;
-	possible_net_t *skc_net = NULL;
 
 #ifdef LEGACY_BPF
-	bpf_probe_read(&saddr, sizeof(saddr), ((char *)skp) + status->offset_saddr);
-	bpf_probe_read(&daddr, sizeof(daddr), ((char *)skp) + status->offset_daddr);
-	bpf_probe_read(&sport, sizeof(sport), ((char *)skp) + status->offset_sport);
-	bpf_probe_read(&dport, sizeof(dport), ((char *)skp) + status->offset_dport);
-	bpf_probe_read(&skc_net, sizeof(void *), ((char *)skp) + status->offset_netns);
+	possible_net_t *skc_net = NULL;
+	bpf_probe_read(&saddr, sizeof(saddr), ((char *)sk) + status->offset_saddr);
+	bpf_probe_read(&daddr, sizeof(daddr), ((char *)sk) + status->offset_daddr);
+	bpf_probe_read(&sport, sizeof(sport), ((char *)sk) + status->offset_sport);
+	bpf_probe_read(&dport, sizeof(dport), ((char *)sk) + status->offset_dport);
+	bpf_probe_read(&skc_net, sizeof(void *), ((char *)sk) + status->offset_netns);
 	bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), ((char *)skc_net) + status->offset_ino);
 #else
 	bpf_core_read(&saddr, sizeof(saddr), &sk->__sk_common.skc_rcv_saddr);
@@ -79,10 +79,8 @@ static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct guess_status_t *st
 	bpf_core_read(&sport, sizeof(sport), &sk->__sk_common.skc_num);
 	bpf_core_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
 	struct net *net_ptr = NULL;
-	// Read sk_net pointer
 	bpf_core_read(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
 	if (net_ptr) {
-		// Read namespace inode number
 		bpf_core_read(&net_ns_inum, sizeof(net_ns_inum), &net_ptr->ns.inum);
 	}
 #endif
@@ -106,16 +104,16 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct guess_status_t *st
 	uint64_t saddr_h = 0, saddr_l = 0, daddr_h = 0, daddr_l = 0;
 	uint32_t net_ns_inum = 0;
 	uint16_t sport = 0, dport = 0;
-	possible_net_t *skc_net = NULL;
 
 #ifdef LEGACY_BPF
-	bpf_probe_read(&saddr_h, sizeof(saddr_h), ((char *)skp) + status->offset_daddr_ipv6 + 2 * sizeof(uint64_t));
-	bpf_probe_read(&saddr_l, sizeof(saddr_l), ((char *)skp) + status->offset_daddr_ipv6 + 3 * sizeof(uint64_t));
-	bpf_probe_read(&daddr_h, sizeof(daddr_h), ((char *)skp) + status->offset_daddr_ipv6);
-	bpf_probe_read(&daddr_l, sizeof(daddr_l), ((char *)skp) + status->offset_daddr_ipv6 + sizeof(uint64_t));
-	bpf_probe_read(&sport, sizeof(sport), ((char *)skp) + status->offset_sport);
-	bpf_probe_read(&dport, sizeof(dport), ((char *)skp) + status->offset_dport);
-	bpf_probe_read(&skc_net, sizeof(void *), ((char *)skp) + status->offset_netns);
+	possible_net_t *skc_net = NULL;
+	bpf_probe_read(&saddr_h, sizeof(saddr_h), ((char *)sk) + status->offset_daddr_ipv6 + 2 * sizeof(uint64_t));
+	bpf_probe_read(&saddr_l, sizeof(saddr_l), ((char *)sk) + status->offset_daddr_ipv6 + 3 * sizeof(uint64_t));
+	bpf_probe_read(&daddr_h, sizeof(daddr_h), ((char *)sk) + status->offset_daddr_ipv6);
+	bpf_probe_read(&daddr_l, sizeof(daddr_l), ((char *)sk) + status->offset_daddr_ipv6 + sizeof(uint64_t));
+	bpf_probe_read(&sport, sizeof(sport), ((char *)sk) + status->offset_sport);
+	bpf_probe_read(&dport, sizeof(dport), ((char *)sk) + status->offset_dport);
+	bpf_probe_read(&skc_net, sizeof(void *), ((char *)sk) + status->offset_netns);
 	bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), ((char *)skc_net) + status->offset_ino);
 #else
 	struct inet_sock *inet = (struct inet_sock *)sk;
@@ -133,10 +131,8 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct guess_status_t *st
      //           struct in6_addr daddr = {};
      //           bpf_probe_read_kernel(&daddr, sizeof(daddr), &rt->rt6i_dst.addr);
 	struct net *net_ptr = NULL;
-    // Read sk_net pointer
     bpf_core_read(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
     if (net_ptr) {
-        // Read namespace inode number
         bpf_core_read(&net_ns_inum, sizeof(net_ns_inum), &net_ptr->ns.inum);
 	}
 #endif

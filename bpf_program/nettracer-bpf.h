@@ -162,13 +162,13 @@ struct guess_status_t {
 };
 
 enum bpf_log_level {
-       BPF_LOG_LEVEL_TRACE,
-       BPF_LOG_LEVEL_DEBUG,
-       BPF_LOG_LEVEL_INFO,
-       BPF_LOG_LEVEL_WARN,
-       BPF_LOG_LEVEL_ERROR,
-       BPF_LOG_LEVEL_CRITICAL,
-       BPF_LOG_LEVEL_OFF
+    BPF_LOG_LEVEL_TRACE,
+    BPF_LOG_LEVEL_DEBUG,
+    BPF_LOG_LEVEL_INFO,
+    BPF_LOG_LEVEL_WARN,
+    BPF_LOG_LEVEL_ERROR,
+    BPF_LOG_LEVEL_CRITICAL,
+    BPF_LOG_LEVEL_OFF
 };
 
 struct nettracer_config_t {

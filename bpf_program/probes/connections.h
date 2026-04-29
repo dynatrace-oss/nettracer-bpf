@@ -25,7 +25,7 @@
 #include <net/sock.h>
 #include "legacy/bpf_helpers.h"
 #include "legacy/maps.h"
-#include "log.h"
+#include "legacy/log.h"
 #else
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
