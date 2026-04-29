@@ -16,17 +16,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 #pragma once
-#ifdef LEGACY_BPF
-#include <linux/types.h>
-
 #ifdef __cplusplus
 #include <cstdint>
 #endif
-
-#else
-#include "vmlinux.h"
-#endif
-
 
 enum tcp_event_type {
 	TCP_EVENT_TYPE_CONNECT,

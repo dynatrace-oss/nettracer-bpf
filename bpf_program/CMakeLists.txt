@@ -16,6 +16,8 @@ set(SOURCES
 )
 
 PREPEND(SOURCES_FULL "${CMAKE_CURRENT_LIST_DIR}" ${SOURCES})
+set(LEGACY_BPF 1)
+add_definitions(-DLEGACY_BPF=1)
 
 set(HEADERS
 	metrics_utilities.h
@@ -24,6 +26,7 @@ set(HEADERS
 	probes/metrics.h
 	tuples_utilities.h
 )
+
 
 if( DEFINED LEGACY_BPF)
 	list(APPEND HEADERS
@@ -59,6 +62,8 @@ else()
 	)
 	set(FULL_COMMAND ${LLVM_BINDIR}/clang
 		-D__TARGET_ARCH_${ARCH}
+		-fno-jump-tables -fno-builtin
+		-Wall -Werror
 		${BPF_OPTIMIZATION}
 		-target bpf
 		-c "${CMAKE_CURRENT_LIST_DIR}/nettracer-bpf.c"

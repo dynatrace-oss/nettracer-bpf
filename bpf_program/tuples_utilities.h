@@ -60,8 +60,7 @@ __attribute__((always_inline))
 static bool check_family(struct sock *sk, uint16_t expected_family) {
 	struct guess_status_t *status;
 	uint32_t zero = 0;
-	uint16_t family;
-	family = 0;
+	uint16_t family = 0;
 
 #ifdef LEGACY_BPF
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
@@ -70,11 +69,10 @@ static bool check_family(struct sock *sk, uint16_t expected_family) {
 	}
 
 	bpf_probe_read(&family, sizeof(uint16_t), ((char *)sk) + status->offset_family);
-	return family == expected_family;
 #else
 	bpf_core_read(&family, sizeof(family), &sk->__sk_common.skc_family);
-	return false;
 #endif
+	return family == expected_family;
 }
 
 __attribute__((always_inline))

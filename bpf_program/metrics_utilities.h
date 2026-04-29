@@ -30,11 +30,16 @@
 
 __attribute__((always_inline))
 static void update_stats(void *tuple, enum protocol proto, uint64_t sent, uint64_t received) {
-	void *map = (proto == IPV4) ? &stats_ipv4 : &stats_ipv6;
-
 	struct stats_t empty = { 0 };
-	bpf_map_update_elem(map, tuple, &empty, BPF_NOEXIST);
-	struct stats_t* stats = bpf_map_lookup_elem(map, tuple);
+	struct stats_t* stats = NULL;
+
+	if( proto == IPV4) {
+		bpf_map_update_elem(&stats_ipv4, tuple, &empty, BPF_NOEXIST);
+		stats = bpf_map_lookup_elem(&stats_ipv4, tuple);
+	}else{
+		bpf_map_update_elem(&stats_ipv6, tuple, &empty, BPF_NOEXIST);
+		stats = bpf_map_lookup_elem(&stats_ipv6, tuple);
+	}
 
 	if (stats == NULL) {
 		return;
@@ -50,11 +55,17 @@ static void update_stats(void *tuple, enum protocol proto, uint64_t sent, uint64
 
 __attribute__((always_inline))
 static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_status_t *status, struct sock *sk) {
-	void *map = (proto == IPV4) ? &tcp_stats_ipv4 : &tcp_stats_ipv6;
 	struct tcp_stats_t empty = { 0 };
-	bpf_map_update_elem(map, tuple, &empty, BPF_NOEXIST);
-	struct tcp_stats_t* stats = bpf_map_lookup_elem(map, tuple);
+	struct tcp_stats_t* stats = NULL;
 	uint32_t rtt, rtt_var;
+
+	if( proto == IPV4) {
+		bpf_map_update_elem(&tcp_stats_ipv4, tuple, &empty, BPF_NOEXIST);
+		stats = bpf_map_lookup_elem(&tcp_stats_ipv4, tuple);
+	}else {
+		bpf_map_update_elem(&tcp_stats_ipv6, tuple, &empty, BPF_NOEXIST);
+		stats = bpf_map_lookup_elem(&tcp_stats_ipv6, tuple);
+	}
 
 	if (stats == NULL) {
 		return;
@@ -83,7 +94,6 @@ static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_stat
 
 __attribute__((always_inline))
 static void maybe_fix_missing_connection_tuple(enum protocol proto, void* tuple) {
-	void *map = (proto == IPV4) ? &tuplepid_ipv4 : &tuplepid_ipv6;
 	uint64_t pid = bpf_get_current_pid_tgid();
 
 	if ((pid >> 32) <= 10) { // probe activated with insufficient context
@@ -91,7 +101,11 @@ static void maybe_fix_missing_connection_tuple(enum protocol proto, void* tuple)
 	}
 
 	struct pid_comm_t p = {.pid = pid, .state = CONN_ACTIVE};
-	bpf_map_update_elem(map, tuple, &p, BPF_NOEXIST);
+	if( proto == IPV4) {
+		bpf_map_update_elem(&tuplepid_ipv4, tuple, &p, BPF_NOEXIST);
+	}else {
+		bpf_map_update_elem(&tuplepid_ipv6, tuple, &p, BPF_NOEXIST);
+	}
 }
 
 __attribute__((always_inline))
