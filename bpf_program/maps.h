@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Dynatrace LLC
+ * Copyright 2026 Dynatrace LLC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,131 +17,132 @@
  */
 #pragma once
 
-#include "bpf_helpers.h"
+#include "vmlinux.h"
 #include "nettracer-bpf.h"
-
-#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
 #define  MAP_MAX_ENTRIES 1024
 
 // Map with only one element at 0-key, representing offset guessing status
-struct bpf_map_def SEC("maps") nettracer_status = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(struct guess_status_t),
-	.max_entries = 1
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, __u32);
+	__type(value, struct guess_status_t);
+	__uint(max_entries, 1);
+} nettracer_status SEC(".maps");
 
 // Map with only one element at 0-key, representing configuration for BPF program
-struct bpf_map_def SEC("maps") nettracer_config = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(struct nettracer_config_t),
-	.max_entries = 1
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, __u32);
+	__type(value, struct nettracer_config_t);
+	__uint(max_entries, 1);
+} nettracer_config SEC(".maps");
 
 /* This is a key/value store with the keys being the cpu number
  * and the values being a perf file descriptor.
  */
-struct bpf_map_def SEC("maps") bpf_logs = {
-	.type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(uint32_t),
-	.max_entries = 2024
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__type(key, __u32);
+	__type(value, __u32);
+	__uint(max_entries, 2024);
+} bpf_logs SEC(".maps");
 
 /* This is a key/value store with the keys being a pid
  * and the values being a struct sock *.
  */
-struct bpf_map_def SEC("maps") connectsock_ipv4 = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(uint64_t),
-	.value_size = sizeof(void *),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, __u64); //(void *)
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} connectsock_ipv4 SEC(".maps");
 
 /* This is a key/value store with the keys being a pid
  * and the values being a struct sock *.
  */
-struct bpf_map_def SEC("maps") connectsock_ipv6 = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(uint64_t),
-	.value_size = sizeof(void *),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, __u64); // sizeof(void *),
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} connectsock_ipv6 SEC(".maps");
 
 /* This is a key/value store with the keys being an ipv4_tuple_t
  * and the values being a struct pid_comm_t.
  */
-struct bpf_map_def SEC("maps") tuplepid_ipv4 = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct ipv4_tuple_t),
-	.value_size = sizeof(struct pid_comm_t),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, struct ipv4_tuple_t);
+	__type(value, struct pid_comm_t);
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} tuplepid_ipv4 SEC(".maps");
 
 /* This is a key/value store with the keys being an ipv6_tuple_t
  * and the values being a struct pid_comm_t.
  */
-struct bpf_map_def SEC("maps") tuplepid_ipv6 = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct ipv6_tuple_t),
-	.value_size = sizeof(struct pid_comm_t),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, struct ipv6_tuple_t);
+	__type(value, struct pid_comm_t);
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} tuplepid_ipv6 SEC(".maps");
 
 /* This is a key/value store with the keys being the cpu number
  * and the values being a perf file descriptor.
  */
-struct bpf_map_def SEC("maps") tcp_event_ipv4 = {
-	.type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(uint32_t),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__type(key, __u32);
+	__type(value,  __u32);
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} tcp_event_ipv4 SEC(".maps");
 
 /* This is a key/value store with the keys being the cpu number
  * and the values being a perf file descriptor.
  */
-struct bpf_map_def SEC("maps") tcp_event_ipv6 = {
-	.type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(uint32_t),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__type(key, __u32);
+	__type(value, __u32);
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} tcp_event_ipv6 SEC(".maps");
 
 // Key/value stores with generic and TCP stats for IPv4 and IPv6
 
-struct bpf_map_def SEC("maps") stats_ipv4 = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct ipv4_tuple_t),
-	.value_size = sizeof(struct stats_t),
-	.max_entries = MAP_MAX_ENTRIES
-};
-struct bpf_map_def SEC("maps") stats_ipv6 = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct ipv6_tuple_t),
-	.value_size = sizeof(struct stats_t),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, struct ipv4_tuple_t);
+	__type(value, struct stats_t);
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} stats_ipv4 SEC(".maps");
 
-struct bpf_map_def SEC("maps") tcp_stats_ipv4 = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct ipv4_tuple_t),
-	.value_size = sizeof(struct tcp_stats_t),
-	.max_entries = MAP_MAX_ENTRIES
-};
-struct bpf_map_def SEC("maps") tcp_stats_ipv6 = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct ipv6_tuple_t),
-	.value_size = sizeof(struct tcp_stats_t),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, struct ipv6_tuple_t);
+	__type(value, struct stats_t);
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} stats_ipv6 SEC(".maps");
 
-struct bpf_map_def SEC("maps") map_sends = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(uint64_t),
-	.value_size = sizeof(void *),
-	.max_entries = MAP_MAX_ENTRIES
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, struct ipv4_tuple_t);
+	__type(value, struct tcp_stats_t);
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} tcp_stats_ipv4 SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, struct ipv6_tuple_t);
+	__type(value, struct tcp_stats_t);
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} tcp_stats_ipv6 SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, __u64); //void*
+	__uint(max_entries, MAP_MAX_ENTRIES);
+} map_sends SEC(".maps");
 

@@ -15,16 +15,20 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-#include "bpf_helpers.h"
-#include "log.h"
-#include "maps.h"
 #include "metrics_utilities.h"
 #include "tuples_utilities.h"
 
+#ifdef LEGACY_BPF
 #include <linux/bpf.h>
 #include <linux/ptrace.h>
 #include <net/inet_sock.h>
 #include <net/sock.h>
+#include "legacy/bpf_helpers.h"
+#include "legacy/maps.h"
+#else
+#include "maps.h"
+#include <bpf/bpf_helpers.h>
+#endif
 
 __attribute__((always_inline))
 static int send_metric(struct sock* sk, int32_t bytes_sent) {
