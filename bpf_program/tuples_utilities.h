@@ -121,19 +121,17 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct guess_status_t *st
 	bpf_probe_read(&dport, sizeof(dport), ((char *)sk) + status->offset_dport);
 #else
 	struct inet_sock *inet = (struct inet_sock *)sk;
-    struct ipv6_pinfo *np = inet->pinet6;
-	bpf_core_read(&saddr_h, sizeof(saddr_h), &np->saddr);
-	bpf_core_read(&saddr_l, sizeof(saddr_l), &np->saddr + sizeof(uint64_t));
-	bpf_core_read(&daddr_h, sizeof(daddr_h), &sk->__sk_common.skc_v6_daddr);  //beware this field can be in different place 
-	bpf_core_read(&daddr_l, sizeof(daddr_l), &sk->__sk_common.skc_v6_daddr + sizeof(uint64_t));  // beware this field can be in different place 
+	struct ipv6_pinfo *np;
+	struct in6_addr saddr, daddr;
+	bpf_core_read(&np, sizeof(np), &inet->pinet6);
+	bpf_core_read(&saddr, sizeof(saddr), &np->saddr);
+	saddr_h = *(__u64 *)&saddr.in6_u.u6_addr8[0];
+	saddr_l = *(__u64 *)&saddr.in6_u.u6_addr8[8];
+	bpf_core_read(&daddr, sizeof(daddr), &sk->__sk_common.skc_v6_daddr);  //this field can be in different place depending on kernel version
+	daddr_h = *(__u64 *)&daddr.in6_u.u6_addr8[0];
+	daddr_l = *(__u64 *)&daddr.in6_u.u6_addr8[8];
 	bpf_core_read(&sport, sizeof(sport), &sk->__sk_common.skc_num);
 	bpf_core_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
-	//struct dst_entry *dst = NULL;
-     //       bpf_probe_read_kernel(&dst, sizeof(dst), &sk->sk_dst_cache);
-     //       if (dst) {
-     //           struct rt6_info *rt = (struct rt6_info *)dst;
-     //           struct in6_addr daddr = {};
-     //           bpf_probe_read_kernel(&daddr, sizeof(daddr), &rt->rt6i_dst.addr);
 #endif
 
 	tuple->saddr_h = saddr_h;

@@ -48,7 +48,7 @@ int kprobe__tcp_v4_connect( struct pt_regs *ctx) {
 
 #else
 SEC("kprobe/tcp_v4_connect")
-int kprobe__tcp_v4_connect( struct sock *sk, struct sockaddr *uaddr, int addr_len){
+int BPF_KPROBE(kprobe__tcp_v4_connect, struct sock *sk, struct sockaddr *uaddr, int addr_len){
 	uint64_t pid = bpf_get_current_pid_tgid();
 	bpf_map_update_elem(&connectsock_ipv4, &pid, &sk, BPF_ANY);
 	return 0;

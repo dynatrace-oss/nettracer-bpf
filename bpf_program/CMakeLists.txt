@@ -49,16 +49,18 @@ if(LEGACY_BPF)
 		-o nettracer-bpf.c.o
 	)
 
+	set(BPF_OUTPUT_FILE "nettracer-bpf.o")
 	set(LLC_COMMAND ${LLVM_BINDIR}/llc
 		nettracer-bpf.c.o
 		-march=bpf -filetype=obj
-		-o "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nettracer-bpf.o"
+		-o "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_OUTPUT_FILE}"
 	)
 	set(FULL_COMMAND ${CLANG_COMMAND} && ${LLC_COMMAND})
 else()
 	list(APPEND HEADERS
 		maps.h
 	)
+	set(BPF_OUTPUT_FILE "nettracer-bpf.core.o")
 	set(FULL_COMMAND ${LLVM_BINDIR}/clang
 		-D__TARGET_ARCH_${ARCH}
 		-fno-jump-tables -fno-builtin
@@ -67,21 +69,21 @@ else()
 		-target bpf
 		-c "${CMAKE_CURRENT_LIST_DIR}/nettracer-bpf.c"
 		-I "${CMAKE_CURRENT_LIST_DIR}"
-		-o "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nettracer-bpf.o"
+		-o "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_OUTPUT_FILE}"
 	)
 endif()
 
 PREPEND(HEADERS_FULL "${CMAKE_CURRENT_LIST_DIR}" ${HEADERS})
 
-add_custom_command(OUTPUT "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nettracer-bpf.o"
+add_custom_command(OUTPUT "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_OUTPUT_FILE}"
 	COMMAND ${FULL_COMMAND}
 	DEPENDS ${SOURCES_FULL} ${HEADERS_FULL}
 )
 add_custom_target(bpf_program
 	ALL
-	DEPENDS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nettracer-bpf.o"
+	DEPENDS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_OUTPUT_FILE}"
 )
 
-install(FILES "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nettracer-bpf.o"
+install(FILES "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_OUTPUT_FILE}"
 	DESTINATION "bin"
 )
