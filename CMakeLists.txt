@@ -38,15 +38,11 @@ else ()
 	)
 endif ()
 
-if(DEFINED BPF_DEBUG)
-	set(BPF_DEBUG ${BPF_DEBUG})  # suppress CMake's warning about unused variable - it IS used in bpf_program
-endif()
-
 if(NOT DEFINED KERNEL_VERSION)
 	execute_process(COMMAND uname -r OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE KERNEL_VERSION)
 endif()
 
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM 17 REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 
 if(NOT DEFINED LLVM_BINDIR)
@@ -76,6 +72,20 @@ elseif(ARCHITECTURE STREQUAL "aarch64")
 	set(ARCH "arm64")
 else()
 	message(FATAL_ERROR "Architecture not supported!")
+endif()
+
+option(LEGACY_BPF "Build offsetguessed bpf programs" ON)
+if(LEGACY_BPF)
+	add_definitions("-DUSE_RODATA=0")
+else()
+	add_definitions("-DUSE_RODATA=1")
+endif()
+
+option(BPF_DEBUG "Enable bpf_trace_printk logging" OFF)
+if(BPF_DEBUG)
+	set(BPF_DEBUG 1)
+else()
+	set(BPF_DEBUG 0)
 endif()
 
 # we need to detect locations of kernel headers

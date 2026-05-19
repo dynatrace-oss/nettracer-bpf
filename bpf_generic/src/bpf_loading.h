@@ -32,6 +32,8 @@ namespace bpf {
 struct map_data;
 using maps_config = std::vector<map_data>;
 
+using BpfPrograms = std::unordered_map<std::string_view, std::vector<char>>;
+
 struct kprobe {
 	std::string fname;
 	bpf_insn* insn;
@@ -47,7 +49,7 @@ class bpf_subsystem {
 	const ISystemCalls& sysCalls;
 
 	bool load_and_attach(kprobe& prgrm, const char* license, int kernVersion);
-	void load_programs_from_sections(const std::unordered_map<std::string, llvm::StringRef>& bpfPrograms, int kernVersion, const char* license);
+	void load_programs_from_sections(const BpfPrograms& bpfPrograms, int kernVersion, const char* license);
 	int install_kprobe_fs(const std::string& prefix, const std::string& name, bool is_kprobe, int fd);
 	int uninstall_kprobe_fs(const std::string& cmd);
 	void close_all_probes();
