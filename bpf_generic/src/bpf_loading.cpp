@@ -236,7 +236,7 @@ void bpf_subsystem::load_programs_from_sections(const BpfPrograms& bpfPrograms, 
 	bool allFailed = true;
     for (const auto& [name, program]: bpfPrograms) {
 		LOG_DEBUG("loading {} {}", name, program.size());
-		kprobe probe{.fname = name, .insn = std::bit_cast<bpf_insn*>(program.data()), .size = program.size(), .fd = -1, .efd = -1};
+		kprobe probe{.fname = std::string(name), .insn = std::bit_cast<bpf_insn*>(program.data()), .size = program.size(), .fd = -1, .efd = -1};
 		allFailed &= !load_and_attach(probe, license, kernVersion);
 	}
 
@@ -257,12 +257,15 @@ bpf_subsystem::bpf_subsystem(const ISystemCalls& sysCalls)
 	: sysCalls(sysCalls) {}
 
 bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entries) {
-
-	MapsSectionLoader sectionloader(path);
-	maps = sectionloader.load();
+	SectionLoader sectionloader(path);
+	if (!sectionloader.loadSections()) {
+		LOG_ERROR("Error loading sections from elf");
+		return false;
+	}
+	maps = sectionloader.getMapsConfig();
 	BPFMapsWrapper mapsWrapper;
 	set_maps_max_entries(map_max_entries);
-	if (!loadMaps(maps, mapsWrapper)) {
+	if (!loadMaps(maps, mapsWrapper, sectionloader.getRodataSection())) {
 		LOG_ERROR("Cannot load BPF maps");
 		return false;
 	}
@@ -272,7 +275,7 @@ bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 		return false;
 	}
 
-	if (!sectionloader.processReloSections(maps)) {
+	if (!sectionloader.relocateData(maps)) {
 		LOG_ERROR("Processing relocations failed");
 		return false;
 	}
@@ -286,7 +289,7 @@ bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 		// don't return, see what happens
 	}
 
-	load_programs_from_sections(sectionloader.getBpfPrograms(), *kernelVersion, sectionloader.getLicense().c_str());
+	load_programs_from_sections(sectionloader.getBpfPrograms(), *kernelVersion, sectionloader.getLicense());
 	return true;
 }
 

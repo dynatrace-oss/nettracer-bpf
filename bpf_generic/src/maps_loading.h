@@ -23,32 +23,38 @@
 
 #include "bpf_loading.h"
 #include "maps_def.h"
+#include <memory>
 #include <unordered_map>
 
 namespace bpf {
 
-bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper);
+bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper, const llvm::object::SectionRef* rodataSec);
 
-using BpfPrograms = std::unordered_map<std::string, llvm::StringRef>;
-using MapsSymbols = std::unordered_map<size_t, std::string>;
+using MapsSymbols = std::unordered_map<uintptr_t, std::string_view>;
 
-class MapsSectionLoader {
+class SectionLoader {
 public:
-	explicit MapsSectionLoader(const std::string& path);
-	maps_config load();
-	bool processReloSections(maps_config& maps);
-	BpfPrograms& getBpfPrograms(){ return bpfPrograms;}
-	std::string getLicense(){ return license.str();}
-private:
-	MapsSymbols getSymTableEntriesForMaps();
-	maps_config copyElfMapsDataToMapsConfig(const MapsSymbols& sym, std::size_t map_sz_copy) const;
+	explicit SectionLoader(const std::string& path);
+	bool loadSections();
+	bool relocateData(maps_config& maps);
 
-	llvm::StringRef content;
-	llvm::StringRef license;
+	const llvm::object::SectionRef* getRodataSection() const { return sections.rodata.get(); }
+	maps_config getMapsConfig();
+	BpfPrograms& getBpfPrograms(){ return bpfPrograms;}
+	const char* getLicense(){ return sections.license->getContents()->data();}
+private:
+	struct {
+		std::unordered_map<std::string_view, llvm::object::SectionRef> kprobes{};
+		std::unordered_map<std::string_view, llvm::object::SectionRef> rel{};
+		std::unique_ptr<llvm::object::SectionRef> maps{};
+		std::unique_ptr<llvm::object::SectionRef> license{};
+		std::unique_ptr<llvm::object::SectionRef> rodata{};
+	} sections{};
+	MapsSymbols mapsRelSymOffsToName;
+
 	std::unique_ptr<llvm::WriteThroughMemoryBuffer> memBufffer;
 	std::unique_ptr<llvm::object::Binary> binary;
 	llvm::object::ELFObjectFileBase *ELFobj;
-	MapsSymbols symbolsMap;
 	BpfPrograms bpfPrograms;
 };
 

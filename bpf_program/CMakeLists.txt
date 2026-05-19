@@ -16,7 +16,6 @@ set(SOURCES
 )
 
 PREPEND(SOURCES_FULL "${CMAKE_CURRENT_LIST_DIR}" ${SOURCES})
-option(LEGACY_BPF "Build offsetguessed bpf programs" ON)
 
 set(HEADERS
 	metrics_utilities.h
@@ -25,7 +24,6 @@ set(HEADERS
 	probes/metrics.h
 	tuples_utilities.h
 )
-
 
 if(LEGACY_BPF)
 	list(APPEND HEADERS
@@ -36,7 +34,7 @@ if(LEGACY_BPF)
 		legacy/other.h
 	)
 	set(CLANG_COMMAND ${LLVM_BINDIR}/clang
-		-D__KERNEL__ -D__TARGET_ARCH_${ARCH} -DLEGACY_BPF=1
+		-D__KERNEL__ -D__TARGET_ARCH_${ARCH} -DLEGACY_BPF=1 -DUSE_RODATA=0 -DBPF_DEBUG=${BPF_DEBUG}
 		-D${BUILD_TYPE_MACRO}
 		-fno-jump-tables -fno-builtin
 		-Wall -Wpadded -Werror
@@ -62,7 +60,7 @@ else()
 	)
 	set(BPF_OUTPUT_FILE "nettracer-bpf.core.o")
 	set(FULL_COMMAND ${LLVM_BINDIR}/clang
-		-D__TARGET_ARCH_${ARCH}
+		-D__TARGET_ARCH_${ARCH} -DUSE_RODATA=1 -DBPF_DEBUG=${BPF_DEBUG}
 		-fno-jump-tables -fno-builtin
 		-Wall -Werror
 		${BPF_OPTIMIZATION}

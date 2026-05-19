@@ -20,6 +20,7 @@
 #include "maps.h"
 #include "nettracer-bpf.h"
 #include "offset_guessing.h"
+#include "print.h"
 
 #include <linux/ptrace.h>
 #include <linux/tcp.h>
@@ -38,13 +39,13 @@ int kprobe__tcp_getsockopt(struct pt_regs *ctx) {
 	uint32_t zero = 0;
 	struct guess_status_t *status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
-		DEBUG_BPF("tcp_getsockopt: guessing status is null");
+		BPF_PRINTK("tcp_getsockopt: guessing status is null");
 		return 0;
 	}
 
 	uint64_t pid = bpf_get_current_pid_tgid();
 	if (status->pid_tgid != pid) {
-		DEBUG_BPF("tcp_getsockopt: non-matching pid (%d != %d)", status->pid_tgid, pid);
+		BPF_PRINTK("tcp_getsockopt: non-matching pid (%d != %d)", status->pid_tgid, pid);
 		return 0;
 	}
 
