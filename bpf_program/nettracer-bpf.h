@@ -177,3 +177,43 @@ struct bpf_log_event_t {
 	uint8_t padding[3];
 	int64_t args[10];
 };
+
+struct bpf_debug_counters_t {
+	uint64_t update_ipv4_on_connect_failures;
+	uint64_t update_ipv6_on_connect_failures;
+	uint64_t read_ipv4_on_connect_failures;
+	uint64_t read_ipv6_on_connect_failures;
+	uint64_t read_ipv4_on_close_failures;
+	uint64_t read_ipv6_on_close_failures;
+	uint64_t read_ipv4_on_accept_failures;
+	uint64_t read_ipv6_on_accept_failures;
+	uint64_t update_ipv4_on_accept_failures;
+	uint64_t update_ipv6_on_accept_failures;
+	uint64_t lookup_ipv4_on_close_failures;
+	uint64_t lookup_ipv6_on_close_failures;
+	uint64_t status_lookup_failures;
+	uint64_t stats_updating_failures;
+	uint64_t tcp_stats_updating_failures;
+	uint64_t perf_output_ipv4_on_connect_failures;
+	uint64_t perf_output_ipv6_on_connect_failures;
+	uint64_t perf_output_ipv4_on_accept_failures;
+	uint64_t perf_output_ipv6_on_accept_failures;
+	uint64_t perf_output_ipv4_on_close_failures;
+	uint64_t perf_output_ipv6_on_close_failures;
+	uint64_t connectsock_ipv4_update_failures;
+	uint64_t connectsock_ipv6_update_failures;
+	uint64_t map_sends_update_failures;
+};
+
+// Helper to safely increment a field of bpf_debug_counters_t from BPF code.
+// Relies on bpf_debug_counters being a PERCPU_ARRAY map of size 1 at key 0,
+// so plain ++ is race-free across CPUs (no __sync_fetch_and_add needed).
+// The NULL check is required by the BPF verifier on every map lookup result.
+#define INC_DEBUG_COUNTER(field) do {                                          \
+	uint32_t _dbg_zero = 0;                                                    \
+	struct bpf_debug_counters_t *_dbg_c =                                      \
+		bpf_map_lookup_elem(&bpf_debug_counters, &_dbg_zero);                  \
+	if (_dbg_c) {                                                              \
+		_dbg_c->field++;                                                       \
+	}                                                                          \
+} while (0)
