@@ -29,4 +29,10 @@ bool isKernelSupported(int kernelVersion);
 
 std::string kernelVersionToString(int kernelVersion);
 
+// Returns the number of possible CPUs reported by the kernel via
+// /sys/devices/system/cpu/possible (the same value libbpf uses for sizing
+// per-CPU BPF maps). Returns std::nullopt if the file cannot be read or
+// parsed.
+std::optional<unsigned> getNumPossibleCpus(const ISystemCalls& sysCalls);
+
 } // namespace bpf
