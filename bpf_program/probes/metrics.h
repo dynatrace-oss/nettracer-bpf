@@ -41,6 +41,7 @@ static int send_metric(struct sock* sk, int32_t bytes_sent) {
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
+		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
 
@@ -78,7 +79,9 @@ SEC("kprobe/tcp_sendmsg")
 int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
 	struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
 	uint64_t pid = bpf_get_current_pid_tgid();
-	bpf_map_update_elem(&map_sends, &pid, &sk, BPF_ANY);
+	if (bpf_map_update_elem(&map_sends, &pid, &sk, BPF_ANY) < 0) {
+		INC_DEBUG_COUNTER(map_sends_update_failures);
+	}
 	return 0;
 }
 
@@ -118,6 +121,7 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
+		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
 
@@ -159,6 +163,7 @@ int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
+		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
 
@@ -178,6 +183,7 @@ int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
 		struct tcp_stats_t* stats = bpf_map_lookup_elem(&tcp_stats_ipv4, &ipv4_tuple);
 
 		if (stats == NULL) {
+			INC_DEBUG_COUNTER(tcp_stats_updating_failures);
 			return 0;
 		}
 
@@ -200,6 +206,7 @@ int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
 		bpf_map_update_elem(&tcp_stats_ipv6, &ipv6_tuple, &empty, BPF_NOEXIST);
 		stats = bpf_map_lookup_elem(&tcp_stats_ipv6, &ipv6_tuple);
 		if (stats == NULL) {
+			INC_DEBUG_COUNTER(tcp_stats_updating_failures);
 			return 0;
 		}
 

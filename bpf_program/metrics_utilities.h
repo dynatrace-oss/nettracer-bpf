@@ -42,6 +42,7 @@ static void update_stats(void *tuple, enum protocol proto, uint64_t sent, uint64
 	}
 
 	if (stats == NULL) {
+		INC_DEBUG_COUNTER(stats_updating_failures);
 		return;
 	}
 
@@ -68,6 +69,7 @@ static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_stat
 	}
 
 	if (stats == NULL) {
+		INC_DEBUG_COUNTER(tcp_stats_updating_failures);
 		return;
 	}
 
