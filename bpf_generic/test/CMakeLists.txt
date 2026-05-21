@@ -1,5 +1,5 @@
 set(SOURCES
-	kernel_version_test.cpp
+	system_utils_test.cpp
 )
 PREPEND(SOURCES_FULL "${CMAKE_CURRENT_LIST_DIR}/cpp" ${SOURCES})
 

@@ -17,7 +17,9 @@
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/errors.h"
 #include "bpf_generic/src/log.h"
+#include "bpf_generic/src/system_utils.h"
 
+#include "bpf_debug_counters.h"
 #include "bpf_events.h"
 #include "config_watcher.h"
 #include "connections_printing.h"
@@ -75,6 +77,7 @@ po::options_description getOptionsDescription() {
 			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
 			("log,l", po::value<std::string>()->default_value(""), "Logger path")
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
+			("debug_counters_interval", po::value<unsigned>()->default_value(300), "Interval (seconds) for logging BPF debug counters; 0 disables")
 			("incremental,i", "Enable incremental data")
 			("noninteractive,r", "Hex output")
 			("with_loopback,f", "With loopback")
@@ -171,6 +174,51 @@ bool isIPv6MonitoringPossible(int status_fd, bpf::BPFMapsWrapper& mapsWrapper) {
 	const uint32_t zero = 0;
 	guess_status_t status;
 	return mapsWrapper.lookupElement(status_fd, &zero, &status) && status.offset_daddr_ipv6 != 0;
+}
+
+unsigned resolveNumPossibleCpus() {
+	if (auto detected = bpf::getNumPossibleCpus(SystemCalls::getInstance())) {
+		return detected.value();
+	}
+	const unsigned hardwareConcurrency{std::thread::hardware_concurrency()};
+	const unsigned fallback{hardwareConcurrency > 0 ? hardwareConcurrency : 1u};
+	LOG_WARN("Could not read /sys/devices/system/cpu/possible, falling back to {}", fallback);
+	return fallback;
+}
+
+void runDebugCountersLoop(int mapFd, unsigned numPossibleCpus, unsigned intervalSeconds, const bpf::BPFMapsWrapper& mapsWrapper) {
+	nettracer::BpfDebugCountersReader reader{mapFd, numPossibleCpus, mapsWrapper};
+	nettracer::BpfDebugCounters previousCounters{};
+	const auto period = std::chrono::seconds(intervalSeconds);
+	while (true) {
+		std::unique_lock<std::mutex> lk{exitCtrl.m};
+		if (exitCtrl.cv.wait_for(lk, period, [] { return !exitCtrl.running; })) {
+			break;
+		}
+		lk.unlock();
+		auto currentCounters = reader.readAndAggregate();
+		if (!currentCounters) {
+			LOG_WARN("[bpf_debug_counters] lookup failed, skipping interval");
+			continue;
+		}
+		LOG_INFO("[bpf_debug_counters] cumulative: {}", nettracer::formatNonZeroFields(*currentCounters));
+		LOG_INFO("[bpf_debug_counters] delta:      {}", nettracer::formatNonZeroFields(nettracer::subtractBpfDebugCounters(*currentCounters, previousCounters)));
+		previousCounters = *currentCounters;
+	}
+}
+
+std::thread startDebugCountersThread(bpf::bpf_subsystem& ebpf, const bpf::BPFMapsWrapper& mapsWrapper, unsigned intervalSeconds) {
+	if (intervalSeconds == 0) {
+		return {};
+	}
+	const int mapFd{ebpf.get_map_fd("bpf_debug_counters")};
+	if (mapFd < 0) {
+		LOG_WARN("bpf_debug_counters map not available, skipping debug counters logging");
+		return {};
+	}
+	const unsigned numPossibleCpus{resolveNumPossibleCpus()};
+	LOG_INFO("Starting BPF debug counters logger (interval={}s, cpus={})", intervalSeconds, numPossibleCpus);
+	return std::thread{runDebugCountersLoop, mapFd, numPossibleCpus, intervalSeconds, std::cref(mapsWrapper)};
 }
 
 enum ReturnCodes {
@@ -331,6 +379,9 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
 	}
 
+	const unsigned debugCountersInterval{vm["debug_counters_interval"].as<unsigned>()};
+	std::thread debugCountersThread{startDebugCountersThread(ebpf, mapsWrapper, debugCountersInterval)};
+
 	bevents.start();
 	std::promise<bool> map_reader_promise;
 	auto map_reader_future = map_reader_promise.get_future();
@@ -339,6 +390,9 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	if (map_reader.joinable()) {
 		map_reader.join();
 	};
+	if (debugCountersThread.joinable()) {
+		debugCountersThread.join();
+	}
     bevents.stop();
 	LOG_INFO("Events stopped");
 

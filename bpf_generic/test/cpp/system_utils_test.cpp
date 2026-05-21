@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 #include <gtest/gtest.h>
-#include "kernel_version.h"
+#include "system_utils.h"
 #include "mock_system_calls.h"
 #include <algorithm>
 #include <linux/version.h>
@@ -254,4 +254,86 @@ TEST_F(VersionOnGenericDistroTest, test_4_17_2_dash) {
 
 TEST_F(VersionOnGenericDistroTest, test_centos_similar_candidate) {
 	checkParsedVersion("4.18.0-305.3.1.el8.x86_64", 4, 18, 0);
+}
+
+class NumPossibleCpusTest : public testing::Test {
+protected:
+	void expectFileContent(std::string_view content) {
+		std::FILE* dummyFile{reinterpret_cast<std::FILE*>(0x123456)};
+		EXPECT_CALL(sysCalls, fopen)
+			.WillOnce(Return(dummyFile));
+		EXPECT_CALL(sysCalls, fread)
+			.WillOnce(DoAll(
+				SetArrayArgument<0>(content.cbegin(), content.cend()),
+				Return(content.size())));
+		EXPECT_CALL(sysCalls, fclose)
+			.WillOnce(Return());
+	}
+
+	void expectFileMissing() {
+		EXPECT_CALL(sysCalls, fopen)
+			.WillOnce(Return(nullptr));
+	}
+
+	MockSystemCalls sysCalls;
+};
+
+TEST_F(NumPossibleCpusTest, single_cpu) {
+	expectFileContent("0");
+	auto result{getNumPossibleCpus(sysCalls)};
+	ASSERT_TRUE(result);
+	EXPECT_EQ(*result, 1u);
+}
+
+TEST_F(NumPossibleCpusTest, single_range) {
+	expectFileContent("0-3");
+	auto result{getNumPossibleCpus(sysCalls)};
+	ASSERT_TRUE(result);
+	EXPECT_EQ(*result, 4u);
+}
+
+TEST_F(NumPossibleCpusTest, single_range_with_newline) {
+	expectFileContent("0-7\n");
+	auto result{getNumPossibleCpus(sysCalls)};
+	ASSERT_TRUE(result);
+	EXPECT_EQ(*result, 8u);
+}
+
+TEST_F(NumPossibleCpusTest, mixed_ranges_and_singletons) {
+	expectFileContent("0,2-5,7");
+	auto result{getNumPossibleCpus(sysCalls)};
+	ASSERT_TRUE(result);
+	EXPECT_EQ(*result, 6u);
+}
+
+TEST_F(NumPossibleCpusTest, multiple_ranges) {
+	expectFileContent("0-1,4-7");
+	auto result{getNumPossibleCpus(sysCalls)};
+	ASSERT_TRUE(result);
+	EXPECT_EQ(*result, 6u);
+}
+
+TEST_F(NumPossibleCpusTest, large_range) {
+	expectFileContent("0-127");
+	auto result{getNumPossibleCpus(sysCalls)};
+	ASSERT_TRUE(result);
+	EXPECT_EQ(*result, 128u);
+}
+
+TEST_F(NumPossibleCpusTest, file_missing) {
+	expectFileMissing();
+	auto result{getNumPossibleCpus(sysCalls)};
+	EXPECT_FALSE(result);
+}
+
+TEST_F(NumPossibleCpusTest, empty_file) {
+	expectFileContent("");
+	auto result{getNumPossibleCpus(sysCalls)};
+	EXPECT_FALSE(result);
+}
+
+TEST_F(NumPossibleCpusTest, only_whitespace) {
+	expectFileContent("   \n");
+	auto result{getNumPossibleCpus(sysCalls)};
+	EXPECT_FALSE(result);
 }

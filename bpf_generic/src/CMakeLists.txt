@@ -2,7 +2,7 @@ set(SOURCES
 	bpf_loading.cpp
 	bpf_wrapper.cpp
 	log.cpp
-	kernel_version.cpp
+	system_utils.cpp
 	maps_loading.cpp
 	perf_event.cpp
 	system_calls.cpp
@@ -13,7 +13,7 @@ set(HEADERS
 	bpf_wrapper.h
 	errors.h
 	log.h
-	kernel_version.h
+	system_utils.h
 	maps_loading.h
 	perf_event.h
 	perf_sys.h
