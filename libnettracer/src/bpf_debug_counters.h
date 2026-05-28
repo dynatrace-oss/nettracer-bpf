@@ -31,9 +31,8 @@ namespace nettracer {
 // duplicating the field list. The struct lives in bpf_program/nettracer-bpf.h.
 using BpfDebugCounters = bpf_debug_counters_t;
 
-// Number of uint64_t counters in BpfDebugCounters. A static_assert in the .cpp
-// verifies this matches sizeof(BpfDebugCounters).
-inline constexpr std::size_t kBpfDebugCountersFieldCount = 24;
+// Number of uint64_t counters in BpfDebugCounters.
+constexpr std::size_t kBpfDebugCountersFieldCount = sizeof(bpf_debug_counters_t) / sizeof(uint64_t);;
 
 // (name, pointer-to-member) pair used to iterate over all counter fields
 // generically for aggregation, subtraction and formatting.

@@ -117,9 +117,9 @@ TEST(BpfDebugCountersSubtract, computes_per_field_delta) {
 	EXPECT_EQ(delta.map_sends_update_failures, 20u);
 }
 
-TEST(BpfDebugCountersFormat, all_zero_returns_marker) {
+TEST(BpfDebugCountersFormat, all_zero_returns_empty_string) {
 	nettracer::BpfDebugCounters counters{};
-	EXPECT_EQ(nettracer::formatNonZeroFields(counters), "(all zero)");
+	EXPECT_EQ(nettracer::formatNonZeroFields(counters), "");
 }
 
 TEST(BpfDebugCountersFormat, only_non_zero_fields_are_listed) {
