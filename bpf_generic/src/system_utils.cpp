@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-#include "kernel_version.h"
+#include "system_utils.h"
 
 #include <cerrno>
 #include <cstdio>
@@ -123,6 +123,44 @@ std::string kernelVersionToString(int kernelVersion) {
 	int minor{(kernelVersion >> 8) - (major << 8)};
 	int patch{kernelVersion - (major << 16) - (minor << 8)};
 	return std::to_string(major) + '.' + std::to_string(minor) + '.' + std::to_string(patch);
+}
+
+std::optional<unsigned> getNumPossibleCpus(const ISystemCalls& sysCalls) {
+	// /sys/devices/system/cpu/possible contains a comma-separated list of
+	// inclusive ranges describing CPU ids that the kernel may bring online,
+	// e.g. "0-3", "0,2-5,7", or a bare "0". This is the same source libbpf
+	// uses to size per-CPU map buffers (libbpf_num_possible_cpus()).
+	FileScopeGuard file{sysCalls.fopen("/sys/devices/system/cpu/possible", "r"), sysCalls};
+	if (!*file) {
+		return std::nullopt;
+	}
+	const size_t maxLength{128};
+	std::string content(maxLength, '\0');
+	const size_t bytesRead{sysCalls.fread(content.data(), maxLength, *file)};
+	if (bytesRead == 0) {
+		return std::nullopt;
+	}
+	content.resize(bytesRead);
+
+	unsigned total{0};
+	bool sawAny{false};
+	std::regex rangeRegex{R"((\d+)(?:-(\d+))?)"};
+	auto begin{std::sregex_iterator{content.cbegin(), content.cend(), rangeRegex}};
+	auto end{std::sregex_iterator{}};
+	for (auto it{begin}; it != end; ++it) {
+		const auto& match{*it};
+		unsigned first{static_cast<unsigned>(std::stoul(match.str(1)))};
+		unsigned last{match[2].matched ? static_cast<unsigned>(std::stoul(match.str(2))) : first};
+		if (last < first) {
+			return std::nullopt;
+		}
+		total += (last - first + 1);
+		sawAny = true;
+	}
+	if (!sawAny) {
+		return std::nullopt;
+	}
+	return total;
 }
 
 } // namespace bpf

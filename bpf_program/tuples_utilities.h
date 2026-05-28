@@ -65,6 +65,7 @@ static bool check_family(struct sock *sk, uint16_t expected_family) {
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
+		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
 

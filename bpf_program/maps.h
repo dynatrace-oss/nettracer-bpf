@@ -146,3 +146,12 @@ struct {
 	__uint(max_entries, MAP_MAX_ENTRIES);
 } map_sends SEC(".maps");
 
+// Map with only one element at 0-key, representing debug counters for BPF program.
+// PERCPU_ARRAY: each CPU gets its own copy, so plain ++ is safe (no atomics needed).
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, __u32);
+	__type(value, struct bpf_debug_counters_t);
+	__uint(max_entries, 1);
+} bpf_debug_counters SEC(".maps");
+

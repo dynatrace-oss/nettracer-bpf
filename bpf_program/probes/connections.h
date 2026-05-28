@@ -36,15 +36,15 @@
 #define LOG_DEBUG_BPF(...)
 #endif
 
-#include "print.h"
-
 #ifdef LEGACY_BPF
 SEC("kprobe/tcp_v4_connect")
 int kprobe__tcp_v4_connect( struct pt_regs *ctx) {
 	struct sock *sk;
 	uint64_t pid = bpf_get_current_pid_tgid();
 	sk = (struct sock *) PT_REGS_PARM1(ctx);
-	bpf_map_update_elem(&connectsock_ipv4, &pid, &sk, BPF_ANY);
+	if (bpf_map_update_elem(&connectsock_ipv4, &pid, &sk, BPF_ANY) < 0) {
+		INC_DEBUG_COUNTER(connectsock_ipv4_update_failures);
+	}
 	return 0;
 }
 
@@ -52,7 +52,9 @@ int kprobe__tcp_v4_connect( struct pt_regs *ctx) {
 SEC("kprobe/tcp_v4_connect")
 int BPF_KPROBE(kprobe__tcp_v4_connect, struct sock *sk, struct sockaddr *uaddr, int addr_len){
 	uint64_t pid = bpf_get_current_pid_tgid();
-	bpf_map_update_elem(&connectsock_ipv4, &pid, &sk, BPF_ANY);
+	if (bpf_map_update_elem(&connectsock_ipv4, &pid, &sk, BPF_ANY) < 0) {
+		INC_DEBUG_COUNTER(connectsock_ipv4_update_failures);
+	}
 	return 0;
 }
 #endif
@@ -83,11 +85,13 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
 
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
+		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
 
 	struct ipv4_tuple_t t = { };
 	if (!read_ipv4_tuple(&t, status, skp)) {
+		INC_DEBUG_COUNTER(read_ipv4_on_connect_failures);
 		return 0;
 	}
 
@@ -98,13 +102,16 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
 	struct pid_comm_t p = {.pid = pid, .state = CONN_ACTIVE};
 	uint32_t cpu = bpf_get_smp_processor_id();
 	if (bpf_map_update_elem(&tuplepid_ipv4, &t, &p, BPF_ANY) < 0) {
+		INC_DEBUG_COUNTER(update_ipv4_on_connect_failures);
 		LOG_DEBUG_BPF(ctx, "Connect missed, reached max conns?: {:d}:{:d} {:d}:{:d} {:d}", t.saddr, t.sport, t.daddr, t.dport, pid >> 32);
 		BPF_PRINTK("Update failed connectv4/src: %x :%d", t.saddr, t.sport);
 		BPF_PRINTK("Update failed connectv4/dst: %x :%d", t.daddr, t.dport);
 	}
 
 	struct tcp_ipv4_event_t evt = convert_ipv4_tuple_to_event(t, cpu, TCP_EVENT_TYPE_CONNECT, pid >> 32);
-	bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt));
+	if (bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt)) < 0) {
+		INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_failures);
+	}
 	return 0;
 }
 
@@ -116,7 +123,9 @@ int kprobe__tcp_v6_connect(struct pt_regs *ctx)
 
 	sk = (struct sock *) PT_REGS_PARM1(ctx);
 
-	bpf_map_update_elem(&connectsock_ipv6, &pid, &sk, BPF_ANY);
+	if (bpf_map_update_elem(&connectsock_ipv6, &pid, &sk, BPF_ANY) < 0) {
+		INC_DEBUG_COUNTER(connectsock_ipv6_update_failures);
+	}
 	return 0;
 }
 
@@ -146,6 +155,7 @@ int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
 
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL || status->state == GUESS_STATE_UNINITIALIZED) {
+		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
 #ifdef LEGACY_BPF
@@ -155,6 +165,7 @@ int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
 #endif
 	struct ipv6_tuple_t t = { };
 	if (!read_ipv6_tuple(&t, status, skp)) {
+		INC_DEBUG_COUNTER(read_ipv6_on_connect_failures);
 		return 0;
 	}
 
@@ -167,13 +178,16 @@ int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
 	uint32_t cpu = bpf_get_smp_processor_id();
 
 	if (bpf_map_update_elem(&tuplepid_ipv6, &t, &p, BPF_ANY) < 0) {
+		INC_DEBUG_COUNTER(update_ipv6_on_connect_failures);
 		LOG_DEBUG_BPF(ctx, "Connect v6 missed, reached max conns?: {:d}{:d}:{:d} {:d}{:d}:{:d} {:d}", t.saddr_h, t.saddr_l, t.sport, t.daddr_h, t.daddr_l, t.dport, pid >> 32);
 		BPF_PRINTK("Update failed connectv6/src: %lx %lx :%d", t.saddr_h, t.saddr_l, t.sport);
 		BPF_PRINTK("Update failed connectv6/dst: %lx %lx :%d", t.daddr_h, t.daddr_l, t.dport);
 	}
 
 	struct tcp_ipv6_event_t evt = convert_ipv6_tuple_to_event(t, cpu, TCP_EVENT_TYPE_CONNECT, pid >> 32);
-	bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt));
+	if (bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt)) < 0) {
+		INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_failures);
+	}
 	return 0;
 }
 
@@ -191,12 +205,14 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
+		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
 
 	if (check_family(newsk, AF_INET)) {
 		struct ipv4_tuple_t t = { };
 		if (!read_ipv4_tuple(&t, status, newsk)){
+			INC_DEBUG_COUNTER(read_ipv4_on_accept_failures);
 			return 0;
 		}
 
@@ -210,15 +226,19 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 		if (evt.saddr != 0 && evt.daddr != 0 && evt.sport != 0 && evt.dport != 0) {
 			struct pid_comm_t p = {.pid = pid, .state = CONN_ACTIVE};
 			if (bpf_map_update_elem(&tuplepid_ipv4, &t, &p, BPF_ANY) < 0) {
+				INC_DEBUG_COUNTER(update_ipv4_on_accept_failures);
 				LOG_DEBUG_BPF(ctx, "Accept missed, reached max conns?: {:d}:{:d} {:d}:{:d} {:d}", t.saddr, t.sport, t.daddr, t.dport, pid >> 32);
 				BPF_PRINTK("Update failed acceptv4/src: %x :%d", t.saddr, t.sport);
 				BPF_PRINTK("Update failed acceptv4/dst: %x :%d", t.daddr, t.dport);
 			}
-			bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt));
+			if (bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt)) < 0) {
+				INC_DEBUG_COUNTER(perf_output_ipv4_on_accept_failures);
+			}
 		}
 	} else if (check_family(newsk, AF_INET6)) {
 		struct ipv6_tuple_t t = {};
 		if (!read_ipv6_tuple(&t, status, newsk)) {
+			INC_DEBUG_COUNTER(read_ipv6_on_accept_failures);
 			return 0;
 		}
 
@@ -232,6 +252,7 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 		if ((evt.saddr_h || evt.saddr_l) && (evt.daddr_h || evt.daddr_l) && evt.sport != 0 && evt.dport != 0) {
 			struct pid_comm_t p = {.pid = pid, .state = CONN_ACTIVE};
 			if (bpf_map_update_elem(&tuplepid_ipv6, &t, &p, BPF_ANY) < 0) {
+				INC_DEBUG_COUNTER(update_ipv6_on_accept_failures);
 				LOG_DEBUG_BPF(
 						ctx,
 						"Accept v6 missed, reached max conns?: {:d}{:d}:{:d} {:d}{:d}:{:d} {:d}",
@@ -245,7 +266,9 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 				BPF_PRINTK("Update failed acceptv6/src: %lx %lx :%d", t.saddr_h, t.saddr_l, t.sport);
 				BPF_PRINTK("Update failed acceptv6/dst: %lx %lx :%d", t.daddr_h, t.daddr_l, t.dport);
 			}
-			bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt));
+			if (bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt)) < 0) {
+				INC_DEBUG_COUNTER(perf_output_ipv6_on_accept_failures);
+			}
 		}
 	}
 	return 0;
@@ -263,12 +286,14 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
+		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
 
 	if (check_family(sk, AF_INET)) {
 		struct ipv4_tuple_t t = {};
 		if (!read_ipv4_tuple(&t, status, sk)){
+			INC_DEBUG_COUNTER(read_ipv4_on_close_failures);
 			return 0;
 		}
 
@@ -280,6 +305,7 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 		struct pid_comm_t* pp;
 		pp = bpf_map_lookup_elem(&tuplepid_ipv4, &t);
 		if (pp == NULL) {
+			INC_DEBUG_COUNTER(lookup_ipv4_on_close_failures);
 			LOG_DEBUG_BPF(ctx, "Missing tuplepid entry: {:d}:{:d} {:d}:{:d}", t.saddr, t.sport, t.daddr, t.dport);
 			BPF_PRINTK("Update failed closev4/src: %x :%d", t.saddr, t.sport);
 			BPF_PRINTK("Update failed closev4/dst: %x :%d", t.daddr, t.dport);
@@ -288,10 +314,13 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 		}
 
 		struct tcp_ipv4_event_t evt = convert_ipv4_tuple_to_event(t, cpu, TCP_EVENT_TYPE_CLOSE, pid >> 32);
-		bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt));
+		if (bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt)) < 0) {
+			INC_DEBUG_COUNTER(perf_output_ipv4_on_close_failures);
+		}
 	} else if (check_family(sk, AF_INET6)) {
 		struct ipv6_tuple_t t = {};
 		if (!read_ipv6_tuple(&t, status, sk)) {
+			INC_DEBUG_COUNTER(read_ipv6_on_close_failures);
 			return 0;
 		}
 		if (filter_ipv6(&t)) {
@@ -301,6 +330,7 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 		struct pid_comm_t* pp;
 		pp = bpf_map_lookup_elem(&tuplepid_ipv6, &t);
 		if (pp == NULL) {
+			INC_DEBUG_COUNTER(lookup_ipv6_on_close_failures);
 			LOG_DEBUG_BPF(
 					ctx,
 					"Missing tuplepid entry: {:d}{:d}:{:d} {:d}{:d}:{:d}",
@@ -317,7 +347,9 @@ int kprobe__tcp_close(struct pt_regs *ctx)
 		}
 
 		struct tcp_ipv6_event_t evt = convert_ipv6_tuple_to_event(t, cpu, TCP_EVENT_TYPE_CLOSE, pid >> 32);
-		bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt));
+		if (bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt)) < 0) {
+			INC_DEBUG_COUNTER(perf_output_ipv6_on_close_failures);
+		}
 	}
 	return 0;
 }

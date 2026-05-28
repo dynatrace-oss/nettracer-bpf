@@ -17,7 +17,7 @@
 
 #include "bpf_wrapper.h"
 #include "errors.h"
-#include "kernel_version.h"
+#include "system_utils.h"
 #include "maps_loading.h"
 #include "perf_sys.h"
 
