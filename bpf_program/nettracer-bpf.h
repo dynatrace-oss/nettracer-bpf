@@ -178,6 +178,7 @@ struct bpf_log_event_t {
 	int64_t args[10];
 };
 
+// All fields must be uint64_t for the generic handling to work correctly.
 struct bpf_debug_counters_t {
 	uint64_t update_ipv4_on_connect_failures;
 	uint64_t update_ipv6_on_connect_failures;

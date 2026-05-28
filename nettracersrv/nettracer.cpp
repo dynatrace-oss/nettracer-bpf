@@ -201,8 +201,11 @@ void runDebugCountersLoop(int mapFd, unsigned numPossibleCpus, unsigned interval
 			LOG_WARN("[bpf_debug_counters] lookup failed, skipping interval");
 			continue;
 		}
-		LOG_INFO("[bpf_debug_counters] cumulative: {}", nettracer::formatNonZeroFields(*currentCounters));
-		LOG_INFO("[bpf_debug_counters] delta:      {}", nettracer::formatNonZeroFields(nettracer::subtractBpfDebugCounters(*currentCounters, previousCounters)));
+		const auto cumulativeStr = nettracer::formatNonZeroFields(*currentCounters);
+		const auto deltaStr = nettracer::formatNonZeroFields(nettracer::subtractBpfDebugCounters(*currentCounters, previousCounters));
+		if (!deltaStr.empty()) {
+			LOG_INFO("[bpf_debug_counters] delta:      {}", deltaStr);
+		}
 		previousCounters = *currentCounters;
 	}
 }

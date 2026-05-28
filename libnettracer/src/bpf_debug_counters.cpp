@@ -25,8 +25,6 @@ namespace nettracer {
 
 static_assert(sizeof(BpfDebugCounters) == kBpfDebugCountersFieldCount * sizeof(std::uint64_t),
 	"BpfDebugCounters layout has drifted from kBpfDebugCountersFieldCount; update both together");
-static_assert(sizeof(BpfDebugCounters) % 8 == 0,
-	"BpfDebugCounters must be 8-byte aligned for PERCPU_ARRAY lookup");
 
 const std::array<BpfDebugCounterField, kBpfDebugCountersFieldCount>& bpfDebugCounterFields() {
 	static const std::array<BpfDebugCounterField, kBpfDebugCountersFieldCount> fields = {{
@@ -90,7 +88,7 @@ std::string formatNonZeroFields(const BpfDebugCounters& counters) {
 		first = false;
 	}
 	if (first) {
-		return "(all zero)";
+		return "";
 	}
 	return fmt::to_string(out);
 }
