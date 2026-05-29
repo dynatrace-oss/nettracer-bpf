@@ -72,9 +72,9 @@ set(FULL_COMMAND ${LLVM_BINDIR}/clang
 	-fno-jump-tables -fno-builtin
 	-Wall -Werror
 	${BPF_OPTIMIZATION}
-	-target bpf
+	-target bpf -g
 	-c "${CMAKE_CURRENT_LIST_DIR}/nettracer-bpf.c"
-	-I "${CMAKE_CURRENT_LIST_DIR}"
+	-I "${CMAKE_CURRENT_LIST_DIR}" -I "${CMAKE_BINARY_DIR}/libbpf"
 	-o "${BPF_OUTPUT_FILE}"
 )
 
