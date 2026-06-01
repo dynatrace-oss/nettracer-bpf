@@ -74,12 +74,7 @@ else()
 	message(FATAL_ERROR "Architecture not supported!")
 endif()
 
-option(LEGACY_BPF "Build offsetguessed bpf programs" ON)
-if(LEGACY_BPF)
-	add_definitions("-DUSE_RODATA=0")
-else()
-	add_definitions("-DUSE_RODATA=1")
-endif()
+add_definitions("-DUSE_RODATA=0")
 
 option(BPF_DEBUG "Enable bpf_trace_printk logging" OFF)
 if(BPF_DEBUG)
@@ -143,7 +138,6 @@ arch/${ARCH}/include/generated/uapi")
 endfunction()
 collect_kernel_headers_dirs("${KERNEL_HEADERS_BASE}" KERNEL_HEADERS)
 
-
 # Must add include paths here because includes are applied before flags in CMake and -nostdinc messes things up
 add_compile_options(-Wall -I/usr/include -I/usr/include/${ARCHITECTURE}-linux-gnu)
 
@@ -183,6 +177,11 @@ include(CTest)
 enable_testing()
 add_custom_target(run-tests COMMAND ${CMAKE_CTEST_COMMAND} -T Test --no-compress-output --output-on-failure)
 
+set(THIRDPARTY_MAKE_JOBS_COUNT "1" CACHE STRING "Number of jobs to use when compiling ebpf_common submodules")
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/ebpf-common/libbpf-bootstrap/tools/cmake)
+ 
+add_subdirectory(ebpf-common)
 add_subdirectory(bpf_program)
 add_subdirectory(bpf_generic)
 add_subdirectory(libnettracer)
