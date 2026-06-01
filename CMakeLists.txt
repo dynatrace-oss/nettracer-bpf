@@ -74,12 +74,7 @@ else()
 	message(FATAL_ERROR "Architecture not supported!")
 endif()
 
-option(LEGACY_BPF "Build offsetguessed bpf programs" ON)
-if(LEGACY_BPF)
-	add_definitions("-DUSE_RODATA=0")
-else()
-	add_definitions("-DUSE_RODATA=1")
-endif()
+add_definitions("-DUSE_RODATA=0")
 
 option(BPF_DEBUG "Enable bpf_trace_printk logging" OFF)
 if(BPF_DEBUG)
@@ -142,7 +137,6 @@ arch/${ARCH}/include/generated/uapi")
 	set(${out_dirs} "${COMBINED}" PARENT_SCOPE)
 endfunction()
 collect_kernel_headers_dirs("${KERNEL_HEADERS_BASE}" KERNEL_HEADERS)
-
 
 # Must add include paths here because includes are applied before flags in CMake and -nostdinc messes things up
 add_compile_options(-Wall -I/usr/include -I/usr/include/${ARCHITECTURE}-linux-gnu)
