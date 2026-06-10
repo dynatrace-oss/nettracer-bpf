@@ -21,7 +21,7 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Support/MemoryBuffer.h>
 
-#include "bpf_loading.h"
+#include "classic_loader.h"
 #include "maps_def.h"
 #include <memory>
 #include <unordered_map>

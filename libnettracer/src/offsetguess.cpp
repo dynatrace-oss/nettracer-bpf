@@ -15,7 +15,6 @@
 */
 #include "offsetguess.h"
 
-#include "bpf_generic/src/bpf_loading.h"
 #include "bpf_generic/src/log.h"
 #include "localsock.h"
 #include "localsock6.h"

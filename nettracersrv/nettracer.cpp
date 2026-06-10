@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-#include "bpf_generic/src/bpf_loading.h"
+#include "bpf_generic/src/bpf_interface.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/errors.h"
 #include "bpf_generic/src/log.h"
@@ -139,7 +139,7 @@ bool increaseMemoryLimit() {
 	return true;
 }
 
-bool setUpBPFConfig(const po::variables_map& vm, bpf::bpf_subsystem& ebpf, bpf::BPFMapsWrapper& mapsWrapper) {
+bool setUpBPFConfig(const po::variables_map& vm, bpf::Ibpf& ebpf, bpf::BPFMapsWrapper& mapsWrapper) {
 	int configFd{ebpf.get_map_fd("nettracer_config")};
 	uint32_t zero{0};
 	nettracer_config_t config{};
@@ -152,22 +152,6 @@ bool setUpBPFConfig(const po::variables_map& vm, bpf::bpf_subsystem& ebpf, bpf::
 		return false;
 	}
 	return true;
-}
-
-bpf_fds getIPv4Fds(bpf::bpf_subsystem& ebpf) {
-	bpf_fds ipv4_fds{};
-	ipv4_fds.pid_fd = ebpf.get_map_fd("tuplepid_ipv4");
-	ipv4_fds.stats_fd = ebpf.get_map_fd("stats_ipv4");
-	ipv4_fds.tcp_stats_fd = ebpf.get_map_fd("tcp_stats_ipv4");
-	return ipv4_fds;
-}
-
-bpf_fds getIPv6Fds(bpf::bpf_subsystem& ebpf) {
-	bpf_fds ipv6_fds{};
-	ipv6_fds.pid_fd = ebpf.get_map_fd("tuplepid_ipv6");
-	ipv6_fds.stats_fd = ebpf.get_map_fd("stats_ipv6");
-	ipv6_fds.tcp_stats_fd = ebpf.get_map_fd("tcp_stats_ipv6");
-	return ipv6_fds;
 }
 
 bool isIPv6MonitoringPossible(int status_fd, bpf::BPFMapsWrapper& mapsWrapper) {
@@ -249,13 +233,13 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	LOG_INFO("time_interval: {}", time_interval);
 	exitCtrl.wait_time = time_interval;
 
-	bpf::bpf_subsystem ebpf;
+	std::unique_ptr<bpf::Ibpf> ebpf = bpf::createOffsetGuessedBPF();
 	bpf::BPFMapsWrapper mapsWrapper;
 
 	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"), vm.count("with_loopback") == 0);
 
 	if (vm.count("clear_probes")) {
-		ebpf.clear_all_probes();
+		ebpf->clear_all_probes();
 		LOG_INFO("clear_probes");
 	}
 
@@ -268,7 +252,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 			nn_entries = MAX_MAP_SIZE;
 		}
 		netst.set_max_map_size(nn_entries);
-		if (!ebpf.load_bpf_file(vm["program"].as<std::string>(), nn_entries)) {
+		if (!ebpf->load_bpf(vm["program"].as<std::string>(), nn_entries)) {
 			return ReturnCodes::GenericError;
 		}
 	} catch (const InsufficientCapabilitiesError& e) {
@@ -280,23 +264,23 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 	LOG_INFO("BPF program loaded");
 
-	if (!setUpBPFConfig(vm, ebpf, mapsWrapper)) {
+	if (!setUpBPFConfig(vm, *ebpf, mapsWrapper)) {
 		return ReturnCodes::InsufficientCapabilities;
 	}
 
-	int status_fd = ebpf.get_map_fd("nettracer_status");
+	int status_fd = ebpf->get_map_fd("nettracer_status");
 	if (status_fd < 0) {
 		LOG_ERROR("no fd for status map");
 		return ReturnCodes::GenericError;
 	}
 
-	bpf_fds ipv4_fds{getIPv4Fds(ebpf)};
+	bpf::bpf_fds ipv4_fds{getIPv4Fds(*ebpf)};
 	if (ipv4_fds.isInvalid()){
 		LOG_ERROR("invalid fds for ipv4 maps");
 		return ReturnCodes::GenericError;
 	}
 
-	bpf_fds ipv6_fds{getIPv6Fds(ebpf)};
+	bpf::bpf_fds ipv6_fds{getIPv6Fds(*ebpf)};
 	if (ipv6_fds.isInvalid()) {
 		LOG_ERROR("invalid fds for ipv6 maps");
 		return ReturnCodes::GenericError;
@@ -364,19 +348,19 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		};
 	}
 
-	auto log_pmap = ebpf.get_perf_map("bpf_logs");
+	auto log_pmap = ebpf->get_perf_map("bpf_logs");
 	if (!log_pmap.pfd.empty() && !noStdoutLog) {
 		LOG_INFO("Starting BPF log events");
 		bevents.add_observer<bpf_log_event_t>(log_pmap, bpf_log_event_update);
 	}
 
-	auto ipv4_pmap = ebpf.get_perf_map("tcp_event_ipv4");
+	auto ipv4_pmap = ebpf->get_perf_map("tcp_event_ipv4");
 	if (!ipv4_pmap.pfd.empty()) {
 		LOG_INFO("Starting TCP IPv4 events");
 		bevents.add_observer<tcp_ipv4_event_t>(ipv4_pmap, ipv4_event_update);
 	}
 
-	auto ipv6_pmap = ebpf.get_perf_map("tcp_event_ipv6");
+	auto ipv6_pmap = ebpf->get_perf_map("tcp_event_ipv6");
 	if (!ipv6_pmap.pfd.empty() && monitorIPv6) {
 		LOG_INFO("Starting TCP IPv6 events");
 		bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);

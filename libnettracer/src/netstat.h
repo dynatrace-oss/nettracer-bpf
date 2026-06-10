@@ -85,7 +85,7 @@ protected:
 
 	std::pair<unsigned, unsigned> countTcpSessions();
 	template<typename IPTYPE>
-	void update(const bpf_fds& fds);
+	void update(const bpf::bpf_fds& fds);
 
 	template<typename IPTYPE, typename T, typename F>
 	void process_bpf_map(int fd, F func);
@@ -100,7 +100,7 @@ protected:
 	void clean();
 
 	template<typename IPTYPE>
-	void clean_bpf(const bpf_fds& fds);
+	void clean_bpf(const bpf::bpf_fds& fds);
 
 	virtual system_clock::time_point getCurrentTimeFromSystemClock() const;
 	virtual steady_clock::time_point getCurrentTimeFromSteadyClock() const;
@@ -113,7 +113,7 @@ public:
 	void on_config_change();
 	void init();
 
-	bool map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6);
+	bool map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6);
 
 	template<typename IPTYPE, typename EventIPTYPE>
 	void event(const EventIPTYPE& evt);

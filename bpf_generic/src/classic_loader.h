@@ -16,6 +16,7 @@
 #pragma once
 
 #include "system_calls.h"
+#include "bpf_interface.h"
 #include <linux/bpf.h>
 #include <cstdint>
 #include <map>
@@ -42,7 +43,7 @@ struct kprobe {
 	int efd;
 };
 
-class bpf_subsystem {
+class ClassicLoader : public Ibpf {
 	maps_config maps;
 	std::vector<kprobe> probes;
 	bool debug_print = false;
@@ -57,12 +58,12 @@ class bpf_subsystem {
 	void set_maps_max_entries(uint32_t map_max_entries);
 
 public:
-	explicit bpf_subsystem(const ISystemCalls& sysCalls = SystemCalls::getInstance());
-	bool load_bpf_file(const std::string& path, uint32_t map_max_entries);
-	int get_map_fd(const std::string& name);
-	map_data get_perf_map(const std::string& name);
-	void clear_all_probes();
-	~bpf_subsystem();
+	explicit ClassicLoader(const ISystemCalls& sysCalls = SystemCalls::getInstance());
+	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries) override;
+	virtual int get_map_fd(const std::string& name) override;
+	virtual map_data get_perf_map(const std::string& name) override;
+	virtual void clear_all_probes() override;
+	virtual ~ClassicLoader() override;
 };
 
 } // namespace bpf

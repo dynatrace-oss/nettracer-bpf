@@ -56,4 +56,16 @@ public:
 	virtual bool getNextKey(int fd, const void* previousKey, void* currentKey) const;
 };
 
+struct bpf_fds {
+    int pid_fd;
+    int stats_fd;
+    int tcp_stats_fd;
+    bool isInvalid() {
+        return (pid_fd < 0 || stats_fd < 0 || tcp_stats_fd < 0);
+    }
+};
+
+class Ibpf;
+bpf_fds getIPv4Fds(Ibpf& ebpf);
+bpf_fds getIPv6Fds(Ibpf& ebpf);
 } // namespace bpf

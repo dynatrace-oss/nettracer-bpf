@@ -15,7 +15,6 @@
 */
 #pragma once
 
-#include "bpf_program/nettracer-bpf.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
 #include "tuple_utils.h"
@@ -24,14 +23,6 @@
 #include <tuple>
 #include <condition_variable>
 
-struct bpf_fds {
-    int pid_fd;
-    int stats_fd;
-    int tcp_stats_fd;
-    bool isInvalid() {
-        return (pid_fd < 0 || stats_fd < 0 || tcp_stats_fd < 0);
-    }
-};
 
 template<typename T>
 struct ConnectionsState {
@@ -51,6 +42,6 @@ struct ExitCtrl {
 };
 
 template<typename Tuple>
-void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
+void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
 template<typename Tuple, typename Event>
 void updateConnectionsAfterEvent(const Event& evt, ConnectionsState<Tuple>& connsState);
