@@ -18,6 +18,8 @@
 #include <stdexcept>
 #include <string>
 
+enum ReturnCodes { Success, InsufficientCapabilities, GenericError, Reconfigure };
+
 class InsufficientCapabilitiesError : public std::runtime_error {
 public:
     InsufficientCapabilitiesError(const std::string& msg)

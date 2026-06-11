@@ -1,18 +1,18 @@
 /*
-* Copyright 2025 Dynatrace LLC
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
-*
-* https://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2025 Dynatrace LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License cat
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include "bpf_generic/src/bpf_interface.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/errors.h"
@@ -23,9 +23,11 @@
 #include "bpf_events.h"
 #include "config_watcher.h"
 #include "connections_printing.h"
+#include "kernel_version.h"
 #include "netstat.h"
 #include "offsetguess.h"
 #include "proc_tcp.h"
+#include "system_calls.h"
 #include "tuple_utils.h"
 #include "unified_log.h"
 
@@ -60,7 +62,7 @@ void atexit_handler(int a) {
 }
 
 void setUpExitBehavior() {
-	struct sigaction action{};
+	struct sigaction action {};
 	action.sa_handler = atexit_handler;
 	action.sa_flags = 0;
 	sigaction(SIGINT, &action, nullptr);
@@ -81,6 +83,7 @@ po::options_description getOptionsDescription() {
 			("incremental,i", "Enable incremental data")
 			("noninteractive,r", "Hex output")
 			("with_loopback,f", "With loopback")
+			("bpf,b", po::value<std::string>()->default_value("auto"), "BTF or classic")
 			("program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")
 			("header,s", "Add average header size to traffic")
 			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
@@ -154,10 +157,24 @@ bool setUpBPFConfig(const po::variables_map& vm, bpf::Ibpf& ebpf, bpf::BPFMapsWr
 	return true;
 }
 
-bool isIPv6MonitoringPossible(int status_fd, bpf::BPFMapsWrapper& mapsWrapper) {
-	const uint32_t zero = 0;
-	guess_status_t status;
-	return mapsWrapper.lookupElement(status_fd, &zero, &status) && status.offset_daddr_ipv6 != 0;
+static std::pair<std::unique_ptr<bpf::Ibpf>, bool> createBPFinterface(int kernelVersion, std::string option) {
+
+	if (option == "auto") {
+		if (isKernelSupportedForBTF(kernelVersion)) {
+			return {bpf::createBTFBPF(), false};
+		}
+		if (!isKernelSupportedForClassic(kernelVersion)) {
+			LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(kernelVersion));
+			// don't return, see what happens
+		}
+		return {bpf::createOffsetGuessedBPF(), true};
+	} else if (option == "BTF") {
+		return {bpf::createBTFBPF(), false};
+	} else if (option == "offsetguessing") {
+		return {bpf::createOffsetGuessedBPF(), true};
+	}
+
+	return {};
 }
 
 unsigned resolveNumPossibleCpus() {
@@ -194,11 +211,11 @@ void runDebugCountersLoop(int mapFd, unsigned numPossibleCpus, unsigned interval
 	}
 }
 
-std::thread startDebugCountersThread(bpf::bpf_subsystem& ebpf, const bpf::BPFMapsWrapper& mapsWrapper, unsigned intervalSeconds) {
+std::thread startDebugCountersThread(bpf::Ibpf* ebpf, const bpf::BPFMapsWrapper& mapsWrapper, unsigned intervalSeconds) {
 	if (intervalSeconds == 0) {
 		return {};
 	}
-	const int mapFd{ebpf.get_map_fd("bpf_debug_counters")};
+	const int mapFd{ebpf->get_map_fd("bpf_debug_counters")};
 	if (mapFd < 0) {
 		LOG_WARN("bpf_debug_counters map not available, skipping debug counters logging");
 		return {};
@@ -208,15 +225,9 @@ std::thread startDebugCountersThread(bpf::bpf_subsystem& ebpf, const bpf::BPFMap
 	return std::thread{runDebugCountersLoop, mapFd, numPossibleCpus, intervalSeconds, std::cref(mapsWrapper)};
 }
 
-enum ReturnCodes {
-	Success,
-	InsufficientCapabilities,
-	GenericError,
-	Reconfigure
-};
-
 ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables_map& vm) {
-	const std::string nettracerVersionStr{fmt::format("{}.{}.{}", NETTRACER_VERSION_MAJOR, NETTRACER_VERSION_MINOR, NETTRACER_VERSION_PATCH)};
+	const std::string nettracerVersionStr{
+			fmt::format("{}.{}.{}", NETTRACER_VERSION_MAJOR, NETTRACER_VERSION_MINOR, NETTRACER_VERSION_PATCH)};
 	if (vm.count("version")) {
 		std::cout << "version: " << nettracerVersionStr << std::endl;
 		return ReturnCodes::Success;
@@ -233,10 +244,18 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	LOG_INFO("time_interval: {}", time_interval);
 	exitCtrl.wait_time = time_interval;
 
-	std::unique_ptr<bpf::Ibpf> ebpf = bpf::createOffsetGuessedBPF();
+	auto kernelVersion{getKernelVersion(SystemCalls::getInstance())};
+	if (!kernelVersion) {
+		LOG_ERROR("Could not obtain current kernel version");
+		return ReturnCodes::GenericError;
+	}
+	LOG_DEBUG("Detected kernel {}", kernelVersionToString(*kernelVersion));
+
+	auto [ebpf, isOffsetGuessing] = createBPFinterface(*kernelVersion, vm["bpf"].as<std::string>());
 	bpf::BPFMapsWrapper mapsWrapper;
 
-	netstat::NetStat netst(exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"), vm.count("with_loopback") == 0);
+	netstat::NetStat netst(
+			exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"), vm.count("with_loopback") == 0);
 
 	if (vm.count("clear_probes")) {
 		ebpf->clear_all_probes();
@@ -252,7 +271,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 			nn_entries = MAX_MAP_SIZE;
 		}
 		netst.set_max_map_size(nn_entries);
-		if (!ebpf->load_bpf(vm["program"].as<std::string>(), nn_entries)) {
+		if (!ebpf->load_bpf(vm["program"].as<std::string>(), nn_entries, *kernelVersion)) {
 			return ReturnCodes::GenericError;
 		}
 	} catch (const InsufficientCapabilitiesError& e) {
@@ -275,7 +294,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 
 	bpf::bpf_fds ipv4_fds{getIPv4Fds(*ebpf)};
-	if (ipv4_fds.isInvalid()){
+	if (ipv4_fds.isInvalid()) {
 		LOG_ERROR("invalid fds for ipv4 maps");
 		return ReturnCodes::GenericError;
 	}
@@ -287,21 +306,21 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 
 	if (vm.count("test")) {
-	    LOG_INFO("All checks passed, stopping NetTracer");
-	    return ReturnCodes::Success;
+		LOG_INFO("All checks passed, stopping NetTracer");
+		return ReturnCodes::Success;
 	}
 
-	if (!doOffsetGuessing(status_fd)) {
+	if ( isOffsetGuessing && !doOffsetGuessing(status_fd)) {
 		LOG_ERROR("Offset guessing failed");
 		return ReturnCodes::GenericError;
 	}
 
-	bool monitorIPv6 = isIPv6MonitoringPossible(status_fd, mapsWrapper);
+	bool monitorIPv6 = bpf::isIPv6MonitoringPossible(status_fd, mapsWrapper);
 
 	netst.init();
-    bpf_events bevents(cw);
-    bevents.set_kbhit_observer( std::bind(&netstat::NetStat::set_kbhit, &netst));
-    
+	bpf_events bevents(cw);
+	bevents.set_kbhit_observer(std::bind(&netstat::NetStat::set_kbhit, &netst));
+
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
 	std::function<void(const bpf_log_event_t&)> bpf_log_event_update;
@@ -321,14 +340,11 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		static ConnectionsState<ipv4_tuple_t> ipv4Connections;
 		static ConnectionsState<ipv6_tuple_t> ipv6Connections;
 		bpf_log_event_update = [](const bpf_log_event_t& evt) { unifyBPFLog(evt); };
-		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) {
-			updateConnectionsAfterEvent(evt, ipv4Connections);
-		};
+		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { updateConnectionsAfterEvent(evt, ipv4Connections); };
 		if (monitorIPv6) {
-		ipv6_event_update = [&](const tcp_ipv6_event_t& evt) {
-			updateConnectionsAfterEvent(evt, ipv6Connections);
-		};}
-		map_reading = [&](std::promise<bool>&& promise){
+			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { updateConnectionsAfterEvent(evt, ipv6Connections); };
+		}
+		map_reading = [&](std::promise<bool>&& promise) {
 			while (exitCtrl.running) {
 				cw.on_pollin();
 				if (cw.is_config_changed()) {

@@ -21,11 +21,11 @@
 
 struct utsname;
 
-namespace bpf {
-
 std::optional<int> getKernelVersion(const ISystemCalls& sysCalls);
 
-bool isKernelSupported(int kernelVersion);
+bool isKernelSupported(int kernelVersion, int minimalVersion);
+bool isKernelSupportedForClassic(int kernelVersion);
+bool isKernelSupportedForBTF(int kernelVersion);
 
 std::string kernelVersionToString(int kernelVersion);
 
@@ -35,4 +35,3 @@ std::string kernelVersionToString(int kernelVersion);
 // parsed.
 std::optional<unsigned> getNumPossibleCpus(const ISystemCalls& sysCalls);
 
-} // namespace bpf

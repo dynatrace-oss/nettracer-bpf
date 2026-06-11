@@ -25,7 +25,7 @@ struct map_data;
 
 class Ibpf {
 public:
-	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries) = 0;
+	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) = 0;
 	virtual int get_map_fd(const std::string& name) = 0;
 	virtual void clear_all_probes() = 0;
 	virtual map_data get_perf_map(const std::string& name) = 0;

@@ -15,6 +15,7 @@
 */
 #include "bpf_wrapper.h"
 #include "bpf_interface.h"
+#include "bpf_program/nettracer-bpf.h"
 #include <algorithm>
 #include <cstring>
 #include <unistd.h>
@@ -148,6 +149,12 @@ bpf_fds getIPv6Fds(bpf::Ibpf& ebpf) {
 	ipv6_fds.stats_fd = ebpf.get_map_fd("stats_ipv6");
 	ipv6_fds.tcp_stats_fd = ebpf.get_map_fd("tcp_stats_ipv6");
 	return ipv6_fds;
+}
+
+bool isIPv6MonitoringPossible(int status_fd, BPFMapsWrapper& mapsWrapper) {
+	const uint32_t zero = 0;
+	guess_status_t status;
+	return mapsWrapper.lookupElement(status_fd, &zero, &status) && status.offset_daddr_ipv6 != 0;
 }
 
 } // namespace bpf

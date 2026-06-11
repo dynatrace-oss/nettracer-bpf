@@ -3,10 +3,8 @@ set(SOURCES
 	btf_loader.cpp
 	bpf_wrapper.cpp
 	log.cpp
-	system_utils.cpp
 	maps_loading.cpp
 	perf_event.cpp
-	system_calls.cpp
 )
 
 set(HEADERS
@@ -15,16 +13,15 @@ set(HEADERS
 	bpf_wrapper.h
 	errors.h
 	log.h
-	system_utils.h
 	maps_loading.h
 	perf_event.h
 	perf_sys.h
-	system_calls.h
 )
 
 set(CMAKE_CXX_STANDARD 20)
 add_library(bpf_generic STATIC ${SOURCES} ${HEADERS})
 
+include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 include_directories("${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../libbpf")

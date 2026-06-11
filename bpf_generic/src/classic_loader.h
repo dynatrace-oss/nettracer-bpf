@@ -1,5 +1,5 @@
 /*
-* Copyright 2025 Dynatrace LLC
+* Copyright 2026 Dynatrace LLC
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 */
 #pragma once
 
-#include "system_calls.h"
 #include "bpf_interface.h"
 #include <linux/bpf.h>
 #include <cstdint>
@@ -47,7 +46,6 @@ class ClassicLoader : public Ibpf {
 	maps_config maps;
 	std::vector<kprobe> probes;
 	bool debug_print = false;
-	const ISystemCalls& sysCalls;
 
 	bool load_and_attach(kprobe& prgrm, const char* license, int kernVersion);
 	void load_programs_from_sections(const BpfPrograms& bpfPrograms, int kernVersion, const char* license);
@@ -58,8 +56,8 @@ class ClassicLoader : public Ibpf {
 	void set_maps_max_entries(uint32_t map_max_entries);
 
 public:
-	explicit ClassicLoader(const ISystemCalls& sysCalls = SystemCalls::getInstance());
-	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries) override;
+	ClassicLoader() = default;
+	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) override;
 	virtual int get_map_fd(const std::string& name) override;
 	virtual map_data get_perf_map(const std::string& name) override;
 	virtual void clear_all_probes() override;

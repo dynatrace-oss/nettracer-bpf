@@ -3,6 +3,7 @@ set(SOURCES
 	bpf_debug_counters_test.cpp
 	connection_test.cpp
 	connections_printing_test.cpp
+	kernel_version_test.cpp
 	mock_bpf_maps_test.cpp
 	#netstat_test.cpp
 	proc_tcp_test.cpp
@@ -15,6 +16,7 @@ set(HEADERS
 	bpf_maps_processing_testing.h
 	log_redirection.h
 	mock_bpf_maps.h
+	mock_system_calls.h
 )
 PREPEND(HEADERS_FULL "${CMAKE_CURRENT_LIST_DIR}/cpp" ${HEADERS})
 

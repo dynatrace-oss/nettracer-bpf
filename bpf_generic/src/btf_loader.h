@@ -37,9 +37,10 @@ class BTFLoader : public Ibpf {
 
 	nettracer_bpf_core* skel{nullptr};
 	void attachAllProbes();
+	void set_maps_max_entries(uint32_t map_max_entries);
 public:
 	BTFLoader() = default;
-	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries)  override;
+	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion)  override;
 	virtual int get_map_fd(const std::string& name) override;
 	map_data get_perf_map(const std::string& name) override;
 	void clear_all_probes() override;

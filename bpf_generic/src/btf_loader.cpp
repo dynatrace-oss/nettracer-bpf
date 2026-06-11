@@ -8,8 +8,13 @@ extern "C" {
 
 namespace bpf {
 
-bool BTFLoader::load_bpf(const std::string& a, uint32_t b){
-	LOG_DEBUG("Loading BPF program.");
+void BTFLoader::set_maps_max_entries(uint32_t map_max_entries){
+	bpf_map__set_max_entries( skel->maps.connectsock_ipv4,  map_max_entries);
+}
+
+bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t kernVersion){
+
+	LOG_INFO("Loading BTFBPF");
 
 	{
 		LIBBPF_OPTS(bpf_object_open_opts, newOpenOpts);
@@ -28,6 +33,7 @@ bool BTFLoader::load_bpf(const std::string& a, uint32_t b){
 		throw std::runtime_error("Failed to open BPF object.");
 	}
 
+	set_maps_max_entries(max_entries);
 	LOG_TRACE("Loading Discovery BPF program.");
 	if (const auto res{nettracer_bpf_core__load(skel)}) {
 		throw std::runtime_error("Failed to load BPF object: " + std::to_string(res));
@@ -98,6 +104,7 @@ void BTFLoader::attachAllProbes(){
 }
 
 map_data BTFLoader::get_perf_map(const std::string& name) {
+	//not implemented
 	return {};
 }
 

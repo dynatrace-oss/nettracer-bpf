@@ -16,7 +16,6 @@
 #include "classic_loader.h"
 #include "bpf_wrapper.h"
 #include "errors.h"
-#include "system_utils.h"
 #include "maps_loading.h"
 #include "perf_sys.h"
 
@@ -252,10 +251,8 @@ void ClassicLoader::set_maps_max_entries(uint32_t map_max_entries) {
 	}
 }
 
-ClassicLoader::ClassicLoader(const ISystemCalls& sysCalls)
-	: sysCalls(sysCalls) {}
-
-bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries) {
+bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) {
+	LOG_INFO("Loading Classic BPF");
 	SectionLoader sectionloader(path);
 	if (!sectionloader.loadSections()) {
 		LOG_ERROR("Error loading sections from elf");
@@ -279,16 +276,7 @@ bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries) 
 		return false;
 	}
 
-	auto kernelVersion{getKernelVersion(sysCalls)};
-	if (!kernelVersion) {
-		throw std::runtime_error{"Could not obtain current kernel version"};
-	}
-	if (!isKernelSupported(*kernelVersion)) {
-		LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(*kernelVersion));
-		// don't return, see what happens
-	}
-
-	load_programs_from_sections(sectionloader.getBpfPrograms(), *kernelVersion, sectionloader.getLicense());
+	load_programs_from_sections(sectionloader.getBpfPrograms(), kernVersion, sectionloader.getLicense());
 	return true;
 }
 

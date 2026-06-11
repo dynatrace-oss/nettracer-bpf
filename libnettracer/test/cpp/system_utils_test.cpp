@@ -20,7 +20,6 @@
 #include <linux/version.h>
 
 using namespace std::string_literals;
-using namespace bpf;
 using testing::DoAll;
 using testing::Return;
 using testing::SetArgPointee;
@@ -29,7 +28,7 @@ using testing::SetArrayArgument;
 class SupportedVersionTest : public testing::Test {
 public:
 	void checkSupported(int major, int minor, int patch, bool expectedSupported) {
-		EXPECT_EQ(isKernelSupported(KERNEL_VERSION(major, minor, patch)), expectedSupported);
+		EXPECT_EQ(isKernelSupportedForClassic(KERNEL_VERSION(major, minor, patch)), expectedSupported);
 	}
 };
 

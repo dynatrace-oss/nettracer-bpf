@@ -68,4 +68,5 @@ struct bpf_fds {
 class Ibpf;
 bpf_fds getIPv4Fds(Ibpf& ebpf);
 bpf_fds getIPv6Fds(Ibpf& ebpf);
+bool isIPv6MonitoringPossible(int status_fd, bpf::BPFMapsWrapper& mapsWrapper);
 } // namespace bpf
