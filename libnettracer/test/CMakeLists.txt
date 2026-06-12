@@ -1,5 +1,6 @@
 
 set(SOURCES
+	bpf_debug_counters_test.cpp
 	connection_test.cpp
 	connections_printing_test.cpp
 	mock_bpf_maps_test.cpp

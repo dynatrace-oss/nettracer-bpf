@@ -1,5 +1,6 @@
 set(SOURCES
     bpf_events.cpp
+	bpf_debug_counters.cpp
 	config_watcher.cpp
 	connections_printing.cpp
 	inotify_watcher.cpp
@@ -13,6 +14,7 @@ set(SOURCES
 
 set(HEADERS
     bpf_events.h
+	bpf_debug_counters.h
 	config_watcher.h
 	connections_printing.h
 	inotify_watcher.h
