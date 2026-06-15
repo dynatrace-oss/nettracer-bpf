@@ -252,6 +252,10 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	LOG_DEBUG("Detected kernel {}", kernelVersionToString(*kernelVersion));
 
 	auto [ebpf, isOffsetGuessing] = createBPFinterface(*kernelVersion, vm["bpf"].as<std::string>());
+	if (!ebpf) {
+		LOG_ERROR("Unsuported option for bpf");
+		return ReturnCodes::GenericError;
+	}
 	bpf::BPFMapsWrapper mapsWrapper;
 
 	netstat::NetStat netst(

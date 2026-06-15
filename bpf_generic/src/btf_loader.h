@@ -36,7 +36,7 @@ class BTFLoader : public Ibpf {
 	bpf_object_open_opts openOpts{0};
 
 	nettracer_bpf_core* skel{nullptr};
-	void attachAllProbes();
+	bool tryAttachProbes();
 	void set_maps_max_entries(uint32_t map_max_entries);
 public:
 	BTFLoader() = default;
