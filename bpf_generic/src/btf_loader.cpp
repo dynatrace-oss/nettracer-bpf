@@ -24,39 +24,32 @@ void BTFLoader::set_maps_max_entries(uint32_t map_max_entries) {
 
 bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t kernVersion){
 
-	LOG_INFO("Loading BTFBPF");
+	openOpts = {};
+	openOpts.sz = sizeof(openOpts);
 
-	{
-		LIBBPF_OPTS(bpf_object_open_opts, newOpenOpts);
-		openOpts = newOpenOpts;
-	}
-
-	LOG_TRACE("Fetching BTF for CO-RE.");
+	LOG_TRACE("Ensuring BTF for CO-RE.");
 	if (const auto res{ensure_core_btf(&openOpts)}) {
 		LOG_ERROR("Failed to fetch necessary BTF for CO-RE: {}", strerror(-res));
 		return false;
 	}
-	coreEnsured = true;
 
-	LOG_TRACE("Opening Discovery BPF object.");
+	LOG_TRACE("Opening BPF object.");
 	skel = nettracer_bpf_core__open_opts(&openOpts);
 	if (skel == nullptr) {
-		LOG_ERROR("Failed to open BPF object.");
+		LOG_ERROR("Failed to open BPF object");
 		return false;
 	}
 
 	set_maps_max_entries(max_entries);
-	LOG_TRACE("Loading Discovery BPF program.");
+	LOG_TRACE("Loading BPF program");
 	if (const auto res{nettracer_bpf_core__load(skel)}) {
 		LOG_ERROR("Failed to load BPF object: {}", std::to_string(res));
 		return false;
 	}
 
-	LOG_TRACE("Attaching Discovery BPF program.");
-	//if (const auto res{nettracer_bpf_core__attach(skel)}) {
+	LOG_TRACE("Attaching BPF probes");
 	if (!tryAttachProbes()) {
-		//LOG_ERROR("Failed to attach BPF object: ", std::to_string(res));
-		LOG_ERROR("Failed to attach all BPF object");
+		LOG_ERROR("Failed to attach all BPF probes");
 		return false;
 	}
 
@@ -68,7 +61,7 @@ void BTFLoader::clear_all_probes() {
 }
 
 BTFLoader::~BTFLoader() {
-	clear_all_probes();
+	nettracer_bpf_core__detach(skel);
 	nettracer_bpf_core__destroy(skel);
 	LOG_INFO("BPF destroyed");
 }

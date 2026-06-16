@@ -151,7 +151,7 @@ bpf_fds getIPv6Fds(bpf::Ibpf& ebpf) {
 	return ipv6_fds;
 }
 
-bool isIPv6MonitoringPossible(int status_fd, BPFMapsWrapper& mapsWrapper) {
+bool isIPv6MonitoringPossible(int status_fd, const BPFMapsWrapper& mapsWrapper) {
 	const uint32_t zero = 0;
 	guess_status_t status;
 	return mapsWrapper.lookupElement(status_fd, &zero, &status) && status.offset_daddr_ipv6 != 0;

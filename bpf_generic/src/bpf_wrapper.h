@@ -60,7 +60,7 @@ struct bpf_fds {
     int pid_fd;
     int stats_fd;
     int tcp_stats_fd;
-    bool isInvalid() {
+    bool isInvalid() const{
         return (pid_fd < 0 || stats_fd < 0 || tcp_stats_fd < 0);
     }
 };
@@ -68,5 +68,5 @@ struct bpf_fds {
 class Ibpf;
 bpf_fds getIPv4Fds(Ibpf& ebpf);
 bpf_fds getIPv6Fds(Ibpf& ebpf);
-bool isIPv6MonitoringPossible(int status_fd, bpf::BPFMapsWrapper& mapsWrapper);
+bool isIPv6MonitoringPossible(int status_fd, const bpf::BPFMapsWrapper& mapsWrapper);
 } // namespace bpf

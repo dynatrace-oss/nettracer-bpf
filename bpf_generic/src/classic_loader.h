@@ -57,11 +57,13 @@ class ClassicLoader : public Ibpf {
 
 public:
 	ClassicLoader() = default;
-	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) override;
-	virtual int get_map_fd(const std::string& name) override;
-	virtual map_data get_perf_map(const std::string& name) override;
-	virtual void clear_all_probes() override;
-	virtual ~ClassicLoader() override;
+	ClassicLoader(const ClassicLoader&) = delete;
+	ClassicLoader& operator=(const ClassicLoader&) = delete;
+	bool load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) override;
+	int get_map_fd(const std::string& name) override;
+	map_data get_perf_map(const std::string& name) override;
+	void clear_all_probes() override;
+	~ClassicLoader() override;
 };
 
 } // namespace bpf

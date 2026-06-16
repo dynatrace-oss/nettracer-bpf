@@ -155,7 +155,7 @@ bool setUpBPFConfig(const po::variables_map& vm, bpf::Ibpf& ebpf, bpf::BPFMapsWr
 	return true;
 }
 
-static std::pair<std::unique_ptr<bpf::Ibpf>, bool> createBPFinterface(int kernelVersion, std::string option) {
+static std::pair<std::unique_ptr<bpf::Ibpf>, bool> createBPFinterface(int kernelVersion, std::string_view option) {
 
 	if (option == "auto") {
 		if (isKernelSupportedForBTF(kernelVersion)) {
@@ -243,7 +243,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	exitCtrl.wait_time = time_interval;
 
 	auto kernelVersion{getKernelVersion(SystemCalls::getInstance())};
-	if (!kernelVersion) {
+	if (!kernelVersion.has_value()) {
 		LOG_ERROR("Could not obtain current kernel version");
 		return ReturnCodes::GenericError;
 	}

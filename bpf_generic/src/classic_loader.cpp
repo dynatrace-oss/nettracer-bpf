@@ -51,7 +51,7 @@ constexpr auto KPROBE_NAME_PREFIX = "nt_";
 class file_fd {
 public:
 	int fd;
-	file_fd(const std::string& path) {
+	explicit file_fd(const std::string& path) {
 		fd = open(path.c_str(), O_RDONLY, 0);
 		if (fd < 0)
 			throw std::runtime_error{"cannot open bpf program file: " + path};
@@ -318,8 +318,12 @@ void ClassicLoader::close_all_maps() {
 }
 
 ClassicLoader::~ClassicLoader() {
-	close_all_maps();
-	close_all_probes();
+	try {
+		close_all_maps();
+		close_all_probes();
+	} catch (std::exception& e) {
+		LOG_ERROR("~ClassicLoader exception: {}", e.what());
+	}
 }
 
 void ClassicLoader::clear_all_probes() {
