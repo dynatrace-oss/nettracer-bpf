@@ -17,6 +17,7 @@
  */
 #include "metrics_utilities.h"
 #include "tuples_utilities.h"
+#include "print.h"
 
 #ifdef LEGACY_BPF
 #include <linux/bpf.h>

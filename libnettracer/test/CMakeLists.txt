@@ -3,10 +3,10 @@ set(SOURCES
 	bpf_debug_counters_test.cpp
 	connection_test.cpp
 	connections_printing_test.cpp
-	kernel_version_test.cpp
 	mock_bpf_maps_test.cpp
 	#netstat_test.cpp
 	proc_tcp_test.cpp
+	system_utils_test.cpp
 	tuple_utils_test.cpp
 )
 

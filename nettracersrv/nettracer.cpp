@@ -17,17 +17,15 @@
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/errors.h"
 #include "bpf_generic/src/log.h"
-#include "bpf_generic/src/system_utils.h"
 
 #include "bpf_debug_counters.h"
 #include "bpf_events.h"
 #include "config_watcher.h"
 #include "connections_printing.h"
-#include "kernel_version.h"
 #include "netstat.h"
 #include "offsetguess.h"
 #include "proc_tcp.h"
-#include "system_calls.h"
+#include "system_utils.h"
 #include "tuple_utils.h"
 #include "unified_log.h"
 
@@ -79,7 +77,7 @@ po::options_description getOptionsDescription() {
 			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
 			("log,l", po::value<std::string>()->default_value(""), "Logger path")
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
-			("debug_counters_interval", po::value<unsigned>()->default_value(300), "Interval (seconds) for logging BPF debug counters; 0 disables")
+			("counters_interval", po::value<unsigned>()->default_value(300), "Interval (seconds) for logging BPF debug counters; 0 disables")
 			("incremental,i", "Enable incremental data")
 			("noninteractive,r", "Hex output")
 			("with_loopback,f", "With loopback")
@@ -178,7 +176,7 @@ static std::pair<std::unique_ptr<bpf::Ibpf>, bool> createBPFinterface(int kernel
 }
 
 unsigned resolveNumPossibleCpus() {
-	if (auto detected = bpf::getNumPossibleCpus(SystemCalls::getInstance())) {
+	if (auto detected = getNumPossibleCpus(SystemCalls::getInstance())) {
 		return detected.value();
 	}
 	const unsigned hardwareConcurrency{std::thread::hardware_concurrency()};
@@ -386,8 +384,8 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
 	}
 
-	const unsigned debugCountersInterval{vm["debug_counters_interval"].as<unsigned>()};
-	std::thread debugCountersThread{startDebugCountersThread(ebpf, mapsWrapper, debugCountersInterval)};
+	const unsigned debugCountersInterval{vm["counters_interval"].as<unsigned>()};
+	std::thread debugCountersThread{startDebugCountersThread(ebpf.get(), mapsWrapper, debugCountersInterval)};
 
 	bevents.start();
 	std::promise<bool> map_reader_promise;

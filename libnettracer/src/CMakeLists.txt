@@ -4,12 +4,12 @@ set(SOURCES
 	config_watcher.cpp
 	connections_printing.cpp
 	inotify_watcher.cpp
-	kernel_version.cpp
 	localsock.cpp
 	localsock6.cpp
 	offsetguess.cpp
 	proc_tcp.cpp
 	system_calls.cpp
+	system_utils.cpp
 	tuple_utils.cpp
 	netstat.cpp
 )
@@ -20,12 +20,12 @@ set(HEADERS
 	config_watcher.h
 	connections_printing.h
 	inotify_watcher.h
-	kernel_version.h
 	localsock.h
 	localsock6.h
 	offsetguess.h
 	proc_tcp.h
 	system_calls.h
+	system_utils.h
 	tuple_utils.h
 	netstat.h
 )

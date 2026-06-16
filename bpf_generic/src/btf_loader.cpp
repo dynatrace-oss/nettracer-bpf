@@ -129,6 +129,9 @@ int BTFLoader::get_map_fd(const std::string& id) {
 	if (id == "stats_ipv6") {
 		return bpf_map__fd(skel->maps.stats_ipv6);
 	}
+	if (id == "bpf_debug_counters") {
+		return bpf_map__fd(skel->maps.bpf_debug_counters);
+	}
 
 	return -1;
 }
