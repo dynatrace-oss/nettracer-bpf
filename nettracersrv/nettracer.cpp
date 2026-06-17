@@ -289,12 +289,14 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		return ReturnCodes::InsufficientCapabilities;
 	}
 
-	int status_fd = ebpf->get_map_fd("nettracer_status");
+	int status_fd = -1;
+#ifdef LEGACY_BPF
+	status_fd = ebpf->get_map_fd("nettracer_status");
 	if (status_fd < 0) {
 		LOG_ERROR("no fd for status map");
 		return ReturnCodes::GenericError;
 	}
-
+#endif
 	bpf::bpf_fds ipv4_fds{getIPv4Fds(*ebpf)};
 	if (ipv4_fds.isInvalid()) {
 		LOG_ERROR("invalid fds for ipv4 maps");

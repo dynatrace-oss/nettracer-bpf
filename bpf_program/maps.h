@@ -23,14 +23,6 @@
 
 #define  MAP_MAX_ENTRIES 1024
 
-// Map with only one element at 0-key, representing offset guessing status
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__type(key, __u32);
-	__type(value, struct guess_status_t);
-	__uint(max_entries, 1);
-} nettracer_status SEC(".maps");
-
 // Map with only one element at 0-key, representing configuration for BPF program
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);

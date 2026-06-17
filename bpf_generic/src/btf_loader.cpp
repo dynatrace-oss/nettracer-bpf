@@ -71,10 +71,6 @@ int BTFLoader::get_map_fd(const std::string& id) {
 		return bpf_map__fd(skel->maps.connectsock_ipv4);
 	}
 
-	if (id == "nettracer_status") {
-		return bpf_map__fd(skel->maps.nettracer_status);
-	}
-
 	if (id == "tuplepid_ipv4") {
 		return bpf_map__fd(skel->maps.tuplepid_ipv4);
 	}
