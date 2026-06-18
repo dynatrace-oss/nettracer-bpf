@@ -13,10 +13,13 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-#include <gtest/gtest.h>
-#include "system_utils.h"
+#include "bpf_generic/src/bpf_interface.h"
+#include "bpf_generic/src/btf_loader.h"
+#include "bpf_generic/src/classic_loader.h"
 #include "mock_system_calls.h"
+#include "system_utils.h"
 #include <algorithm>
+#include <gtest/gtest.h>
 #include <linux/version.h>
 
 using namespace std::string_literals;
@@ -28,7 +31,7 @@ using testing::SetArrayArgument;
 class SupportedVersionTest : public testing::Test {
 public:
 	void checkSupported(int major, int minor, int patch, bool expectedSupported) {
-		EXPECT_EQ(isKernelSupportedForClassic(KERNEL_VERSION(major, minor, patch)), expectedSupported);
+		EXPECT_EQ(isKernelSupported(KERNEL_VERSION(major, minor, patch), KERNEL_VERSION(4, 15, 0)), expectedSupported);
 	}
 };
 
@@ -335,4 +338,36 @@ TEST_F(NumPossibleCpusTest, only_whitespace) {
 	expectFileContent("   \n");
 	auto result{getNumPossibleCpus(sysCalls)};
 	EXPECT_FALSE(result);
+}
+
+TEST(CreateBPFInterfaceTest, kernelTooLow) {
+	MockSystemCalls sysCalls;
+	EXPECT_CALL(sysCalls, isKernelSupportedForClassic).WillOnce(Return(false));
+	EXPECT_CALL(sysCalls, isKernelSupportedForBTF).WillOnce(Return(false));
+	auto [ebpf, needsOffsetGuessing] = createBPFinterface(KERNEL_VERSION(4, 14, 0), "auto", sysCalls);
+	EXPECT_TRUE(needsOffsetGuessing);
+	EXPECT_TRUE(dynamic_cast<bpf::ClassicLoader*>(ebpf.get()) != nullptr);
+}
+
+TEST(CreateBPFInterfaceTest, kernelForClassic) {
+	MockSystemCalls sysCalls;
+	EXPECT_CALL(sysCalls, isKernelSupportedForClassic).WillOnce(Return(true));
+	EXPECT_CALL(sysCalls, isKernelSupportedForBTF).WillOnce(Return(false));
+	auto [ebpf, needsOffsetGuessing] = createBPFinterface(KERNEL_VERSION(4, 15, 0), "auto", sysCalls);
+	EXPECT_TRUE(needsOffsetGuessing);
+	EXPECT_TRUE(dynamic_cast<bpf::ClassicLoader*>(ebpf.get()) != nullptr);
+}
+
+TEST(CreateBPFInterfaceTest, kernelForBTF) {
+	MockSystemCalls sysCalls;
+	EXPECT_CALL(sysCalls, isKernelSupportedForBTF).WillOnce(Return(true));
+	auto [ebpf, needsOffsetGuessing] = createBPFinterface(KERNEL_VERSION(5, 10, 0), "auto", sysCalls);
+	EXPECT_FALSE(needsOffsetGuessing);
+	EXPECT_TRUE(dynamic_cast<bpf::BTFLoader*>(ebpf.get()) != nullptr);
+}
+
+TEST(CreateBPFInterfaceTest, unexpectedOption) {
+	MockSystemCalls sysCalls;
+	auto [ebpf, needsOffsetGuessing] = createBPFinterface(KERNEL_VERSION(5, 10, 0), "unexpected", sysCalls);
+	EXPECT_FALSE(needsOffsetGuessing);
 }

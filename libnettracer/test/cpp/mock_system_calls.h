@@ -25,4 +25,6 @@ public:
 	MOCK_METHOD(std::FILE*, fopen, (const char* name, const char* mode), (const, override));
 	MOCK_METHOD(void, fclose, (std::FILE* file), (const, override));
 	MOCK_METHOD(std::size_t, fread, (char* buffer, std::size_t count, std::FILE* stream), (const, override));
+	MOCK_METHOD(bool, isKernelSupportedForClassic, (int kernelVersion), (const override));
+	MOCK_METHOD(bool, isKernelSupportedForBTF, (int kernelVersion), (const override));
 };

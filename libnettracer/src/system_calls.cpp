@@ -13,8 +13,16 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
+#include "bpf_generic/src/bpf_interface.h"
+#include "bpf_generic/src/log.h"
 #include "system_calls.h"
+#include "system_utils.h"
+#include <linux/version.h>
 #include <sys/utsname.h>
+
+constexpr inline static auto KERNEL_VERSION_FOR_CLASSIC KERNEL_VERSION(4, 15, 0);
+constexpr inline static auto KERNEL_VERSION_FOR_BTF KERNEL_VERSION(5, 4, 0);
 
 int SystemCalls::uname(utsname* buf) const {
 	return ::uname(buf);
@@ -30,4 +38,31 @@ void SystemCalls::fclose(std::FILE* file) const {
 
 std::size_t SystemCalls::fread(char* buffer, std::size_t count, std::FILE* stream) const {
 	return std::fread(buffer, sizeof(char), count, stream);
+}
+
+bool SystemCalls::isKernelSupportedForClassic(int kernelVersion) const {
+	return isKernelSupported(kernelVersion, KERNEL_VERSION_FOR_CLASSIC);
+}
+
+bool SystemCalls::isKernelSupportedForBTF(int kernelVersion) const {
+	return isKernelSupported(kernelVersion, KERNEL_VERSION_FOR_BTF);
+}
+
+std::pair<std::unique_ptr<bpf::Ibpf>, bool> createBPFinterface(int kernelVersion, std::string_view option, const ISystemCalls& isystem) {
+	if (option == "auto") {
+		if (isystem.isKernelSupportedForBTF(kernelVersion)) {
+			return {bpf::createBTFBPF(), false};
+		}
+		if (!isystem.isKernelSupportedForClassic(kernelVersion)) {
+			LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(kernelVersion));
+			// don't return, see what happens
+		}
+		return {bpf::createOffsetGuessedBPF(), true};
+	} else if (option == "BTF") {
+		return {bpf::createBTFBPF(), false};
+	} else if (option == "offsetguessing") {
+		return {bpf::createOffsetGuessedBPF(), true};
+	}
+
+	return {};
 }

@@ -155,26 +155,6 @@ bool setUpBPFConfig(const po::variables_map& vm, bpf::Ibpf& ebpf, bpf::BPFMapsWr
 	return true;
 }
 
-static std::pair<std::unique_ptr<bpf::Ibpf>, bool> createBPFinterface(int kernelVersion, std::string_view option) {
-
-	if (option == "auto") {
-		if (isKernelSupportedForBTF(kernelVersion)) {
-			return {bpf::createBTFBPF(), false};
-		}
-		if (!isKernelSupportedForClassic(kernelVersion)) {
-			LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(kernelVersion));
-			// don't return, see what happens
-		}
-		return {bpf::createOffsetGuessedBPF(), true};
-	} else if (option == "BTF") {
-		return {bpf::createBTFBPF(), false};
-	} else if (option == "offsetguessing") {
-		return {bpf::createOffsetGuessedBPF(), true};
-	}
-
-	return {};
-}
-
 unsigned resolveNumPossibleCpus() {
 	if (auto detected = getNumPossibleCpus(SystemCalls::getInstance())) {
 		return detected.value();
@@ -249,7 +229,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 	LOG_DEBUG("Detected kernel {}", kernelVersionToString(*kernelVersion));
 
-	auto [ebpf, isOffsetGuessing] = createBPFinterface(*kernelVersion, vm["bpf"].as<std::string>());
+	auto [ebpf, needsOffsetGuessing] = createBPFinterface(*kernelVersion, vm["bpf"].as<std::string>(), SystemCalls::getInstance());
 	if (!ebpf) {
 		LOG_ERROR("Unsuported option for bpf");
 		return ReturnCodes::GenericError;
@@ -314,7 +294,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		return ReturnCodes::Success;
 	}
 
-	if ( isOffsetGuessing && !doOffsetGuessing(status_fd)) {
+	if (needsOffsetGuessing && !doOffsetGuessing(status_fd)) {
 		LOG_ERROR("Offset guessing failed");
 		return ReturnCodes::GenericError;
 	}

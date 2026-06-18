@@ -48,19 +48,6 @@ namespace {
 
 constexpr auto KPROBE_NAME_PREFIX = "nt_";
 
-class file_fd {
-public:
-	int fd;
-	explicit file_fd(const std::string& path) {
-		fd = open(path.c_str(), O_RDONLY, 0);
-		if (fd < 0)
-			throw std::runtime_error{"cannot open bpf program file: " + path};
-	}
-	~file_fd() {
-		close(fd);
-	}
-};
-
 bool initialize_perf_maps(maps_config& pmaps, BPFMapsWrapper& mapsWrapper) {
 	bool all_success = true;
 	int page_size = getpagesize();

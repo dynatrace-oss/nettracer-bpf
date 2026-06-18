@@ -14,7 +14,6 @@
 * limitations under the License.
 */
 #pragma once
-
 #include "bpf_interface.h"
 #include <linux/bpf.h>
 #include <cstdint>

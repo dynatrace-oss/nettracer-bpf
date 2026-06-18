@@ -25,9 +25,12 @@ add_executable(libnettracer_test ${SOURCES_FULL} ${HEADERS_FULL})
 target_include_directories(libnettracer_test
 	PRIVATE
 		"${PROJECT_SOURCE_DIR}/libnettracer/src"
+		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../libbpf"
 )
 
 target_link_libraries(libnettracer_test libnettracer)
+target_link_libraries(libnettracer_test z)
 target_link_libraries(libnettracer_test -lpthread)
 target_link_libraries(libnettracer_test -ldl)
 target_link_libraries(libnettracer_test CONAN_PKG::gtest)

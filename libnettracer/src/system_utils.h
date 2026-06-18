@@ -24,8 +24,6 @@ struct utsname;
 std::optional<int> getKernelVersion(const ISystemCalls& sysCalls);
 
 bool isKernelSupported(int kernelVersion, int minimalVersion);
-bool isKernelSupportedForClassic(int kernelVersion);
-bool isKernelSupportedForBTF(int kernelVersion);
 
 std::string kernelVersionToString(int kernelVersion);
 

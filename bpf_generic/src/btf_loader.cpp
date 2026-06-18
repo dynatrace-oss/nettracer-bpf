@@ -57,13 +57,17 @@ bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t
 }
 
 void BTFLoader::clear_all_probes() {
-	nettracer_bpf_core__detach(skel);
+	//not implemented
 }
 
 BTFLoader::~BTFLoader() {
-	nettracer_bpf_core__detach(skel);
-	nettracer_bpf_core__destroy(skel);
-	LOG_INFO("BPF destroyed");
+	if (skel) {
+		nettracer_bpf_core__detach(skel);
+		nettracer_bpf_core__destroy(skel);
+		cleanup_core_btf(&openOpts);
+		LOG_INFO("BPF destroyed");
+	}
+
 }
 
 int BTFLoader::get_map_fd(const std::string& id) {
@@ -128,7 +132,7 @@ int BTFLoader::get_map_fd(const std::string& id) {
 static bpf_link* attachKprobe(bpf_program* prog, const std::string& funcName) {
 	auto link{bpf_program__attach_kprobe(prog, false, funcName.c_str())};
 	if (link == nullptr) {
-		LOG_WARN("Failed to attach kprobe for {}.", funcName);
+		LOG_WARN("Failed to attach kprobe for {}", funcName);
 	}
 	return link;
 }
@@ -136,7 +140,7 @@ static bpf_link* attachKprobe(bpf_program* prog, const std::string& funcName) {
 static bpf_link* attachKretprobe(bpf_program* prog, const std::string& funcName) {
 	auto link{bpf_program__attach_kprobe(prog, true, funcName.c_str())};
 	if (link == nullptr) {
-		LOG_WARN("Failed to attach kretprobe for {}.", funcName);
+		LOG_WARN("Failed to attach kretprobe for {}", funcName);
 	}
 	return link;
 }
