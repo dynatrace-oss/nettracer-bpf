@@ -37,6 +37,7 @@ bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t
 	skel = nettracer_bpf_core__open_opts(&openOpts);
 	if (skel == nullptr) {
 		LOG_ERROR("Failed to open BPF object");
+		cleanup_core_btf(&openOpts);
 		return false;
 	}
 
@@ -57,7 +58,7 @@ bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t
 }
 
 void BTFLoader::clear_all_probes() {
-	//not implemented
+	//handled by kernel at process exit
 }
 
 BTFLoader::~BTFLoader() {
