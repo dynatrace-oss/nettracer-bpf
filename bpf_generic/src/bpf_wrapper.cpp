@@ -14,6 +14,8 @@
 * limitations under the License.
 */
 #include "bpf_wrapper.h"
+#include "bpf_interface.h"
+#include "bpf_program/nettracer-bpf.h"
 #include <algorithm>
 #include <cstring>
 #include <unistd.h>
@@ -131,6 +133,32 @@ bool BPFMapsWrapper::getNextKey(int fd, const void* previousKey, void* key) cons
 	attr.next_key = reinterpret_cast<uint64_t>(key);
 
 	return !sysCallBPF(BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+}
+
+bpf_fds getIPv4Fds(bpf::Ibpf& ebpf) {
+	bpf_fds ipv4_fds{};
+	ipv4_fds.pid_fd = ebpf.get_map_fd("tuplepid_ipv4");
+	ipv4_fds.stats_fd = ebpf.get_map_fd("stats_ipv4");
+	ipv4_fds.tcp_stats_fd = ebpf.get_map_fd("tcp_stats_ipv4");
+	return ipv4_fds;
+}
+
+bpf_fds getIPv6Fds(bpf::Ibpf& ebpf) {
+	bpf_fds ipv6_fds{};
+	ipv6_fds.pid_fd = ebpf.get_map_fd("tuplepid_ipv6");
+	ipv6_fds.stats_fd = ebpf.get_map_fd("stats_ipv6");
+	ipv6_fds.tcp_stats_fd = ebpf.get_map_fd("tcp_stats_ipv6");
+	return ipv6_fds;
+}
+
+bool isIPv6MonitoringPossible(int status_fd, const BPFMapsWrapper& mapsWrapper) {
+#ifdef LEGACY_BPF
+	const uint32_t zero = 0;
+	guess_status_t status;
+	return mapsWrapper.lookupElement(status_fd, &zero, &status) && status.offset_daddr_ipv6 != 0;
+#else
+	return true;
+#endif
 }
 
 } // namespace bpf

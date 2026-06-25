@@ -17,6 +17,7 @@
  */
 #include "metrics_utilities.h"
 #include "tuples_utilities.h"
+#include "print.h"
 
 #ifdef LEGACY_BPF
 #include <linux/bpf.h>
@@ -64,9 +65,8 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
 {
 	int ret = PT_REGS_RC(ctx);
 	uint64_t pid = bpf_get_current_pid_tgid();
-	uint32_t zero = 0;
 	struct sock **skpp;
-	struct guess_status_t *status;
+	struct guess_status_t *status = NULL;
 
 	skpp = bpf_map_lookup_elem(&connectsock_ipv4, &pid);
 	if (skpp == 0) {
@@ -83,11 +83,14 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
 		return 0;
 	}
 
+#ifdef LEGACY_BPF
+	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
 		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
+#endif
 
 	struct ipv4_tuple_t t = { };
 	if (!read_ipv4_tuple(&t, status, skp)) {
@@ -134,9 +137,8 @@ int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
 {
 	int ret = PT_REGS_RC(ctx);
 	uint64_t pid = bpf_get_current_pid_tgid();
-	uint32_t zero = 0;
 	struct sock **skpp;
-	struct guess_status_t *status;
+	struct guess_status_t *status = NULL;
 
 	skpp = bpf_map_lookup_elem(&connectsock_ipv6, &pid);
 	if (skpp == 0) {
@@ -153,12 +155,13 @@ int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
 		return 0;
 	}
 
+#ifdef LEGACY_BPF
+	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL || status->state == GUESS_STATE_UNINITIALIZED) {
 		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
-#ifdef LEGACY_BPF
 	if (!are_offsets_ready_v6(status, skp, pid)) {
 		return 0;
 	}
@@ -194,8 +197,7 @@ int kretprobe__tcp_v6_connect(struct pt_regs *ctx)
 SEC("kretprobe/inet_csk_accept")
 int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 {
-	struct guess_status_t *status;
-	uint32_t zero = 0;
+	struct guess_status_t *status = NULL;
 	struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
 	uint64_t pid = bpf_get_current_pid_tgid();
 	uint32_t cpu = bpf_get_smp_processor_id();
@@ -203,11 +205,14 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 	if (newsk == NULL)
 		return 0;
 
+#ifdef LEGACY_BPF
+	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
 		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
+#endif
 
 	if (check_family(newsk, AF_INET)) {
 		struct ipv4_tuple_t t = { };
@@ -278,17 +283,19 @@ SEC("kprobe/tcp_close")
 int kprobe__tcp_close(struct pt_regs *ctx)
 {
 	struct sock *sk;
-	struct guess_status_t *status;
-	uint32_t zero = 0;
+	struct guess_status_t *status = NULL;
 	uint64_t pid = bpf_get_current_pid_tgid();
 	uint32_t cpu = bpf_get_smp_processor_id();
 	sk = (struct sock *) PT_REGS_PARM1(ctx);
 
+#ifdef LEGACY_BPF
+	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
 		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
+#endif
 
 	if (check_family(sk, AF_INET)) {
 		struct ipv4_tuple_t t = {};

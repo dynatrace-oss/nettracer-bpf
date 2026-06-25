@@ -16,6 +16,8 @@
 #pragma once
 
 #include <cstdio>
+#include <memory>
+#include <string>
 
 struct utsname;
 
@@ -25,6 +27,8 @@ public:
 	virtual std::FILE* fopen(const char* name, const char* mode) const = 0;
 	virtual void fclose(std::FILE* file) const = 0;
 	virtual std::size_t fread(char* buffer, std::size_t count, std::FILE* stream) const = 0;
+	virtual bool isKernelSupportedForClassic(int kernelVersion) const = 0;
+	virtual bool isKernelSupportedForBTF(int kernelVersion) const = 0;
 };
 
 class SystemCalls : public ISystemCalls {
@@ -33,6 +37,8 @@ public:
 	FILE* fopen(const char* name, const char* mode) const override;
 	void fclose(std::FILE* file) const override;
 	std::size_t fread(char* buffer, std::size_t count, std::FILE* stream) const override;
+	bool isKernelSupportedForClassic(int kernelVersion) const override;
+	bool isKernelSupportedForBTF(int kernelVersion) const override;
 
 	static const SystemCalls& getInstance() {
 		const static SystemCalls sysCalls;
@@ -46,3 +52,8 @@ private:
 	SystemCalls() = default;
 };
 
+namespace bpf {
+class Ibpf;
+}
+
+std::pair<std::unique_ptr<bpf::Ibpf>, bool> createBPFinterface(int kernelVersion, std::string_view option, const ISystemCalls& isystem);

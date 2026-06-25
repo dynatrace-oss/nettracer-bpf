@@ -1,9 +1,9 @@
 /*
-* Copyright 2025 Dynatrace LLC
+* Copyright 2026 Dynatrace LLC
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -13,15 +13,26 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
 #pragma once
 
-#include <stdexcept>
+#include <cstdint>
+#include <memory>
 #include <string>
 
-enum ReturnCodes { Success, InsufficientCapabilities, GenericError, Reconfigure };
+namespace bpf {
+	
+struct map_data;
 
-class InsufficientCapabilitiesError : public std::runtime_error {
+class Ibpf {
 public:
-    InsufficientCapabilitiesError(const std::string& msg)
-        : std::runtime_error(msg) {}
+	virtual bool load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) = 0;
+	virtual int get_map_fd(const std::string& name) = 0;
+	virtual void clear_all_probes() = 0;
+	virtual map_data get_perf_map(const std::string& name) = 0;
+	virtual ~Ibpf() = default;
 };
+
+std::unique_ptr<Ibpf> createOffsetGuessedBPF();
+std::unique_ptr<Ibpf> createBTFBPF();
+} // namespace bpf

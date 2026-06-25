@@ -37,13 +37,15 @@ static int send_metric(struct sock* sk, int32_t bytes_sent) {
 		return 0;
 	}
 
-	struct guess_status_t* status;
+	struct guess_status_t* status = NULL;
+#ifdef LEGACY_BPF
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
 		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
+#endif
 
 	if (check_family(sk, AF_INET)) {
 		struct ipv4_tuple_t ipv4_tuple = {};
@@ -117,13 +119,15 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
 		return 0;
 	}
 
-	struct guess_status_t *status;
+	struct guess_status_t *status = NULL;
+#ifdef LEGACY_BPF
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
 		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
+#endif
 
 	if (check_family(sk, AF_INET)) {
 		struct ipv4_tuple_t ipv4_tuple = {};
@@ -158,14 +162,16 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
 SEC("kprobe/tcp_retransmit_skb")
 int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
 	struct sock *sk = (struct sock*)PT_REGS_PARM1(ctx);
+	struct guess_status_t *status = NULL;
 
-	struct guess_status_t *status;
+#ifdef LEGACY_BPF
 	uint32_t zero = 0;
 	status = bpf_map_lookup_elem(&nettracer_status, &zero);
 	if (status == NULL) {
 		INC_DEBUG_COUNTER(status_lookup_failures);
 		return 0;
 	}
+#endif
 
 	if (check_family(sk, AF_INET)) {
 		struct ipv4_tuple_t ipv4_tuple = {};

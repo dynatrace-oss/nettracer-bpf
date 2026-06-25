@@ -6,6 +6,7 @@ set(SOURCES
 	mock_bpf_maps_test.cpp
 	#netstat_test.cpp
 	proc_tcp_test.cpp
+	system_utils_test.cpp
 	tuple_utils_test.cpp
 )
 
@@ -15,6 +16,7 @@ set(HEADERS
 	bpf_maps_processing_testing.h
 	log_redirection.h
 	mock_bpf_maps.h
+	mock_system_calls.h
 )
 PREPEND(HEADERS_FULL "${CMAKE_CURRENT_LIST_DIR}/cpp" ${HEADERS})
 
@@ -23,9 +25,12 @@ add_executable(libnettracer_test ${SOURCES_FULL} ${HEADERS_FULL})
 target_include_directories(libnettracer_test
 	PRIVATE
 		"${PROJECT_SOURCE_DIR}/libnettracer/src"
+		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../libbpf"
 )
 
 target_link_libraries(libnettracer_test libnettracer)
+target_link_libraries(libnettracer_test z)
 target_link_libraries(libnettracer_test -lpthread)
 target_link_libraries(libnettracer_test -ldl)
 target_link_libraries(libnettracer_test CONAN_PKG::gtest)

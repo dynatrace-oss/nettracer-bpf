@@ -14,7 +14,6 @@
 * limitations under the License.
 */
 #include "connections_printing.h"
-#include "bpf_generic/src/bpf_loading.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
 #include <fmt/core.h>
@@ -46,7 +45,7 @@ void processBPFMap(int fd, bpf::BPFMapsWrapper& mapsWrapper, F func) {
 } // namespace
 
 template<typename Tuple>
-void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper) {
+void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper) {
 	const int detailsFd{fds.pid_fd};
 	const int statsFd{fds.stats_fd};
 	const int tcpStatsFd{fds.tcp_stats_fd};
@@ -144,8 +143,8 @@ void updateConnectionsAfterEvent(const Event& evt, ConnectionsState<Tuple>& conn
 	}
 }
 
-template void updateConnectionsFromMaps(ConnectionsState<ipv4_tuple_t>& connsState, const bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
-template void updateConnectionsFromMaps(ConnectionsState<ipv6_tuple_t>& connsState, const bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
+template void updateConnectionsFromMaps(ConnectionsState<ipv4_tuple_t>& connsState, const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
+template void updateConnectionsFromMaps(ConnectionsState<ipv6_tuple_t>& connsState, const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
 
 template void updateConnectionsAfterEvent(const tcp_ipv4_event_t& evt, ConnectionsState<ipv4_tuple_t>& connsState);
 template void updateConnectionsAfterEvent(const tcp_ipv6_event_t& evt, ConnectionsState<ipv6_tuple_t>& connsState);

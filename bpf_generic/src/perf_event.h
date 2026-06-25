@@ -14,7 +14,6 @@
 * limitations under the License.
 */
 #pragma once
-#include "bpf_loading.h"
 #include "log.h"
 #include "maps_def.h"
 #include <fmt/core.h>

@@ -1,5 +1,5 @@
 /*
-* Copyright 2025 Dynatrace LLC
+* Copyright 2026 Dynatrace LLC
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,8 +14,7 @@
 * limitations under the License.
 */
 #pragma once
-
-#include "system_calls.h"
+#include "bpf_interface.h"
 #include <linux/bpf.h>
 #include <cstdint>
 #include <map>
@@ -42,11 +41,10 @@ struct kprobe {
 	int efd;
 };
 
-class bpf_subsystem {
+class ClassicLoader : public Ibpf {
 	maps_config maps;
 	std::vector<kprobe> probes;
 	bool debug_print = false;
-	const ISystemCalls& sysCalls;
 
 	bool load_and_attach(kprobe& prgrm, const char* license, int kernVersion);
 	void load_programs_from_sections(const BpfPrograms& bpfPrograms, int kernVersion, const char* license);
@@ -57,12 +55,14 @@ class bpf_subsystem {
 	void set_maps_max_entries(uint32_t map_max_entries);
 
 public:
-	explicit bpf_subsystem(const ISystemCalls& sysCalls = SystemCalls::getInstance());
-	bool load_bpf_file(const std::string& path, uint32_t map_max_entries);
-	int get_map_fd(const std::string& name);
-	map_data get_perf_map(const std::string& name);
-	void clear_all_probes();
-	~bpf_subsystem();
+	ClassicLoader() = default;
+	ClassicLoader(const ClassicLoader&) = delete;
+	ClassicLoader& operator=(const ClassicLoader&) = delete;
+	bool load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) override;
+	int get_map_fd(const std::string& name) override;
+	map_data get_perf_map(const std::string& name) override;
+	void clear_all_probes() override;
+	~ClassicLoader() override;
 };
 
 } // namespace bpf

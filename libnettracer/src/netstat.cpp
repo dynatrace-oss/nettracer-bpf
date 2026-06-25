@@ -75,7 +75,7 @@ void NetStat::process_bpf_map(int fd, F func) {
 }
 
 template<typename IPTYPE>
-void NetStat::update(const bpf_fds& fds) {
+void NetStat::update(const bpf::bpf_fds& fds) {
 	process_bpf_map<IPTYPE, pid_comm_t>(fds.pid_fd, [&](auto& el, const auto& val) {
 		uint32_t pid = static_cast<uint32_t>(val.pid >> 32);
 		if(el.pid == 0){
@@ -138,7 +138,7 @@ std::pair<unsigned, unsigned> NetStat::countTcpSessions() {
 	return std::pair<unsigned, unsigned>{incoming, container4.size() + container6.size() - incoming};
 }
 
-bool NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
+bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6) {
 	using namespace std::literals::chrono_literals;
 
 	TimeGuard outputCtr(exitCtrl.wait_time), logCtr(seconds(5min).count());
@@ -181,7 +181,7 @@ bool NetStat::map_loop(const bpf_fds& fdsIPv4, const bpf_fds& fdsIPv6) {
 }
 
 template<typename IPTYPE>
-void NetStat::clean_bpf(const bpf_fds& fds) {
+void NetStat::clean_bpf(const bpf::bpf_fds& fds) {
 	auto now = getCurrentTimeFromSteadyClock();
 	std::unique_lock<std::mutex> l(mx);
 	auto& aggr{connections<IPTYPE>()};

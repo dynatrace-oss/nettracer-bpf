@@ -137,7 +137,7 @@ protected:
 		addTCPStats(*ipv6TCPStatsMap, getIPv6Tuples());
 	}
 
-	static inline const bpf_fds ipv4FDs{1, 2, 3}, ipv6FDs{4, 5, 6};
+	static inline const bpf::bpf_fds ipv4FDs{1, 2, 3}, ipv6FDs{4, 5, 6};
 
 	MockBPFMapsWrapper mockMapsWrapper;
 

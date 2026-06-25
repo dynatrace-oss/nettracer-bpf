@@ -13,11 +13,9 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-#include "bpf_loading.h"
-
+#include "classic_loader.h"
 #include "bpf_wrapper.h"
 #include "errors.h"
-#include "system_utils.h"
 #include "maps_loading.h"
 #include "perf_sys.h"
 
@@ -49,19 +47,6 @@ namespace bpf {
 namespace {
 
 constexpr auto KPROBE_NAME_PREFIX = "nt_";
-
-class file_fd {
-public:
-	int fd;
-	file_fd(const std::string& path) {
-		fd = open(path.c_str(), O_RDONLY, 0);
-		if (fd < 0)
-			throw std::runtime_error{"cannot open bpf program file: " + path};
-	}
-	~file_fd() {
-		close(fd);
-	}
-};
 
 bool initialize_perf_maps(maps_config& pmaps, BPFMapsWrapper& mapsWrapper) {
 	bool all_success = true;
@@ -137,7 +122,7 @@ int config_tracepoint(int fd, int kprobeId) {
 
 } // namespace
 
-int bpf_subsystem::get_map_fd(const std::string& id) {
+int ClassicLoader::get_map_fd(const std::string& id) {
 	auto it = std::find_if(maps.begin(), maps.end(), [&](const auto& it) { return it.name == id; });
 	if (it != maps.end())
 		return it->fd;
@@ -145,7 +130,7 @@ int bpf_subsystem::get_map_fd(const std::string& id) {
 		return -1;
 }
 
-map_data bpf_subsystem::get_perf_map(const std::string& name) {
+map_data ClassicLoader::get_perf_map(const std::string& name) {
 	auto it = std::find_if(maps.begin(), maps.end(), [&](const auto& it) { return it.name == name; });
 	if (it != maps.end())
 		return *it;
@@ -153,7 +138,7 @@ map_data bpf_subsystem::get_perf_map(const std::string& name) {
 		return {};
 }
 
-int bpf_subsystem::uninstall_kprobe_fs(const std::string& cmd) {
+int ClassicLoader::uninstall_kprobe_fs(const std::string& cmd) {
 	int flags;
 	if (!cmd.empty()) {
 		flags = O_WRONLY | O_APPEND;
@@ -168,7 +153,7 @@ int bpf_subsystem::uninstall_kprobe_fs(const std::string& cmd) {
 	return ret;
 }
 
-int bpf_subsystem::install_kprobe_fs(const std::string& prefix, const std::string& name, bool isKprobe, int fd) {
+int ClassicLoader::install_kprobe_fs(const std::string& prefix, const std::string& name, bool isKprobe, int fd) {
 	std::string formatted{fmt::format("{0}:{1}{2} {2}", isKprobe ? 'p' : 'r', prefix, name)};
 	int fdke = open(DEBUGFS "kprobe_events", O_WRONLY | O_APPEND);
 	int ret = write(fdke, formatted.c_str(), formatted.size());
@@ -187,7 +172,7 @@ int bpf_subsystem::install_kprobe_fs(const std::string& prefix, const std::strin
 	return ret;
 }
 
-bool bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kernVersion) {
+bool ClassicLoader::load_and_attach(kprobe& probe, const char* license, int kernVersion) {
 	auto nameSepPos{probe.fname.find("/")};
 	if (nameSepPos == std::string::npos) {
 		LOG_ERROR("Invalid event name: " + probe.fname);
@@ -232,7 +217,7 @@ bool bpf_subsystem::load_and_attach(kprobe& probe, const char* license, int kern
 	return true;
 }
 
-void bpf_subsystem::load_programs_from_sections(const BpfPrograms& bpfPrograms, int kernVersion, const char* license) {
+void ClassicLoader::load_programs_from_sections(const BpfPrograms& bpfPrograms, int kernVersion, const char* license) {
 	bool allFailed = true;
     for (const auto& [name, program]: bpfPrograms) {
 		LOG_DEBUG("loading {} {}", name, program.size());
@@ -245,7 +230,7 @@ void bpf_subsystem::load_programs_from_sections(const BpfPrograms& bpfPrograms, 
 	}
 }
 
-void bpf_subsystem::set_maps_max_entries(uint32_t map_max_entries) {
+void ClassicLoader::set_maps_max_entries(uint32_t map_max_entries) {
 	for (auto& m : maps) {
 		if (m.def.max_entries == 1024) { // only change size of maps with traffic data, not logs or configuration
 			m.def.max_entries = map_max_entries;
@@ -253,10 +238,8 @@ void bpf_subsystem::set_maps_max_entries(uint32_t map_max_entries) {
 	}
 }
 
-bpf_subsystem::bpf_subsystem(const ISystemCalls& sysCalls)
-	: sysCalls(sysCalls) {}
-
-bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entries) {
+bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) {
+	LOG_INFO("Loading Classic BPF");
 	SectionLoader sectionloader(path);
 	if (!sectionloader.loadSections()) {
 		LOG_ERROR("Error loading sections from elf");
@@ -280,20 +263,11 @@ bool bpf_subsystem::load_bpf_file(const std::string& path, uint32_t map_max_entr
 		return false;
 	}
 
-	auto kernelVersion{getKernelVersion(sysCalls)};
-	if (!kernelVersion) {
-		throw std::runtime_error{"Could not obtain current kernel version"};
-	}
-	if (!isKernelSupported(*kernelVersion)) {
-		LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(*kernelVersion));
-		// don't return, see what happens
-	}
-
-	load_programs_from_sections(sectionloader.getBpfPrograms(), *kernelVersion, sectionloader.getLicense());
+	load_programs_from_sections(sectionloader.getBpfPrograms(), kernVersion, sectionloader.getLicense());
 	return true;
 }
 
-void bpf_subsystem::close_all_probes() {
+void ClassicLoader::close_all_probes() {
 	for (auto probe = probes.rbegin(); probe != probes.rend(); probe++) {
 		if (probe->efd != -1)
 			close(probe->efd);
@@ -319,7 +293,7 @@ void bpf_subsystem::close_all_probes() {
 	probes.clear();
 }
 
-void bpf_subsystem::close_all_maps() {
+void ClassicLoader::close_all_maps() {
 	for (const auto& m : maps) {
 		for (auto fd : m.pfd) {
 			close(fd);
@@ -330,13 +304,21 @@ void bpf_subsystem::close_all_maps() {
 	maps.clear();
 }
 
-bpf_subsystem::~bpf_subsystem() {
-	close_all_maps();
-	close_all_probes();
+ClassicLoader::~ClassicLoader() {
+	try {
+		close_all_maps();
+		close_all_probes();
+	} catch (std::exception& e) {
+		LOG_ERROR("~ClassicLoader exception: {}", e.what());
+	}
 }
 
-void bpf_subsystem::clear_all_probes() {
+void ClassicLoader::clear_all_probes() {
 	uninstall_kprobe_fs("");
+}
+
+std::unique_ptr<Ibpf> createOffsetGuessedBPF() {
+	return std::make_unique<ClassicLoader>();
 }
 
 } // namespace bpf

@@ -8,6 +8,8 @@ set(SOURCES
 	localsock6.cpp
 	offsetguess.cpp
 	proc_tcp.cpp
+	system_calls.cpp
+	system_utils.cpp
 	tuple_utils.cpp
 	netstat.cpp
 )
@@ -22,6 +24,8 @@ set(HEADERS
 	localsock6.h
 	offsetguess.h
 	proc_tcp.h
+	system_calls.h
+	system_utils.h
 	tuple_utils.h
 	netstat.h
 )

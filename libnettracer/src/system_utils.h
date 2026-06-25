@@ -16,13 +16,20 @@
 #pragma once
 
 #include "system_calls.h"
-#include <gmock/gmock.h>
-#include <sys/utsname.h>
+#include <optional>
+#include <string>
 
-class MockSystemCalls : public ISystemCalls {
-public:
-	MOCK_METHOD(int, uname, (utsname* buf), (const, override));
-	MOCK_METHOD(std::FILE*, fopen, (const char* name, const char* mode), (const, override));
-	MOCK_METHOD(void, fclose, (std::FILE* file), (const, override));
-	MOCK_METHOD(std::size_t, fread, (char* buffer, std::size_t count, std::FILE* stream), (const, override));
-};
+struct utsname;
+
+std::optional<int> getKernelVersion(const ISystemCalls& sysCalls);
+
+bool isKernelSupported(int kernelVersion, int minimalVersion);
+
+std::string kernelVersionToString(int kernelVersion);
+
+// Returns the number of possible CPUs reported by the kernel via
+// /sys/devices/system/cpu/possible (the same value libbpf uses for sizing
+// per-CPU BPF maps). Returns std::nullopt if the file cannot be read or
+// parsed.
+std::optional<unsigned> getNumPossibleCpus(const ISystemCalls& sysCalls);
+
