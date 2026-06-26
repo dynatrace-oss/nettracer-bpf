@@ -110,6 +110,12 @@ static void maybe_fix_missing_connection_tuple(enum protocol proto, void* tuple)
 	}
 }
 
+#if defined(LEGACY_BPF) && LEGACY_BPF
+#define HTONL htonl
+#else
+#define HTONL bpf_htonl
+#endif
+
 __attribute__((always_inline))
 static bool filter_loopback(const int32_t ip) {
 #ifdef __TARGET_ARCH_x86
@@ -117,7 +123,7 @@ static bool filter_loopback(const int32_t ip) {
 	return (ip & loopback) == loopback;
 #else
 	const uint32_t loopback = 0x7f000000;
-	return (htonl(ip) & loopback) == loopback;
+	return (HTONL(ip) & loopback) == loopback;
 #endif
 }
 
@@ -137,7 +143,7 @@ static bool isipv4ipv6(uint64_t addr_l, uint64_t addr_h) {
 	uint64_t res = addr_l & mask;
 #else
 	uint64_t mask = 0xffff;
-	uint64_t res = htonl(addr_l) & mask;
+	uint64_t res = HTONL(addr_l) & mask;
 #endif
 	return res  == mask;
 }
