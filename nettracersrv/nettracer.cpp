@@ -229,7 +229,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 	LOG_DEBUG("Detected kernel {}", kernelVersionToString(*kernelVersion));
 
-	auto [ebpf, needsOffsetGuessing] = createBPFinterface(*kernelVersion, vm["bpf"].as<std::string>(), SystemCalls::getInstance());
+	auto ebpf = createBPFinterface(*kernelVersion, vm["bpf"].as<std::string>(), SystemCalls::getInstance());
 	if (!ebpf) {
 		LOG_ERROR("Unsuported option for bpf");
 		return ReturnCodes::GenericError;
@@ -269,14 +269,6 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		return ReturnCodes::InsufficientCapabilities;
 	}
 
-	int status_fd = -1;
-#ifdef LEGACY_BPF
-	status_fd = ebpf->get_map_fd("nettracer_status");
-	if (status_fd < 0) {
-		LOG_ERROR("no fd for status map");
-		return ReturnCodes::GenericError;
-	}
-#endif
 	bpf::bpf_fds ipv4_fds{getIPv4Fds(*ebpf)};
 	if (ipv4_fds.isInvalid()) {
 		LOG_ERROR("invalid fds for ipv4 maps");
@@ -294,12 +286,21 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		return ReturnCodes::Success;
 	}
 
-	if (needsOffsetGuessing && !doOffsetGuessing(status_fd)) {
-		LOG_ERROR("Offset guessing failed");
-		return ReturnCodes::GenericError;
+	bool monitorIPv6 = true;
+	if (ebpf->needs_offset_guessing()) {
+		LOG_INFO("Offset guessing...");
+		auto status_fd = ebpf->get_map_fd("nettracer_status");
+		if (status_fd < 0) {
+			LOG_ERROR("no fd for status map");
+			return ReturnCodes::GenericError;
+		}
+		if (!doOffsetGuessing(status_fd)) {
+			LOG_ERROR("Offset guessing failed");
+			return ReturnCodes::GenericError;
+		}
+		monitorIPv6 = bpf::isIPv6MonitoringPossible(status_fd, mapsWrapper);
+		LOG_INFO(fmt::format("Offset guessing finished: ipv6:{}", monitorIPv6));
 	}
-
-	bool monitorIPv6 = bpf::isIPv6MonitoringPossible(status_fd, mapsWrapper);
 
 	netst.init();
 	bpf_events bevents(cw);

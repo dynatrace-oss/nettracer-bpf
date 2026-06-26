@@ -293,6 +293,10 @@ void ClassicLoader::close_all_probes() {
 	probes.clear();
 }
 
+bool ClassicLoader::needs_offset_guessing() const {
+	return true;
+}
+
 void ClassicLoader::close_all_maps() {
 	for (const auto& m : maps) {
 		for (auto fd : m.pfd) {

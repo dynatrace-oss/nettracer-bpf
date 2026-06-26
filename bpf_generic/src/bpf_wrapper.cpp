@@ -152,13 +152,9 @@ bpf_fds getIPv6Fds(bpf::Ibpf& ebpf) {
 }
 
 bool isIPv6MonitoringPossible(int status_fd, const BPFMapsWrapper& mapsWrapper) {
-#ifdef LEGACY_BPF
 	const uint32_t zero = 0;
 	guess_status_t status;
 	return mapsWrapper.lookupElement(status_fd, &zero, &status) && status.offset_daddr_ipv6 != 0;
-#else
-	return true;
-#endif
 }
 
 } // namespace bpf

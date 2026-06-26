@@ -56,4 +56,4 @@ namespace bpf {
 class Ibpf;
 }
 
-std::pair<std::unique_ptr<bpf::Ibpf>, bool> createBPFinterface(int kernelVersion, std::string_view option, const ISystemCalls& isystem);
+std::unique_ptr<bpf::Ibpf> createBPFinterface(int kernelVersion, std::string_view option, const ISystemCalls& isystem);

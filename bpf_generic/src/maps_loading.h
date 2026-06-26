@@ -52,7 +52,7 @@ private:
 	} sections{};
 	MapsSymbols mapsRelSymOffsToName;
 
-	std::unique_ptr<llvm::WriteThroughMemoryBuffer> memBufffer;
+	std::unique_ptr<llvm::MemoryBuffer> memBufffer;
 	std::unique_ptr<llvm::object::Binary> binary;
 	llvm::object::ELFObjectFileBase *ELFobj;
 	BpfPrograms bpfPrograms;
