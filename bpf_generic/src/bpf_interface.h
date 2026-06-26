@@ -30,6 +30,7 @@ public:
 	virtual int get_map_fd(const std::string& name) = 0;
 	virtual void clear_all_probes() = 0;
 	virtual map_data get_perf_map(const std::string& name) = 0;
+	virtual bool needs_offset_guessing() const = 0;
 	virtual ~Ibpf() = default;
 };
 

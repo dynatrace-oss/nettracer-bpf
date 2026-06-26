@@ -62,6 +62,7 @@ public:
 	int get_map_fd(const std::string& name) override;
 	map_data get_perf_map(const std::string& name) override;
 	void clear_all_probes() override;
+	bool needs_offset_guessing() const override;
 	~ClassicLoader() override;
 };
 

@@ -61,6 +61,10 @@ void BTFLoader::clear_all_probes() {
 	//handled by kernel at process exit
 }
 
+bool BTFLoader::needs_offset_guessing() const {
+	return false;
+}
+
 BTFLoader::~BTFLoader() {
 	if (skel) {
 		nettracer_bpf_core__detach(skel);

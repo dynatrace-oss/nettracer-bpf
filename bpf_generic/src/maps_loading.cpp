@@ -47,9 +47,9 @@ std::string to_string(bpf_map_type type) {
 
 SectionLoader::SectionLoader(const std::string& path){
 
-	auto BufferOrErr = WriteThroughMemoryBuffer::getFile(path.c_str());
+	auto BufferOrErr = MemoryBuffer::getFile(path.c_str());
 	if (!BufferOrErr) {
-		throw std::runtime_error("Error reading file");
+		throw std::runtime_error(fmt::format("Error reading file: {} ({})", strerror(errno), errno));
 	}
 
 	memBufffer.swap(*BufferOrErr);
