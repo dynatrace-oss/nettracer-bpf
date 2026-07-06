@@ -49,26 +49,20 @@ bool SystemCalls::isKernelSupportedForBTF(int kernelVersion) const {
 }
 
 std::unique_ptr<bpf::Ibpf> createBPFinterface(int kernelVersion, std::string_view option, const ISystemCalls& isystem) {
-	// @todo: BTF temporarily disabled -> enable
-	// if (option == "auto") {
-	// 	if (isystem.isKernelSupportedForBTF(kernelVersion)) {
-	// 		return bpf::createBTFBPF();
-	// 	}
-	// 	if (!isystem.isKernelSupportedForClassic(kernelVersion)) {
-	// 		LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(kernelVersion));
-	// 		// don't return, see what happens
-	// 	}
-	// 	return bpf::createOffsetGuessedBPF();
-	// } else if (option == "BTF") {
-	// 	return bpf::createBTFBPF();
-	// } else if (option == "offsetguessing") {
-	// 	return bpf::createOffsetGuessedBPF();
-	// }
-
-	// return {};
-	if (!isystem.isKernelSupportedForClassic(kernelVersion)) {
-		LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(kernelVersion));
-		// don't return, see what happens
+	if (option == "auto") {
+		if (isystem.isKernelSupportedForBTF(kernelVersion)) {
+			return bpf::createBTFBPF();
+		}
+		if (!isystem.isKernelSupportedForClassic(kernelVersion)) {
+			LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(kernelVersion));
+			// don't return, see what happens
+		}
+		return bpf::createOffsetGuessedBPF();
+	} else if (option == "BTF") {
+		return bpf::createBTFBPF();
+	} else if (option == "offsetguessing") {
+		return bpf::createOffsetGuessedBPF();
 	}
-	return bpf::createOffsetGuessedBPF();
+
+	return {};
 }

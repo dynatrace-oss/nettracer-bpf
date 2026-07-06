@@ -19,7 +19,6 @@
 #include <llvm/Object/ELF.h>
 #include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Support/Error.h>
-#include <llvm/Support/MemoryBuffer.h>
 
 #include "classic_loader.h"
 #include "maps_def.h"
@@ -52,8 +51,7 @@ private:
 	} sections{};
 	MapsSymbols mapsRelSymOffsToName;
 
-	std::unique_ptr<llvm::MemoryBuffer> memBufffer;
-	std::unique_ptr<llvm::object::Binary> binary;
+	llvm::object::OwningBinary<llvm::object::Binary> binary;
 	llvm::object::ELFObjectFileBase *ELFobj;
 	BpfPrograms bpfPrograms;
 };

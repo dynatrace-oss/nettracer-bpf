@@ -47,19 +47,13 @@ std::string to_string(bpf_map_type type) {
 
 SectionLoader::SectionLoader(const std::string& path){
 
-	auto BufferOrErr = MemoryBuffer::getFile(path.c_str());
-	if (!BufferOrErr) {
-		throw std::runtime_error(fmt::format("Error reading file: {} ({})", strerror(errno), errno));
-	}
-
-	memBufffer.swap(*BufferOrErr);
-	Expected<std::unique_ptr<Binary>> BinOrErr = createBinary(memBufffer->getMemBufferRef());
+	Expected<OwningBinary<Binary>> BinOrErr = createBinary(path);
 	if (!BinOrErr) {
 		throw std::runtime_error("Error parsing ELF");
 	}
 
-	binary.swap(*BinOrErr);
-	ELFobj = dyn_cast<ELFObjectFileBase>(binary.get());
+	binary = std::move(*BinOrErr);
+	ELFobj = dyn_cast<ELFObjectFileBase>(binary.getBinary());
 	if (!ELFobj) {
 		throw std::runtime_error("Error ELFObj");
 	}

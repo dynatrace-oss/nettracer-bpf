@@ -81,7 +81,7 @@ po::options_description getOptionsDescription() {
 			("incremental,i", "Enable incremental data")
 			("noninteractive,r", "Hex output")
 			("with_loopback,f", "With loopback")
-			("bpf,b", po::value<std::string>()->default_value("auto"), "BTF or classic")
+			("bpf,b", po::value<std::string>()->default_value("offsetguessing"), "BTF or classic")
 			("program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")
 			("header,s", "Add average header size to traffic")
 			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
