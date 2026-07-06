@@ -13,10 +13,8 @@
 #else
 #include "maps.h"
 #endif
-
 #include "probes/connections.h"
 #include "probes/metrics.h"
-
 
 char _license[] SEC("license") = "GPL";
 #ifdef LEGACY_BPF

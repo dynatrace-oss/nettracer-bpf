@@ -29,7 +29,7 @@ struct pollfd;
 
 template <typename T>
 using f_ac = std::function<void(const T&)>;
-using actions = std::variant<f_ac<tcp_ipv4_event_t>, f_ac<tcp_ipv6_event_t>, f_ac<bpf_log_event_t>>;
+using actions = std::variant<f_ac<tcp_ipv4_event_t>, f_ac<tcp_ipv6_event_t>>;
 
 struct evt_descr {
 	bpf::map_data md;

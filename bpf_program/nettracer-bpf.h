@@ -153,30 +153,6 @@ struct guess_status_t {
 	uint32_t rtt_var;
 };
 
-enum bpf_log_level {
-    BPF_LOG_LEVEL_TRACE,
-    BPF_LOG_LEVEL_DEBUG,
-    BPF_LOG_LEVEL_INFO,
-    BPF_LOG_LEVEL_WARN,
-    BPF_LOG_LEVEL_ERROR,
-    BPF_LOG_LEVEL_CRITICAL,
-    BPF_LOG_LEVEL_OFF
-};
-
-struct nettracer_config_t {
-	enum bpf_log_level log_level;
-};
-
-struct bpf_log_event_t {
-	uint64_t timestamp;
-	uint32_t cpu;
-	uint32_t pid;
-	enum bpf_log_level severity;
-	char format[80];
-	uint8_t args_num;
-	uint8_t padding[3];
-	int64_t args[10];
-};
 
 // All fields must be uint64_t for the generic handling to work correctly.
 struct bpf_debug_counters_t {

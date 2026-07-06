@@ -140,21 +140,6 @@ bool increaseMemoryLimit() {
 	return true;
 }
 
-bool setUpBPFConfig(const po::variables_map& vm, bpf::Ibpf& ebpf, bpf::BPFMapsWrapper& mapsWrapper) {
-	int configFd{ebpf.get_map_fd("nettracer_config")};
-	uint32_t zero{0};
-	nettracer_config_t config{};
-	(void)mapsWrapper.lookupElement(configFd, &zero, &config);
-
-	config.log_level = loglevelFromConfig(vm) <= spdlog::level::debug ? BPF_LOG_LEVEL_DEBUG : BPF_LOG_LEVEL_INFO;
-
-	if (!mapsWrapper.updateElement(configFd, &zero, &config)) {
-		LOG_ERROR("Could not set up BPF config");
-		return false;
-	}
-	return true;
-}
-
 unsigned resolveNumPossibleCpus() {
 	if (auto detected = getNumPossibleCpus(SystemCalls::getInstance())) {
 		return detected.value();
@@ -265,10 +250,6 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 	LOG_INFO("BPF program loaded");
 
-	if (!setUpBPFConfig(vm, *ebpf, mapsWrapper)) {
-		return ReturnCodes::InsufficientCapabilities;
-	}
-
 	bpf::bpf_fds ipv4_fds{getIPv4Fds(*ebpf)};
 	if (ipv4_fds.isInvalid()) {
 		LOG_ERROR("invalid fds for ipv4 maps");
@@ -308,7 +289,6 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
-	std::function<void(const bpf_log_event_t&)> bpf_log_event_update;
 	std::function<void(std::promise<bool>&&)> map_reading;
 
 	if (noStdoutLog) {
@@ -324,7 +304,6 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	} else {
 		static ConnectionsState<ipv4_tuple_t> ipv4Connections;
 		static ConnectionsState<ipv6_tuple_t> ipv6Connections;
-		bpf_log_event_update = [](const bpf_log_event_t& evt) { unifyBPFLog(evt); };
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { updateConnectionsAfterEvent(evt, ipv4Connections); };
 		if (monitorIPv6) {
 			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { updateConnectionsAfterEvent(evt, ipv6Connections); };
@@ -347,12 +326,6 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 
 			promise.set_value(exitCtrl.running);
 		};
-	}
-
-	auto log_pmap = ebpf->get_perf_map("bpf_logs");
-	if (!log_pmap.pfd.empty() && !noStdoutLog) {
-		LOG_INFO("Starting BPF log events");
-		bevents.add_observer<bpf_log_event_t>(log_pmap, bpf_log_event_update);
 	}
 
 	auto ipv4_pmap = ebpf->get_perf_map("tcp_event_ipv4");
