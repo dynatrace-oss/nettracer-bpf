@@ -74,6 +74,7 @@ po::options_description getOptionsDescription() {
 	desc.add_options()
 			("clear_probes,c", "Clear all probes on start")
 			("debug,d", po::value<std::string>()->default_value("info"), "Enable debug logs")
+			("events,e", po::value<unsigned>()->default_value(1), "Enable events")
 			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
 			("log,l", po::value<std::string>()->default_value(""), "Logger path")
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
@@ -328,14 +329,15 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		};
 	}
 
+	const bool eventsEnabled = vm["events"].as<unsigned>() == 1;
 	auto ipv4_pmap = ebpf->get_perf_map("tcp_event_ipv4");
-	if (!ipv4_pmap.pfd.empty()) {
+	if (!ipv4_pmap.pfd.empty() && eventsEnabled ) {
 		LOG_INFO("Starting TCP IPv4 events");
 		bevents.add_observer<tcp_ipv4_event_t>(ipv4_pmap, ipv4_event_update);
 	}
 
 	auto ipv6_pmap = ebpf->get_perf_map("tcp_event_ipv6");
-	if (!ipv6_pmap.pfd.empty() && monitorIPv6) {
+	if (!ipv6_pmap.pfd.empty() && monitorIPv6&& eventsEnabled) {
 		LOG_INFO("Starting TCP IPv6 events");
 		bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
 	}
