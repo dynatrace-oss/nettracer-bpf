@@ -167,9 +167,12 @@ map_data BTFLoader::get_perf_map(const std::string& name) {
 	map_data ret{};
 	if (name == "tcp_event_ipv6") {
 		ret.fd = bpf_map__fd(skel->maps.tcp_event_ipv6);
-	}
-	if (name == "tcp_event_ipv4") {
+		ret.name = "tcp_event_ipv6";
+	} else if (name == "tcp_event_ipv4") {
 		ret.fd = bpf_map__fd(skel->maps.tcp_event_ipv4);
+		ret.name = "tcp_event_ipv4";
+	} else {
+		LOG_WARN("perf map not known");
 	}
 
 	return ret;

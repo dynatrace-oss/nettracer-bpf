@@ -18,6 +18,7 @@
 
 #include "bpf_generic/src/maps_def.h"
 #include "bpf_program/nettracer-bpf.h"
+#include <bpf/libbpf.h>
 #include <functional>
 #include <thread>
 #include <variant>
@@ -34,11 +35,31 @@ using actions = std::variant<f_ac<tcp_ipv4_event_t>, f_ac<tcp_ipv6_event_t>>;
 struct evt_descr {
 	bpf::map_data md;
 	actions action;
+	perf_buffer* rb{nullptr};
+	int rb_idx{};
+	int expected_size;
+
+	evt_descr() = default;
+	evt_descr(const evt_descr&) = delete;
+	evt_descr& operator=(const evt_descr&) = delete;
+	evt_descr(evt_descr&& other) noexcept
+			: md(std::move(other.md)),
+			  action(std::move(other.action)),
+			  rb(other.rb),
+			  rb_idx(other.rb_idx),
+			  expected_size(other.expected_size) {
+		other.rb = nullptr;
+	}
+
+	evt_descr& operator=(evt_descr&&) = delete;
+	~evt_descr();
 };
 
 class bpf_events {
 	std::thread reader;
 	bool running = false;
+	int page_size;
+	bool legacy_perf_events;
 	void read_loop();
 	std::vector<evt_descr> observers;
 	std::vector<pollfd> create_pfds();
@@ -47,14 +68,16 @@ class bpf_events {
 	config_watcher& cw;
 
 public:
-	bpf_events(config_watcher& cw) : cw(cw) {}
+	bpf_events(config_watcher& cw, bool legacy) : page_size(getpagesize()), legacy_perf_events(legacy), cw(cw) {
+	}
 
 	template <typename T>
 	void add_observer(const bpf::map_data md, f_ac<T> ac) {
 		evt_descr tmp;
 		tmp.md = md;
 		tmp.action = ac;
-		observers.push_back(tmp);
+		tmp.expected_size = sizeof(T);
+		observers.emplace_back(std::move(tmp));
 	}
 
 	void set_kbhit_observer(std::function<void()>&& f) {
@@ -70,7 +93,9 @@ public:
 	void loop();
 
 private:
-	using evt_source = std::pair<int, evt_descr>;
+	using evt_source = std::pair<int, const evt_descr*>;
 	evt_source fd_to_evtype(int fd);
+	perf_buffer* fd_to_perfbuf(int fd);
+	void process_bpf_event(int fd);
 };
 

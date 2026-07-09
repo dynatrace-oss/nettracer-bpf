@@ -285,7 +285,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 
 	netst.init();
-	bpf_events bevents(cw);
+	bpf_events bevents(cw, ebpf->needs_offset_guessing());
 	bevents.set_kbhit_observer(std::bind(&netstat::NetStat::set_kbhit, &netst));
 
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
@@ -331,17 +331,16 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 
 	const bool eventsEnabled = vm["events"].as<unsigned>() == 1;
 	auto ipv4_pmap = ebpf->get_perf_map("tcp_event_ipv4");
-	if (!ipv4_pmap.pfd.empty() && eventsEnabled ) {
+	if (eventsEnabled) {
 		LOG_INFO("Starting TCP IPv4 events");
 		bevents.add_observer<tcp_ipv4_event_t>(ipv4_pmap, ipv4_event_update);
-	}
 
-	auto ipv6_pmap = ebpf->get_perf_map("tcp_event_ipv6");
-	if (!ipv6_pmap.pfd.empty() && monitorIPv6&& eventsEnabled) {
-		LOG_INFO("Starting TCP IPv6 events");
-		bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
+		auto ipv6_pmap = ebpf->get_perf_map("tcp_event_ipv6");
+		if (monitorIPv6) {
+			LOG_INFO("Starting TCP IPv6 events");
+			bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
+		}
 	}
-
 	const unsigned debugCountersInterval{vm["counters_interval"].as<unsigned>()};
 	std::thread debugCountersThread{startDebugCountersThread(ebpf.get(), mapsWrapper, debugCountersInterval)};
 
