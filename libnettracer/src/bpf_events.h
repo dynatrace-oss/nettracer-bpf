@@ -35,8 +35,8 @@ using actions = std::variant<f_ac<tcp_ipv4_event_t>, f_ac<tcp_ipv6_event_t>>;
 struct evt_descr {
 	bpf::map_data md;
 	actions action;
-	perf_buffer* rb{nullptr};
-	int rb_idx{};
+	perf_buffer* perf_buf{nullptr};
+	int perf_buf_fd{};
 	int expected_size;
 
 	evt_descr() = default;
@@ -45,10 +45,10 @@ struct evt_descr {
 	evt_descr(evt_descr&& other) noexcept
 			: md(std::move(other.md)),
 			  action(std::move(other.action)),
-			  rb(other.rb),
-			  rb_idx(other.rb_idx),
+			  perf_buf(other.perf_buf),
+			  perf_buf_fd(other.perf_buf_fd),
 			  expected_size(other.expected_size) {
-		other.rb = nullptr;
+		other.perf_buf = nullptr;
 	}
 
 	evt_descr& operator=(evt_descr&&) = delete;

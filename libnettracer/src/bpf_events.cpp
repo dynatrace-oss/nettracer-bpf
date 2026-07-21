@@ -35,7 +35,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz){
 	if (std::holds_alternative<std::function<void(const tcp_ipv4_event_t&)>>(desc->action)) {
 		auto& fn = std::get<std::function<void(const tcp_ipv4_event_t&)>>(desc->action);
 		fn(*reinterpret_cast<const tcp_ipv4_event_t*>(data));
-	} else {
+	} else if (std::holds_alternative<std::function<void(const tcp_ipv6_event_t&)>>(desc->action)) {
 		auto& fn = std::get<std::function<void(const tcp_ipv6_event_t&)>>(desc->action);
 		fn(*reinterpret_cast<const tcp_ipv6_event_t*>(data));
 	}
@@ -48,25 +48,25 @@ static void handle_lost(void *ctx, int cpu, __u64 lost_cnt) {
 }
 
 evt_descr::~evt_descr() {
-	if (rb) {
-		perf_buffer__free(rb);
+	if (perf_buf) {
+		perf_buffer__free(perf_buf);
 	}
 }
 
 void bpf_events::start() {
 	if (!legacy_perf_events) {
 		for (auto& it : observers) {
-			perf_buffer* rb = perf_buffer__new(
+			perf_buffer* perf_buf = perf_buffer__new(
 					it.md.fd,
 					1024,
 					handle_event,
 					handle_lost,
 					&it, // ctx
 					nullptr);
-			if (!rb) {
+			if (perf_buf) {
 				LOG_ERROR("cannot allocate perfbuf for {}", it.md.name);
 			}
-			it.rb = rb;
+			it.perf_buf = perf_buf;
 		}
 	}
 	running = true;
@@ -87,10 +87,10 @@ std::vector<pollfd> bpf_events::create_pfds() {
 
 	if (!legacy_perf_events) {
 		for (auto& it : observers) {
-			if (it.rb) {
-				int poll_fd = perf_buffer__epoll_fd(it.rb);
+			if (it.perf_buf) {
+				int poll_fd = perf_buffer__epoll_fd(it.perf_buf);
 				fds.push_back(pollfd{poll_fd, POLLIN, 0});
-				it.rb_idx = poll_fd;
+				it.perf_buf_fd = poll_fd;
 			}
 		}
 	} else {
@@ -147,8 +147,8 @@ void bpf_events::loop() {
 
 perf_buffer* bpf_events::fd_to_perfbuf(int fd) {
 	for (const auto& it : observers) {
-		if (it.rb_idx == fd) {
-			return it.rb;
+		if (it.perf_buf_fd == fd) {
+			return it.perf_buf;
 		}
 	}
 	return nullptr;
@@ -166,9 +166,9 @@ bpf_events::evt_source bpf_events::fd_to_evtype(int fd) {
 void bpf_events::process_bpf_event(int fd) {
 
 	if (!legacy_perf_events) {
-		perf_buffer* rb = fd_to_perfbuf(fd);
-		if (rb) {
-			perf_buffer__consume(rb);
+		perf_buffer* perf_buf = fd_to_perfbuf(fd);
+		if (perf_buf) {
+			perf_buffer__consume(perf_buf);
 		}
 	} else {
 		auto ac = fd_to_evtype(fd);
