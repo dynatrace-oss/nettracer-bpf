@@ -32,14 +32,6 @@ struct bpf_map_def SEC("maps") nettracer_status = {
 	.max_entries = 1
 };
 
-// Map with only one element at 0-key, representing configuration for BPF program
-struct bpf_map_def SEC("maps") nettracer_config = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(struct nettracer_config_t),
-	.max_entries = 1
-};
-
 /* This is a key/value store with the keys being the cpu number
  * and the values being a perf file descriptor.
  */

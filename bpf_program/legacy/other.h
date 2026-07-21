@@ -16,7 +16,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 #include "bpf_helpers.h"
-#include "log.h"
 #include "maps.h"
 #include "nettracer-bpf.h"
 #include "offset_guessing.h"

@@ -112,14 +112,6 @@ int BTFLoader::get_map_fd(const std::string& id) {
 		return bpf_map__fd(skel->maps.tcp_stats_ipv6);
 	}
 
-	if (id == "nettracer_config") {
-		return bpf_map__fd(skel->maps.nettracer_config);
-	}
-
-	if (id == "bpf_logs") {
-		return bpf_map__fd(skel->maps.bpf_logs);
-	}
-
 	if (id == "stats_ipv4") {
 		return bpf_map__fd(skel->maps.stats_ipv4);
 	}
@@ -172,8 +164,18 @@ bool BTFLoader::tryAttachProbes() {
 }
 
 map_data BTFLoader::get_perf_map(const std::string& name) {
-	//not implemented
-	return {};
+	map_data ret{};
+	if (name == "tcp_event_ipv6") {
+		ret.fd = bpf_map__fd(skel->maps.tcp_event_ipv6);
+		ret.name = "tcp_event_ipv6";
+	} else if (name == "tcp_event_ipv4") {
+		ret.fd = bpf_map__fd(skel->maps.tcp_event_ipv4);
+		ret.name = "tcp_event_ipv4";
+	} else {
+		LOG_WARN("perf map not known");
+	}
+
+	return ret;
 }
 
 std::unique_ptr<Ibpf> createBTFBPF() {

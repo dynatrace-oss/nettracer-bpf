@@ -23,24 +23,6 @@
 
 #define  MAP_MAX_ENTRIES 1024
 
-// Map with only one element at 0-key, representing configuration for BPF program
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__type(key, __u32);
-	__type(value, struct nettracer_config_t);
-	__uint(max_entries, 1);
-} nettracer_config SEC(".maps");
-
-/* This is a key/value store with the keys being the cpu number
- * and the values being a perf file descriptor.
- */
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__type(key, __u32);
-	__type(value, __u32);
-	__uint(max_entries, 2024);
-} bpf_logs SEC(".maps");
-
 /* This is a key/value store with the keys being a pid
  * and the values being a struct sock *.
  */

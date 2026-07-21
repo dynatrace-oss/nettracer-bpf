@@ -74,6 +74,7 @@ po::options_description getOptionsDescription() {
 	desc.add_options()
 			("clear_probes,c", "Clear all probes on start")
 			("debug,d", po::value<std::string>()->default_value("info"), "Enable debug logs")
+			("events,e", po::value<unsigned>()->default_value(1), "Enable events")
 			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
 			("log,l", po::value<std::string>()->default_value(""), "Logger path")
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
@@ -135,21 +136,6 @@ bool increaseMemoryLimit() {
 	int ret{setrlimit(RLIMIT_MEMLOCK, &r)};
 	if (ret) {
 		LOG_ERROR("setrlimit failed: {:d}", ret);
-		return false;
-	}
-	return true;
-}
-
-bool setUpBPFConfig(const po::variables_map& vm, bpf::Ibpf& ebpf, bpf::BPFMapsWrapper& mapsWrapper) {
-	int configFd{ebpf.get_map_fd("nettracer_config")};
-	uint32_t zero{0};
-	nettracer_config_t config{};
-	(void)mapsWrapper.lookupElement(configFd, &zero, &config);
-
-	config.log_level = loglevelFromConfig(vm) <= spdlog::level::debug ? BPF_LOG_LEVEL_DEBUG : BPF_LOG_LEVEL_INFO;
-
-	if (!mapsWrapper.updateElement(configFd, &zero, &config)) {
-		LOG_ERROR("Could not set up BPF config");
 		return false;
 	}
 	return true;
@@ -265,10 +251,6 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 	LOG_INFO("BPF program loaded");
 
-	if (!setUpBPFConfig(vm, *ebpf, mapsWrapper)) {
-		return ReturnCodes::InsufficientCapabilities;
-	}
-
 	bpf::bpf_fds ipv4_fds{getIPv4Fds(*ebpf)};
 	if (ipv4_fds.isInvalid()) {
 		LOG_ERROR("invalid fds for ipv4 maps");
@@ -303,12 +285,11 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 
 	netst.init();
-	bpf_events bevents(cw);
+	bpf_events bevents(cw, ebpf->needs_offset_guessing());
 	bevents.set_kbhit_observer(std::bind(&netstat::NetStat::set_kbhit, &netst));
 
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
-	std::function<void(const bpf_log_event_t&)> bpf_log_event_update;
 	std::function<void(std::promise<bool>&&)> map_reading;
 
 	if (noStdoutLog) {
@@ -324,7 +305,6 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	} else {
 		static ConnectionsState<ipv4_tuple_t> ipv4Connections;
 		static ConnectionsState<ipv6_tuple_t> ipv6Connections;
-		bpf_log_event_update = [](const bpf_log_event_t& evt) { unifyBPFLog(evt); };
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { updateConnectionsAfterEvent(evt, ipv4Connections); };
 		if (monitorIPv6) {
 			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { updateConnectionsAfterEvent(evt, ipv6Connections); };
@@ -349,24 +329,18 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		};
 	}
 
-	auto log_pmap = ebpf->get_perf_map("bpf_logs");
-	if (!log_pmap.pfd.empty() && !noStdoutLog) {
-		LOG_INFO("Starting BPF log events");
-		bevents.add_observer<bpf_log_event_t>(log_pmap, bpf_log_event_update);
-	}
-
+	const bool eventsEnabled = vm["events"].as<unsigned>() == 1;
 	auto ipv4_pmap = ebpf->get_perf_map("tcp_event_ipv4");
-	if (!ipv4_pmap.pfd.empty()) {
+	if (eventsEnabled) {
 		LOG_INFO("Starting TCP IPv4 events");
 		bevents.add_observer<tcp_ipv4_event_t>(ipv4_pmap, ipv4_event_update);
-	}
 
-	auto ipv6_pmap = ebpf->get_perf_map("tcp_event_ipv6");
-	if (!ipv6_pmap.pfd.empty() && monitorIPv6) {
-		LOG_INFO("Starting TCP IPv6 events");
-		bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
+		auto ipv6_pmap = ebpf->get_perf_map("tcp_event_ipv6");
+		if (monitorIPv6) {
+			LOG_INFO("Starting TCP IPv6 events");
+			bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
+		}
 	}
-
 	const unsigned debugCountersInterval{vm["counters_interval"].as<unsigned>()};
 	std::thread debugCountersThread{startDebugCountersThread(ebpf.get(), mapsWrapper, debugCountersInterval)};
 

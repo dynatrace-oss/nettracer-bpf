@@ -35,6 +35,7 @@ add_library(libnettracer STATIC ${SOURCES} ${HEADERS})
 target_include_directories(libnettracer
 	PUBLIC
 		"${PROJECT_SOURCE_DIR}"
+		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../libbpf"
 )
 
 add_dependencies(libnettracer bpf_program)

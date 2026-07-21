@@ -23,7 +23,52 @@
 #include <stdint.h>
 #include <unistd.h>
 
+
+static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz){
+	evt_descr *desc = static_cast<evt_descr*>(ctx);
+	if (data_sz < desc->expected_size) {
+		LOG_DEBUG(
+				"Event {} size too low ", desc->md.name);
+		return;
+	}
+
+	if (std::holds_alternative<std::function<void(const tcp_ipv4_event_t&)>>(desc->action)) {
+		auto& fn = std::get<std::function<void(const tcp_ipv4_event_t&)>>(desc->action);
+		fn(*reinterpret_cast<const tcp_ipv4_event_t*>(data));
+	} else if (std::holds_alternative<std::function<void(const tcp_ipv6_event_t&)>>(desc->action)) {
+		auto& fn = std::get<std::function<void(const tcp_ipv6_event_t&)>>(desc->action);
+		fn(*reinterpret_cast<const tcp_ipv6_event_t*>(data));
+	}
+}
+
+
+static void handle_lost(void *ctx, int cpu, __u64 lost_cnt) {
+	evt_descr *desc = static_cast<evt_descr*>(ctx);
+	LOG_WARN("lost events {}:{}", desc->md.name, lost_cnt);
+}
+
+evt_descr::~evt_descr() {
+	if (perf_buf) {
+		perf_buffer__free(perf_buf);
+	}
+}
+
 void bpf_events::start() {
+	if (!legacy_perf_events) {
+		for (auto& it : observers) {
+			perf_buffer* perf_buf = perf_buffer__new(
+					it.md.fd,
+					1024,
+					handle_event,
+					handle_lost,
+					&it, // ctx
+					nullptr);
+			if (perf_buf) {
+				LOG_ERROR("cannot allocate perfbuf for {}", it.md.name);
+			}
+			it.perf_buf = perf_buf;
+		}
+	}
 	running = true;
 	std::thread t(&bpf_events::loop, this);
 	reader.swap(t);
@@ -39,9 +84,21 @@ void bpf_events::stop() {
 std::vector<pollfd> bpf_events::create_pfds() {
 	std::vector<pollfd> fds;
 	fds.push_back(pollfd{STDIN_FILENO, POLLIN, 0});
-	for (const auto& ito : observers) {
-		std::transform(ito.md.pfd.begin(), ito.md.pfd.end(), std::back_inserter(fds), [](auto& it) { return pollfd{it, POLLIN, 0}; });
+
+	if (!legacy_perf_events) {
+		for (auto& it : observers) {
+			if (it.perf_buf) {
+				int poll_fd = perf_buffer__epoll_fd(it.perf_buf);
+				fds.push_back(pollfd{poll_fd, POLLIN, 0});
+				it.perf_buf_fd = poll_fd;
+			}
+		}
+	} else {
+		for (const auto& ito : observers) {
+			std::transform(ito.md.pfd.begin(), ito.md.pfd.end(), std::back_inserter(fds), [](auto& it) { return pollfd{it, POLLIN, 0}; });
+		}
 	}
+
 	if (cw) {
 		fds.push_back(pollfd{cw.get_poll_fd(), POLLIN, 0});
 	}
@@ -50,7 +107,6 @@ std::vector<pollfd> bpf_events::create_pfds() {
 
 void bpf_events::loop() {
 	using namespace std::chrono_literals;
-	int page_size = getpagesize();
 	std::vector<pollfd> fds = create_pfds();
 	while (running) {
 		int res = poll(fds.data(), fds.size(), 100);
@@ -81,31 +137,50 @@ void bpf_events::loop() {
 					config_change_observer();
 				}
 			} else {
-
-				auto ac = fd_to_evtype(fd.fd);
-				const size_t cpu = ac.first;
-				std::visit(
-						[page_size, cpu, &ac](auto&& arg) {
-							using atype = typename std::decay<decltype(arg)>::type::argument_type;
-							auto events = bpf::deserializeEvent<typename std::decay<atype>::type>(ac.second.md, page_size, cpu);
-							std::sort(events.begin(), events.end(), [](auto const& a, auto const& b) { return a.timestamp < b.timestamp; });
-							std::for_each(events.begin(), events.end(), arg);
-						},
-						ac.second.action);
+				process_bpf_event(fd.fd);
 			}
-
 			fd.events = POLLIN;
 			fd.revents = 0;
 		}
 	}
 }
 
+perf_buffer* bpf_events::fd_to_perfbuf(int fd) {
+	for (const auto& it : observers) {
+		if (it.perf_buf_fd == fd) {
+			return it.perf_buf;
+		}
+	}
+	return nullptr;
+}
+
 bpf_events::evt_source bpf_events::fd_to_evtype(int fd) {
 	for (const auto& it : observers) {
 		auto ft = std::find(it.md.pfd.begin(), it.md.pfd.end(), fd);
 		if (ft != it.md.pfd.end())
-			return {std::distance(it.md.pfd.begin(), ft), it};
+			return {std::distance(it.md.pfd.begin(), ft), &it};
 	}
 	throw std::range_error("no type conversion");
 }
 
+void bpf_events::process_bpf_event(int fd) {
+
+	if (!legacy_perf_events) {
+		perf_buffer* perf_buf = fd_to_perfbuf(fd);
+		if (perf_buf) {
+			perf_buffer__consume(perf_buf);
+		}
+	} else {
+		auto ac = fd_to_evtype(fd);
+		const size_t cpu = ac.first;
+		auto page_size = this->page_size;
+		std::visit(
+				[page_size, cpu, &ac](auto&& arg) {
+					using atype = typename std::decay<decltype(arg)>::type::argument_type;
+					auto events = bpf::deserializeEvent<typename std::decay<atype>::type>(ac.second->md, page_size, cpu);
+					std::sort(events.begin(), events.end(), [](auto const& a, auto const& b) { return a.timestamp < b.timestamp; });
+					std::for_each(events.begin(), events.end(), arg);
+				},
+				ac.second->action);
+	}
+}
