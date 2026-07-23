@@ -50,13 +50,16 @@ bool SystemCalls::isKernelSupportedForBTF(int kernelVersion) const {
 
 std::unique_ptr<bpf::Ibpf> createBPFinterface(int kernelVersion, std::string_view option, const ISystemCalls& isystem) {
 	if (option == "auto") {
-		if (isystem.isKernelSupportedForBTF(kernelVersion)) {
-			return bpf::createBTFBPF();
-		}
 		if (!isystem.isKernelSupportedForClassic(kernelVersion)) {
 			LOG_ERROR("Kernel version {} is not supported", kernelVersionToString(kernelVersion));
 			// don't return, see what happens
 		}
+
+		auto btf = bpf::createBTFBPF();
+		if (btf) {
+			return btf;
+		}
+		LOG_INFO("Fallback to ofsetguessing");
 		return bpf::createOffsetGuessedBPF();
 	} else if (option == "BTF") {
 		return bpf::createBTFBPF();

@@ -27,6 +27,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <string_view>
@@ -239,7 +240,15 @@ void ClassicLoader::set_maps_max_entries(uint32_t map_max_entries) {
 }
 
 bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) {
-	LOG_INFO("Loading Classic BPF");
+
+	std::error_code ec;
+	bool exists = std::filesystem::exists(path, ec);
+	if (ec || !exists) {
+		LOG_ERROR("Cannot access file: {}", path);
+		return false;
+	}
+
+	LOG_INFO("Loading Classic BPF {}");
 	SectionLoader sectionloader(path);
 	if (!sectionloader.loadSections()) {
 		LOG_ERROR("Error loading sections from elf");
