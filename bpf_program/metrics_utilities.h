@@ -154,6 +154,5 @@ static bool filter_ipv6(const struct ipv6_tuple_t* key) {
 		uint32_t ipv4 = (uint32_t)(key->saddr_l >> 32);
 		return filter_loopback(ipv4);
 	}
-	const uint64_t loopback = 0xffffffff00000000;
-	return ((key->saddr_l & loopback) == key->saddr_l);
+	return false;
 }

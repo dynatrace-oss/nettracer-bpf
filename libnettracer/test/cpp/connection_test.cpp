@@ -101,14 +101,14 @@ INSTANTIATE_TEST_SUITE_P(IPv6ConnectionParsingTests, IPv6ConnectionParsingTest, 
 	// outgoing
 	std::make_pair(
 		" 18: 00000000000000000000000001000000:0278 00000000000000000000000001000000:C355 01 00000000:00000000 00:00000000 00000000  0    0 8670135 1 0000000000000000 100 0 0 10 0"s,
-		std::optional{std::make_pair(ipv6_tuple_t{0x0, 0x1000000, 0x0, 0x1000000, 632, 50005, 0}, ConnectionDetails{0, ConnectionDirection::Outgoing})}),
+		std::optional{std::make_pair(ipv6_tuple_t{0x0, 0x100000000000000, 0x0, 0x100000000000000, 632, 50005, 0}, ConnectionDetails{0, ConnectionDirection::Outgoing})}),
 	// incoming
 	std::make_pair(
 		"1: 00000000000000000000000001000000:0277 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 1 1 0000000000000000 100 0 0 10 0"s,
-		std::optional{std::make_pair(ipv6_tuple_t{0x0, 0x0, 0x0, 0x1000000, 0, 631, 0}, ConnectionDetails{0, ConnectionDirection::Incoming})}),
+		std::optional{std::make_pair(ipv6_tuple_t{0x0, 0x0, 0x0, 0x100000000000000, 0, 631, 0}, ConnectionDetails{0, ConnectionDirection::Incoming})}),
 	std::make_pair(
 		"   0: 00000000000000000000000001000000:0277 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 56336 1 0000000000000000 100 0 0 10 0"s,
-		std::optional{std::make_pair(ipv6_tuple_t{0x0, 0x0, 0x0, 0x1000000, 0, 631, 0}, ConnectionDetails{0, ConnectionDirection::Incoming})}),
+		std::optional{std::make_pair(ipv6_tuple_t{0x0, 0x0, 0x0, 0x100000000000000, 0, 631, 0}, ConnectionDetails{0, ConnectionDirection::Incoming})}),
 	// other states
 	std::make_pair(
 		"   0: 00000000000000000000000001000000:0277 00000000000000000000000000000000:0000 06 00000000:00000000 00:00000000 00000000     0        0 56336 1 0000000000000000 100 0 0 10 0"s,
