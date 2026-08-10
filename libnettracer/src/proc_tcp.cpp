@@ -29,6 +29,14 @@ namespace {
 constexpr uint16_t TCP_ESTABLISHED = 1;
 constexpr uint16_t TCP_LISTEN = 10;
 
+std::pair<uint64_t, uint64_t> convertIPv6(const char* ip) {
+	uint64_t ipv6l, ipv6h;
+	uint32_t tmp[4];
+	sscanf(ip, "%08X%08X%08X%08X", &tmp[0], &tmp[1], &tmp[2], &tmp[3]);
+	memcpy(&ipv6l, &tmp[0], 8);
+	memcpy(&ipv6h, &tmp[2], 8);
+	return {ipv6l, ipv6h};
+}
 }
 
 namespace fs = std::filesystem;
@@ -91,7 +99,6 @@ std::optional<std::pair<ipv6_tuple_t, ConnectionDetails>> parseProcIPv6Connectio
     using std::hex;
 
     // for now, forget about PID and netns
-    uint64_t localAddress[2], remoteAddress[2];
     uint16_t localPort, remotePort;
     uint16_t state;
     char localAddressTemp[32+1];
@@ -109,22 +116,14 @@ std::optional<std::pair<ipv6_tuple_t, ConnectionDetails>> parseProcIPv6Connectio
     iss.ignore(1);
     iss >> hex >> remotePort >> state;
 
-    std::string localAddressStr{localAddressTemp, 32+1};
-    std::string remoteAddressStr{remoteAddressTemp, 32+1};
-    localAddressStr.insert(16, 1, ' ');
-    remoteAddressStr.insert(16, 1, ' ');
-
-    iss.str(localAddressStr);
-    iss >> hex >> localAddress[0] >> localAddress[1];
-    iss.str(remoteAddressStr);
-    iss >> hex >> remoteAddress[0] >> remoteAddress[1];
-
-    if (state == TCP_ESTABLISHED) {
+	const auto [localAddressl, localAddressh] = convertIPv6(&localAddressTemp[0]);
+	const auto [remoteAddressl, remoteAddressh] = convertIPv6(&remoteAddressTemp[0]);
+	if (state == TCP_ESTABLISHED) {
 		ipv6_tuple_t conn{
-				swap_uint32_t(localAddress[0]),
-				swap_uint32_t(localAddress[1]),
-				swap_uint32_t(remoteAddress[0]),
-				swap_uint32_t(remoteAddress[1]),
+				localAddressl,
+				localAddressh,
+				remoteAddressl,
+				remoteAddressh,
 				localPort,
 				remotePort,
 				0};
@@ -135,10 +134,10 @@ std::optional<std::pair<ipv6_tuple_t, ConnectionDetails>> parseProcIPv6Connectio
         return {std::make_pair(conn, details)};
 	} else if (state == TCP_LISTEN) {
 		ipv6_tuple_t conn{
-				swap_uint32_t(remoteAddress[0]),
-				swap_uint32_t(remoteAddress[1]),
-				swap_uint32_t(localAddress[0]),
-				swap_uint32_t(localAddress[1]),
+				remoteAddressl,
+				remoteAddressh,
+				localAddressl,
+				localAddressh,
 				remotePort,
 				localPort,
 				0};
@@ -257,43 +256,32 @@ template <>
 std::pair<iNode, Connection<ipv6_tuple_t>> parseLine(const std::string& line, uint32_t ns) {
 	using std::hex;
 	iNode in;
-	uint64_t localAddress[2], remoteAddress[2];
 	uint16_t localPort, remotePort;
 	uint16_t state;
 	int skipInt;
-	char localIp1[17], localIp2[17];
-	char remoteIp1[17], remoteIp2[17];
+	char localAddressTemp[32+1];
+	char remoteAddressTemp[32+1];
 
 	std::istringstream iss{line};
 	iss.exceptions(std::ios::failbit);
 	iss >> skipInt;
-	// iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
-	iss.ignore(2);
-	iss.get(localIp1, 17);
-	iss.get(localIp2, 17);
+	iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
+	iss.get(localAddressTemp, 32 + 1, ':');
 	iss.ignore(1);
 	iss >> hex >> localPort;
 	iss.ignore(1);
-	iss.get(remoteIp1, 17);
-	iss.get(remoteIp2, 17);
+	iss.get(remoteAddressTemp, 32 + 1, ':');
 	iss.ignore(1);
 	iss >> hex >> remotePort >> state;
 
-	localIp1[16] = 0;
-	localIp2[16] = 0;
-	remoteIp2[16] = 0;
-	remoteIp2[16] = 0;
-	localAddress[0] = std::strtoull(localIp1, nullptr, 16);
-	localAddress[1] = std::strtoull(localIp2, nullptr, 16);
-	remoteAddress[0] = std::strtoull(remoteIp1, nullptr, 16);
-	remoteAddress[1] = std::strtoull(remoteIp2, nullptr, 16);
-
+	const auto [localAddressl, localAddressh] = convertIPv6(&localAddressTemp[0]);
+	const auto [remoteAddressl, remoteAddressh] = convertIPv6(&remoteAddressTemp[0]);
 	Connection<ipv6_tuple_t> conn;
 	conn.ep = ipv6_tuple_t{
-			swap_uint32_t(localAddress[0]),
-			swap_uint32_t(localAddress[1]),
-			swap_uint32_t(remoteAddress[0]),
-			swap_uint32_t(remoteAddress[1]),
+			localAddressl,
+			localAddressh,
+			remoteAddressl,
+			remoteAddressh,
 			localPort,
 			remotePort,
 			ns};
