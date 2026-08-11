@@ -45,9 +45,9 @@ TEST(ProcTcpTest, OkParsing6) {
 
 	const auto [inode, conn] = test::parseLine6(input, 0);
 	EXPECT_EQ(conn.ep.saddr_h, 0x0000000);
-	EXPECT_EQ(conn.ep.saddr_l, 0x1000000);
+	EXPECT_EQ(conn.ep.saddr_l, 0x100000000000000);
 	EXPECT_EQ(conn.ep.daddr_h, 0x0000000);
-	EXPECT_EQ(conn.ep.daddr_l, 0x1000000);
+	EXPECT_EQ(conn.ep.daddr_l, 0x100000000000000);
 	EXPECT_EQ(conn.ep.sport, 632);
 	EXPECT_EQ(conn.ep.dport, 50005);
 	EXPECT_EQ(inode, 8670135);
