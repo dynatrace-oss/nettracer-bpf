@@ -92,7 +92,16 @@ void NetStat::update(const bpf::bpf_fds& fds) {
 	});
 
 	process_bpf_map<IPTYPE, tcp_stats_t>(fds.tcp_stats_fd, [&](auto& el, const auto& val) {
-		bool changed = (el.pkts_retrans != val.retransmissions) || (el.pkts_sent != val.segs_out) || (el.pkts_received != val.segs_in) || (el.rtt != val.rtt) || (el.rtt_var != val.rtt_var);
+		bool changed = (el.pkts_retrans != val.retransmissions) || (el.pkts_sent != val.segs_out) || (el.pkts_received != val.segs_in) ||
+					   (el.rtt != val.rtt) || (el.rtt_var != val.rtt_var);
+		if (val.segs_out < el.pkts_sent || val.segs_in < el.pkts_received || val.segs_out > (el.bytes_sent + 1) ||
+			val.segs_in > el.bytes_received) {
+			LOG_WARN("Suspected offsetguessing, zeroing packets");
+			el.pkts_sent = 0;
+			el.pkts_received = 0;
+			el.pkts_retrans = 0;
+			return false;
+		}
 		el.pkts_retrans = val.retransmissions;
 		el.pkts_sent = val.segs_out;
 		el.pkts_received = val.segs_in;
@@ -303,7 +312,10 @@ void NetStat::print() {
 			auto duration = duration_cast<seconds>(end - it->second.start);
 			buf << std::setw(16) << duration_cast<seconds>(it->second.start.time_since_epoch()).count() << std::setw(9)
 					  << duration.count();
+		} else {
+			LOG_WARN("Unknown server for {}", to_string(it->first));
 		}
+
 		*os << buf.str() << std::endl;
 		LOG_DEBUG(buf.str());
 	}

@@ -39,25 +39,23 @@ std::string ipv4_to_string(uint32_t ip) {
 	return std::string(inet_ntop(AF_INET, &ip, buff, sizeof(buff)));
 }
 
-std::string to_string(const std::pair<ipv4_tuple_t, ConnectionDirection>& tupleWithDirection) {
-	auto tuple{tupleWithDirection.first};
+std::string to_string(const ipv4_tuple_t& tuple, ConnectionDirection direction) {
 	return fmt::format(
 			"{}:{:d} {} {}:{:d} NS:{:d}",
 			ipv4_to_string(tuple.saddr),
 			tuple.sport,
-			directionSigns[static_cast<size_t>(tupleWithDirection.second)],
+			directionSigns[static_cast<size_t>(direction)],
 			ipv4_to_string(tuple.daddr),
 			tuple.dport,
 			tuple.netns);
 }
 
-std::string to_string(const std::pair<ipv6_tuple_t, ConnectionDirection>& tupleWithDirection) {
-	auto tuple{tupleWithDirection.first};
+std::string to_string(const ipv6_tuple_t& tuple, ConnectionDirection direction) {
 	return fmt::format(
 			"{}:{:d} {} {}:{:d} NS:{:d}",
 			ipv6_to_string(tuple.saddr_h, tuple.saddr_l),
 			tuple.sport,
-			directionSigns[static_cast<size_t>(tupleWithDirection.second)],
+			directionSigns[static_cast<size_t>(direction)],
 			ipv6_to_string(tuple.daddr_h, tuple.daddr_l),
 			tuple.dport,
 			tuple.netns);

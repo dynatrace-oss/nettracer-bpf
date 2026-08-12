@@ -56,15 +56,17 @@ evt_descr::~evt_descr() {
 void bpf_events::start() {
 	if (!legacy_perf_events) {
 		for (auto& it : observers) {
+			const int page_count = it.md.page_count;
+			LOG_INFO("Allocating perfbuf with page_count {}", page_count);
 			perf_buffer* perf_buf = perf_buffer__new(
 					it.md.fd,
-					1024,
+					page_count,
 					handle_event,
 					handle_lost,
 					&it, // ctx
 					nullptr);
-			if (perf_buf) {
-				LOG_ERROR("cannot allocate perfbuf for {}", it.md.name);
+			if (!perf_buf) {
+				LOG_ERROR("cannot allocate perfbuf for {}: {} ({:d})", it.md.name, strerror(errno), errno);
 			}
 			it.perf_buf = perf_buf;
 		}

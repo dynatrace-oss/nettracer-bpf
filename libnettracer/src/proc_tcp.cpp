@@ -199,7 +199,7 @@ std::unordered_map<ConnectionType, ConnectionDetails> getCurrentConnections() {
         auto conn{parseProcConnectionLine<ConnectionType>(line)};
         if (conn) {
             conns.insert({conn->first, conn->second});
-            LOG_DEBUG(to_string(std::make_pair(conn->first, conn->second.direction)));
+            LOG_DEBUG(to_string(conn->first, conn->second.direction));
         }
         else {
             ++omittedConnsCnt;
