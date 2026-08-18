@@ -94,17 +94,30 @@ void NetStat::update(const bpf::bpf_fds& fds) {
 	process_bpf_map<IPTYPE, tcp_stats_t>(fds.tcp_stats_fd, [&](auto& el, const auto& val) {
 		bool changed = (el.pkts_retrans != val.retransmissions) || (el.pkts_sent != val.segs_out) || (el.pkts_received != val.segs_in) ||
 					   (el.rtt != val.rtt) || (el.rtt_var != val.rtt_var);
-		if (val.segs_out < el.pkts_sent || val.segs_in < el.pkts_received || val.segs_out > (el.bytes_sent + 1) ||
-			val.segs_in > el.bytes_received) {
-			LOG_WARN("Suspected offsetguessing, zeroing packets");
-			el.pkts_sent = 0;
-			el.pkts_received = 0;
-			el.pkts_retrans = 0;
-			return false;
+
+		if ((el.pkts_sent > 0 && val.segs_out < el.pkts_sent) ||
+			(el.pkts_sent_prev > 0 && (val.segs_out - el.pkts_sent_prev) > (el.bytes_sent - el.bytes_sent_prev + 1))) {
+			LOG_DEBUG(
+					"Suspected segs_out:{} segs_out_prev:{} bytes_out:{} bytes_out_prev:{}",
+					val.segs_out,
+					el.pkts_sent_prev,
+					el.bytes_sent,
+					el.bytes_sent_prev);
 		}
-		el.pkts_retrans = val.retransmissions;
+
+		if ((el.pkts_received > 0 && val.segs_in < el.pkts_received) ||
+			(el.pkts_received_prev > 0 && (val.segs_in - el.pkts_received_prev) > (el.bytes_received - el.bytes_received_prev + 1))) {
+			LOG_DEBUG(
+					"Suspected segs_in:{} segs_in_prev:{} bytes_in:{} bytes_in_prev:{}",
+					val.segs_in,
+					el.pkts_received_prev,
+					el.bytes_received,
+					el.bytes_received_prev);
+		}
+
 		el.pkts_sent = val.segs_out;
 		el.pkts_received = val.segs_in;
+		el.pkts_retrans = val.retransmissions;
 		el.rtt = val.rtt;
 		el.rtt_var = val.rtt_var;
 		return changed;
@@ -263,15 +276,13 @@ static void printAddr(std::ostream& os, const ipv6_tuple_t& tup, int field_width
 	   << std::setw(field_width) << fmt::format("{}:{}", ipv6_to_string(tup.daddr_h, tup.daddr_l), tup.dport);
 }
 
-static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
+template <typename IPTYPE>
+static uint64_t subtract(uint64_t a, uint64_t b, std::string_view position, const IPTYPE& key) {
 	uint64_t result = 0;
 	if (a >= b) {
 		result = a - b;
-		if (incremental) {
-			b = a;
-		}
 	} else {
-		LOG_DEBUG("nonmonotonic values {} < {} pos: {}", a, b, pos);
+		LOG_INFO("nonmonotonic counter {} : {} < {} key: {}", position, a, b, to_string(key));
 	}
 	return result;
 }
@@ -279,6 +290,14 @@ static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
 void NetStat::flush() {
 	*os << " " << std::endl;
 	logging::getLogger()->flush();
+}
+
+static void set_prev_metrics(Connection& el) {
+	el.bytes_received_prev = el.bytes_received;
+	el.bytes_sent_prev = el.bytes_sent;
+	el.pkts_retrans_prev = el.pkts_retrans;
+	el.pkts_sent_prev = el.pkts_sent;
+	el.pkts_received_prev = el.pkts_received;
 }
 
 template<typename IPTYPE>
@@ -291,19 +310,19 @@ void NetStat::print() {
 
 		buf.str("");
 		auto wall_now = getCurrentTimeFromSystemClock();
-		uint64_t pkts_sent = subtract(it->second.pkts_sent, it->second.pkts_sent_prev, 2, incremental);
-		uint64_t pkts_received = subtract(it->second.pkts_received, it->second.pkts_received_prev, 3, incremental);
+		uint64_t pkts_sent = subtract(it->second.pkts_sent, (incremental ? it->second.pkts_sent_prev : 0), "pkts_sent", it->first);
+		uint64_t pkts_received = subtract(it->second.pkts_received, (incremental ? it->second.pkts_received_prev : 0), "pkts_received", it->first);
 
 		buf << std::right
 			  << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
 			  << it->first
 			  << std::setw(12) << it->second.pid
 			  << std::setw(12) << it->first.netns << it->second.state
-			  << std::setw(22) << subtract( it->second.bytes_sent, it->second.bytes_sent_prev, 0, incremental) + addAvgHeaderSize<IPTYPE>( pkts_sent, add_header_mode_)
-			  << std::setw(22) << subtract( it->second.bytes_received, it->second.bytes_received_prev, 1, incremental) + addAvgHeaderSize<IPTYPE>( pkts_received, add_header_mode_ )
+			  << std::setw(22) << subtract( it->second.bytes_sent, (incremental ? it->second.bytes_sent_prev : 0), "bytes_sent", it->first) + addAvgHeaderSize<IPTYPE>( pkts_sent, add_header_mode_)
+			  << std::setw(22) << subtract( it->second.bytes_received, (incremental? it->second.bytes_received_prev: 0), "bytes_received", it->first) + addAvgHeaderSize<IPTYPE>( pkts_received, add_header_mode_ )
 		  	  << std::setw(22) << pkts_sent
 			  << std::setw(22) << pkts_received
-			  << std::setw(22) << subtract( it->second.pkts_retrans, it->second.pkts_retrans_prev, 4, incremental)
+			  << std::setw(22) << subtract( it->second.pkts_retrans, (incremental ? it->second.pkts_retrans_prev : 0), "retranmissions", it->first)
 			  << std::setw(12) << it->second.rtt
 			  << std::setw(12) << it->second.rtt_var;
 
@@ -316,8 +335,9 @@ void NetStat::print() {
 			LOG_WARN("Unknown server for {}", to_string(it->first));
 		}
 
+		set_prev_metrics(it->second);
 		*os << buf.str() << std::endl;
-		LOG_DEBUG(buf.str());
+		LOG_TRACE(buf.str());
 	}
 }
 
@@ -334,7 +354,7 @@ template <typename IPTYPE>
 void NetStat::print_human_readable() {
 	std::unique_lock<std::mutex> l(mx);
 	auto& aggr{connections<IPTYPE>()};
-	for (const auto& it : aggr) {
+	for (auto& it : aggr) {
 
 		if (filter_loopback && shouldFilter(it.first)) {
 			continue;
@@ -343,6 +363,7 @@ void NetStat::print_human_readable() {
 		printAddr(*os, it.first, field_width);
 		*os << std::setw(field_width) << it.second.pid <<  std::setw(field_width) << it.second.bytes_sent
 			<< std::setw(field_width) << it.second.bytes_received << std::setw(field_width) << it.second.rtt << "\n";
+		set_prev_metrics(it.second);
 	}
 }
 
