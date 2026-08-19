@@ -266,14 +266,18 @@ static std::ostream& operator<<(std::ostream& os, const netstat::State& s) {
 	return os;
 }
 
-static void printAddr(std::ostream& os, const ipv4_tuple_t& tup, int field_width) {
+static void printAddr(std::ostream& os, const ipv4_tuple_t& tup, int field_width, bool direction) {
+	std::string_view arrow = direction ? "<-" : "->";
 	os << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.saddr), tup.sport)
-	   << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.daddr), tup.dport);
+	   << arrow
+	   << std::setw(field_width) << fmt::format(" {}:{}", ipv4_to_string(tup.daddr), tup.dport);
 }
 
-static void printAddr(std::ostream& os, const ipv6_tuple_t& tup, int field_width) {
+static void printAddr(std::ostream& os, const ipv6_tuple_t& tup, int field_width, bool direction) {
+	std::string_view arrow = direction ? "<-" : "->";
 	os << std::setw(field_width) << fmt::format("{}:{}", ipv6_to_string(tup.saddr_h, tup.saddr_l), tup.sport)
-	   << std::setw(field_width) << fmt::format("{}:{}", ipv6_to_string(tup.daddr_h, tup.daddr_l), tup.dport);
+	   << arrow
+	   << std::setw(field_width) << fmt::format(" {}:{}", ipv6_to_string(tup.daddr_h, tup.daddr_l), tup.dport);
 }
 
 template <typename IPTYPE>
@@ -360,7 +364,7 @@ void NetStat::print_human_readable() {
 			continue;
 		}
 
-		printAddr(*os, it.first, field_width);
+		printAddr(*os, it.first, field_width, it.second.state.Direction);
 		*os << std::setw(field_width) << it.second.pid <<  std::setw(field_width) << it.second.bytes_sent
 			<< std::setw(field_width) << it.second.bytes_received << std::setw(field_width) << it.second.rtt << "\n";
 		set_prev_metrics(it.second);
