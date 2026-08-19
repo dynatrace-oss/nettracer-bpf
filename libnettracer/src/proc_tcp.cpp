@@ -150,8 +150,9 @@ void markIncomingTraffic(const std::vector<ipv6_tuple_t>& listensockets, tcpTabl
 
 	for (const auto& sock : listensockets) {
 		for (auto& connection : table) {
+
 			if (connection.second.ep.sport == sock.sport &&
-				((sock.saddr_h == 0 and sock.saddr_l == 0) ||
+				((sock.saddr_h == 0 && sock.saddr_l == 0) ||
 				 (connection.second.ep.saddr_h == sock.saddr_h && connection.second.ep.saddr_l == sock.saddr_l))) {
 				connection.second.direction = ConnectionDirection::Incoming;
 			}

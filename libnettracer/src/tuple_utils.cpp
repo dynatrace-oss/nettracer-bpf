@@ -148,19 +148,27 @@ bool isIpv4MappedIpv6(uint64_t addr_l, uint64_t addr_h) {
 	uint64_t mask = 0x00000000ffff0000;
 	return (addr_l & mask) == mask;
 #else
-	uint64_t mask = 0xffff;
-	return (htonl(addr_l) & mask) == mask;
+	uint64_t mask = 0xffff00000000;
+	return (addr_l & mask) == mask;
 #endif
 }
 
 bool shouldFilter(const ipv6_tuple_t key) {
 	if (isIpv4MappedIpv6(key.saddr_l, key.saddr_h)) {
+#ifdef __TARGET_ARCH_x86
+		uint32_t ipv4 = static_cast<uint32_t>(key.saddr_l >> 32);
+#else
 		uint32_t ipv4 = static_cast<uint32_t>(key.saddr_l);
+#endif
 		return shouldFilter(ipv4);
 	}
 
-	constexpr uint64_t loopback = 0xffffffff00000000;
-	return key.saddr_h == 0 && ((key.saddr_l & loopback) == key.saddr_l);
+	// ::1 loopback only
+#ifdef __TARGET_ARCH_x86
+	return key.saddr_h == 0 && key.saddr_l == 0x0100000000000000ULL;
+#else
+	return key.saddr_h == 0 && key.saddr_l == 0x0000000000000001ULL;
+#endif
 }
 
 static uint32_t ipv4FromMapped(uint64_t adddrl) {
