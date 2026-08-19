@@ -20,6 +20,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <utility>
 
 enum class ConnectionDirection : unsigned char { Unknown, Incoming, Outgoing };
@@ -49,4 +50,5 @@ tcpTable<ipv6_tuple_t> readTcpTable6(const char* root, bool filter);
 namespace test {
 std::pair<iNode, Connection<ipv6_tuple_t>> parseLine6(const std::string& line, uint32_t ns);
 std::pair<iNode, Connection<ipv4_tuple_t>> parseLine4(const std::string& line, uint32_t ns);
+void markIncomingTraffic(const std::vector<ipv4_tuple_t>& listensockets, tcpTable<ipv4_tuple_t>& table);
 } // namespace test

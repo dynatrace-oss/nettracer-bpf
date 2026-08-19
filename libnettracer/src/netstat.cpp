@@ -373,7 +373,8 @@ void NetStat::initConnection(const tcpTable<IPTYPE> &tbl){
 	for(auto &el: tbl){
 		auto &conn = aggr[el.second.ep];
 		conn.pid = el.second.pid;
-		//conn.state.Direction = (el.second.direction == ConnectionDirection::Incoming) ? 1 : 0;
+		conn.state.Direction = (el.second.direction == ConnectionDirection::Incoming) ? 1 : 0;
+		conn.state.Established = 1;
 		conn.update_time = getCurrentTimeFromSteadyClock();
 	}
 }
