@@ -29,16 +29,8 @@ struct ConnectionDetails {
     ConnectionDirection direction;
 };
 
-[[deprecated]]
-std::optional<std::pair<ipv4_tuple_t, ConnectionDetails>> parseProcIPv4ConnectionLine(const std::string& line);
-[[deprecated]]
-std::optional<std::pair<ipv6_tuple_t, ConnectionDetails>> parseProcIPv6ConnectionLine(const std::string& line);
-
 template<typename ConnectionType>
 using MapTuple2Details = std::unordered_map<ConnectionType, ConnectionDetails>;
-
-template<typename ConnectionType>
-MapTuple2Details<ConnectionType> getCurrentConnections();
 
 template <typename IPTYPE>
 struct Connection {

@@ -31,16 +31,14 @@ protected:
 		ipv4PIDsMap = &mockMapsWrapper.createMap<ipv4_tuple_t, pid_comm_t>(ipv4FDs.pid_fd);
 		ipv4StatsMap = &mockMapsWrapper.createMap<ipv4_tuple_t, stats_t>(ipv4FDs.stats_fd);
 		ipv4TCPStatsMap = &mockMapsWrapper.createMap<ipv4_tuple_t, tcp_stats_t>(ipv4FDs.tcp_stats_fd);
-
-		ipv4ConnsState = std::make_unique<ConnectionsState<ipv4_tuple_t>>(MapTuple2Details<ipv4_tuple_t>{});
+		ipv4ConnsState = std::make_unique<ConnectionsState<ipv4_tuple_t>>();
 	}
 
 	void setUpIPv6Maps() {
 		ipv6PIDsMap = &mockMapsWrapper.createMap<ipv6_tuple_t, pid_comm_t>(ipv6FDs.pid_fd);
 		ipv6StatsMap = &mockMapsWrapper.createMap<ipv6_tuple_t, stats_t>(ipv6FDs.stats_fd);
 		ipv6TCPStatsMap = &mockMapsWrapper.createMap<ipv6_tuple_t, tcp_stats_t>(ipv6FDs.tcp_stats_fd);
-
-		ipv6ConnsState = std::make_unique<ConnectionsState<ipv6_tuple_t>>(MapTuple2Details<ipv6_tuple_t>{});
+		ipv6ConnsState = std::make_unique<ConnectionsState<ipv6_tuple_t>>();
 	}
 
 	virtual void SetUp() override {
