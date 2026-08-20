@@ -150,14 +150,18 @@ struct TimeGuard {
 	}
 };
 
-std::pair<unsigned, unsigned> NetStat::countTcpSessions() {
+std::tuple<unsigned, unsigned, unsigned> NetStat::countTcpSessions() {
 	const auto& container4 = connections<ipv4_tuple_t>();
 	unsigned incoming =
 			std::count_if(std::begin(container4), std::end(container4), [](const auto& it) { return it.second.state.Direction == 1; });
+	unsigned established =
+			std::count_if(std::begin(container4), std::end(container4), [](const auto& it) { return it.second.state.Established == 1; });
 
 	const auto& container6 = connections<ipv6_tuple_t>();
 	incoming += std::count_if(std::begin(container6), std::end(container6), [](const auto& it) { return it.second.state.Direction == 1; });
-	return std::pair<unsigned, unsigned>{incoming, container4.size() + container6.size() - incoming};
+	established +=
+			std::count_if(std::begin(container6), std::end(container6), [](const auto& it) { return it.second.state.Established == 1; });
+	return {incoming, container4.size() + container6.size() - incoming, established};
 }
 
 bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6) {
@@ -174,8 +178,9 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 		clean_bpf<ipv6_tuple_t>(fdsIPv6);
 
 		if (kbhit || outputCtr.time_elapsed()) {
-			const auto tcpSessions = countTcpSessions();
-			const auto tcpSessionsStr =	fmt::format("Number of passive tcp sessions: {}, active: {}", tcpSessions.first, tcpSessions.second);
+			const auto [passive, active, established] = countTcpSessions();
+			const auto tcpSessionsStr =
+					fmt::format("Number of passive tcp sessions: {}, active: {}, established: {}", passive, active, established);
 			if (interactive) {
 				print_human_readable<ipv4_tuple_t>();
 				print_human_readable<ipv6_tuple_t>();

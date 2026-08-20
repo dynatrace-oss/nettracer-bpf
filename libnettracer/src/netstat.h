@@ -22,6 +22,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 
@@ -83,7 +84,7 @@ protected:
 	void initConnection(const tcpTable<IPTYPE>&);
 	void initConnections();
 
-	std::pair<unsigned, unsigned> countTcpSessions();
+	std::tuple<unsigned, unsigned, unsigned> countTcpSessions();
 	template<typename IPTYPE>
 	void update(const bpf::bpf_fds& fds);
 
