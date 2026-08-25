@@ -28,6 +28,7 @@
 #include "system_utils.h"
 #include "tuple_utils.h"
 #include "unified_log.h"
+#include "file_access_interface.h"
 
 #include <boost/program_options.hpp>
 #include <fmt/core.h>
@@ -116,7 +117,23 @@ std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char*
 
 		if (vm.count("args_file")) {
 			auto fname = vm["args_file"].as<std::filesystem::path>();
+			if (auto accessChecker = IFileAccessChecker::create(); 
+				!accessChecker->hasAccess(fname, AccessMode::Read)) {
+				std::error_code errCode(errno, std::generic_category());
+				throw std::filesystem::filesystem_error("Access permission is missing for the specified file.", fname, errCode);	
+			}
 			return {parseArgsFile(fname), std::move(fname)};
+		}
+
+		if (vm.count("log")) {
+			if (auto logger_path = vm["log"].as<std::string>(); 
+				!logger_path.empty()) {
+				if (auto accessChecker = IFileAccessChecker::create(); 
+					!accessChecker->hasAccess(logger_path, AccessMode::Write)) {
+					std::error_code errCode(errno, std::generic_category());
+					throw std::filesystem::filesystem_error("Access permission is missing for the specified log file.", logger_path, errCode);
+				}
+			}
 		}
 
 		return {vm, ""};
