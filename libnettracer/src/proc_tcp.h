@@ -20,6 +20,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <utility>
 
 enum class ConnectionDirection : unsigned char { Unknown, Incoming, Outgoing };
@@ -29,16 +30,8 @@ struct ConnectionDetails {
     ConnectionDirection direction;
 };
 
-[[deprecated]]
-std::optional<std::pair<ipv4_tuple_t, ConnectionDetails>> parseProcIPv4ConnectionLine(const std::string& line);
-[[deprecated]]
-std::optional<std::pair<ipv6_tuple_t, ConnectionDetails>> parseProcIPv6ConnectionLine(const std::string& line);
-
 template<typename ConnectionType>
 using MapTuple2Details = std::unordered_map<ConnectionType, ConnectionDetails>;
-
-template<typename ConnectionType>
-MapTuple2Details<ConnectionType> getCurrentConnections();
 
 template <typename IPTYPE>
 struct Connection {
@@ -57,4 +50,5 @@ tcpTable<ipv6_tuple_t> readTcpTable6(const char* root, bool filter);
 namespace test {
 std::pair<iNode, Connection<ipv6_tuple_t>> parseLine6(const std::string& line, uint32_t ns);
 std::pair<iNode, Connection<ipv4_tuple_t>> parseLine4(const std::string& line, uint32_t ns);
+void markIncomingTraffic(const std::vector<ipv4_tuple_t>& listensockets, tcpTable<ipv4_tuple_t>& table);
 } // namespace test

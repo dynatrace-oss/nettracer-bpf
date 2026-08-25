@@ -51,12 +51,11 @@ constexpr auto KPROBE_NAME_PREFIX = "nt_";
 
 bool initialize_perf_maps(maps_config& pmaps, BPFMapsWrapper& mapsWrapper) {
 	bool all_success = true;
-	int page_size = getpagesize();
 	constexpr int any_pid = -1;
 	constexpr int any_group_fd = -1;
+	static int page_size = getpagesize();
 
 	for (auto& pmap : pmaps) {
-		pmap.page_count = 8;
 		const int pc = get_nprocs();
 
 		if (pmap.def.type != BPF_MAP_TYPE_PERF_EVENT_ARRAY)
@@ -75,12 +74,13 @@ bool initialize_perf_maps(maps_config& pmaps, BPFMapsWrapper& mapsWrapper) {
 				}
 			}
 
-			int mmap_size = page_size * (pmap.page_count + 1);
+			pmap.page_count = calc_page_count(pmap.def.max_entries);
+			int mmap_size =  page_size * (pmap.page_count + 1); // +1 for metadata
+			LOG_INFO("Mmap size: {} page count: {}", mmap_size,  pmap.page_count);
 
 			void* mem = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, pfd, 0);
-			if ((*(int*)mem) == -1) {
-				int err = *(int*)mem;
-				LOG_ERROR("mmap error: {:d}", err);
+			if ( mem == MAP_FAILED) {
+				LOG_ERROR("mmap error: {} ({:d})", strerror(errno), errno);
 				all_success = false;
 				continue;
 			}

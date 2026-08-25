@@ -26,9 +26,6 @@
 
 template<typename T>
 struct ConnectionsState {
-	explicit ConnectionsState(const MapTuple2Details<T>& connections = getCurrentConnections<T>())
-		: connsDetails(connections) {}
-
 	MapTuple2Details<T> connsDetails;
 	std::vector<T> connsClosed;
 	std::mutex mutex;

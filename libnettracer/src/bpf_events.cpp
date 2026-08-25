@@ -15,6 +15,7 @@
 */
 #include "bpf_events.h"
 #include "bpf_generic/src/perf_event.h"
+#include "connections_printing.h"
 #include "config_watcher.h"
 #include <algorithm>
 #include <exception>
@@ -23,6 +24,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+extern ExitCtrl exitCtrl;
 
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz){
 	evt_descr *desc = static_cast<evt_descr*>(ctx);
@@ -56,15 +58,17 @@ evt_descr::~evt_descr() {
 void bpf_events::start() {
 	if (!legacy_perf_events) {
 		for (auto& it : observers) {
+			const int page_count = it.md.page_count;
+			LOG_INFO("Allocating perfbuf with page_count {}", page_count);
 			perf_buffer* perf_buf = perf_buffer__new(
 					it.md.fd,
-					1024,
+					page_count,
 					handle_event,
 					handle_lost,
 					&it, // ctx
 					nullptr);
-			if (perf_buf) {
-				LOG_ERROR("cannot allocate perfbuf for {}", it.md.name);
+			if (!perf_buf) {
+				LOG_ERROR("cannot allocate perfbuf for {}: {} ({:d})", it.md.name, strerror(errno), errno);
 			}
 			it.perf_buf = perf_buf;
 		}
@@ -120,7 +124,9 @@ void bpf_events::loop() {
 
 		for (auto& fd : fds) {
 			if (fd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
-				exit(1);
+				exitCtrl.running = false;
+				exitCtrl.cv.notify_all();
+				return;
 			}
 			if (!(fd.revents & POLLIN)) {
 				continue;

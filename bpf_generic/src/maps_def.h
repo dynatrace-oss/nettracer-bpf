@@ -45,5 +45,6 @@ struct map_data {
 };
 
 using maps_config = std::vector<map_data>;
+int calc_page_count(int max_entries);
 
 } // namespace bpf

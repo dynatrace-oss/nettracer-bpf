@@ -81,7 +81,7 @@ void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf::b
 		}
 
 		LOG_INFO("{} - stats: Bytes sent={:d} Bytes received={:d}",
-			to_string({key, direction}), val.sent_bytes, val.received_bytes);
+			to_string(key, direction), val.sent_bytes, val.received_bytes);
 	});
 
 	processBPFMap<Tuple, tcp_stats_t>(tcpStatsFd, mapsWrapper, [&](const Tuple& key, const tcp_stats_t& val){
@@ -96,7 +96,7 @@ void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf::b
 		}
 
 		LOG_INFO("{} - TCP stats: Retransmissions={:d} Segs_in={:d} Segs_out={:d} RTT={:d} RTT_var={:d}",
-			to_string({key, direction}), val.retransmissions, val.segs_in, val.segs_out, val.rtt, val.rtt_var);
+			to_string(key, direction), val.retransmissions, val.segs_in, val.segs_out, val.rtt, val.rtt_var);
 	});
 
 	std::unique_lock<std::mutex> connsLock{connsMutex};
@@ -108,7 +108,7 @@ void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf::b
 		size_t removed{connsDetails.erase(conn)};
 		if (removed != 1) {
 			// it's most likely caused by 0.0.0.0 addresses read on startup being treated the same as specified addresses, see APM-286176
-			LOG_DEBUG("Couldn't remove connection after close event - connection {} doesn't exist in the map", to_string({conn, ConnectionDirection::Unknown}));
+			LOG_DEBUG("Couldn't remove connection after close event - connection {} doesn't exist in the map", to_string(conn, ConnectionDirection::Unknown));
 		}
 	}
 	closedConns.clear();

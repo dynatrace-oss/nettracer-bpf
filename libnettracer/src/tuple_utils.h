@@ -77,18 +77,19 @@ enum class EventType { Accept = 1, Connect, Close };
 std::string ipv6_to_string(uint64_t h, uint64_t l);
 std::string ipv4_to_string(uint32_t addr);
 
-std::string to_string(const std::pair<ipv4_tuple_t, ConnectionDirection>& tupleWithDirection);
-std::string to_string(const std::pair<ipv6_tuple_t, ConnectionDirection>& tupleWithDirection);
+std::string to_string(const ipv4_tuple_t& tup, ConnectionDirection direction);
+std::string to_string(const ipv6_tuple_t& tup, ConnectionDirection direction);
 std::ostream& operator<<(std::ostream& os, const ipv4_tuple_t& tup);
 std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup);
 
 uint64_t swap_uint32_t(uint64_t addrpart);
 
 inline std::string to_string(const ipv4_tuple_t& tuple) {
-	return to_string(std::make_pair(tuple, ConnectionDirection::Unknown));
+	return to_string(tuple, ConnectionDirection::Unknown);
 }
+
 inline std::string to_string(const ipv6_tuple_t& tuple) {
-	return to_string(std::make_pair(tuple, ConnectionDirection::Unknown));
+	return to_string(tuple, ConnectionDirection::Unknown);
 }
 
 std::string to_string(const tcp_ipv4_event_t& tuple);

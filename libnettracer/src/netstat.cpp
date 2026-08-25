@@ -92,10 +92,32 @@ void NetStat::update(const bpf::bpf_fds& fds) {
 	});
 
 	process_bpf_map<IPTYPE, tcp_stats_t>(fds.tcp_stats_fd, [&](auto& el, const auto& val) {
-		bool changed = (el.pkts_retrans != val.retransmissions) || (el.pkts_sent != val.segs_out) || (el.pkts_received != val.segs_in) || (el.rtt != val.rtt) || (el.rtt_var != val.rtt_var);
-		el.pkts_retrans = val.retransmissions;
+		bool changed = (el.pkts_retrans != val.retransmissions) || (el.pkts_sent != val.segs_out) || (el.pkts_received != val.segs_in) ||
+					   (el.rtt != val.rtt) || (el.rtt_var != val.rtt_var);
+
+		if ((el.pkts_sent > 0 && val.segs_out < el.pkts_sent) ||
+			(el.pkts_sent_prev > 0 && (val.segs_out - el.pkts_sent_prev) > (el.bytes_sent - el.bytes_sent_prev + 1))) {
+			LOG_DEBUG(
+					"Suspected segs_out:{} segs_out_prev:{} bytes_out:{} bytes_out_prev:{}",
+					val.segs_out,
+					el.pkts_sent_prev,
+					el.bytes_sent,
+					el.bytes_sent_prev);
+		}
+
+		if ((el.pkts_received > 0 && val.segs_in < el.pkts_received) ||
+			(el.pkts_received_prev > 0 && (val.segs_in - el.pkts_received_prev) > (el.bytes_received - el.bytes_received_prev + 1))) {
+			LOG_DEBUG(
+					"Suspected segs_in:{} segs_in_prev:{} bytes_in:{} bytes_in_prev:{}",
+					val.segs_in,
+					el.pkts_received_prev,
+					el.bytes_received,
+					el.bytes_received_prev);
+		}
+
 		el.pkts_sent = val.segs_out;
 		el.pkts_received = val.segs_in;
+		el.pkts_retrans = val.retransmissions;
 		el.rtt = val.rtt;
 		el.rtt_var = val.rtt_var;
 		return changed;
@@ -128,14 +150,18 @@ struct TimeGuard {
 	}
 };
 
-std::pair<unsigned, unsigned> NetStat::countTcpSessions() {
+std::tuple<unsigned, unsigned, unsigned> NetStat::countTcpSessions() {
 	const auto& container4 = connections<ipv4_tuple_t>();
 	unsigned incoming =
 			std::count_if(std::begin(container4), std::end(container4), [](const auto& it) { return it.second.state.Direction == 1; });
+	unsigned established =
+			std::count_if(std::begin(container4), std::end(container4), [](const auto& it) { return it.second.state.Established == 1; });
 
 	const auto& container6 = connections<ipv6_tuple_t>();
 	incoming += std::count_if(std::begin(container6), std::end(container6), [](const auto& it) { return it.second.state.Direction == 1; });
-	return std::pair<unsigned, unsigned>{incoming, container4.size() + container6.size() - incoming};
+	established +=
+			std::count_if(std::begin(container6), std::end(container6), [](const auto& it) { return it.second.state.Established == 1; });
+	return {incoming, container4.size() + container6.size() - incoming, established};
 }
 
 bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6) {
@@ -152,8 +178,9 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 		clean_bpf<ipv6_tuple_t>(fdsIPv6);
 
 		if (kbhit || outputCtr.time_elapsed()) {
-			const auto tcpSessions = countTcpSessions();
-			const auto tcpSessionsStr =	fmt::format("Number of passive tcp sessions: {}, active: {}", tcpSessions.first, tcpSessions.second);
+			const auto [passive, active, established] = countTcpSessions();
+			const auto tcpSessionsStr =
+					fmt::format("Number of passive tcp sessions: {}, active: {}, established: {}", passive, active, established);
 			if (interactive) {
 				print_human_readable<ipv4_tuple_t>();
 				print_human_readable<ipv6_tuple_t>();
@@ -244,25 +271,27 @@ static std::ostream& operator<<(std::ostream& os, const netstat::State& s) {
 	return os;
 }
 
-static void printAddr(std::ostream& os, const ipv4_tuple_t& tup, int field_width) {
+static void printAddr(std::ostream& os, const ipv4_tuple_t& tup, int field_width, bool direction) {
+	std::string_view arrow = direction ? "<-" : "->";
 	os << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.saddr), tup.sport)
-	   << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.daddr), tup.dport);
+	   << arrow
+	   << std::setw(field_width) << fmt::format(" {}:{}", ipv4_to_string(tup.daddr), tup.dport);
 }
 
-static void printAddr(std::ostream& os, const ipv6_tuple_t& tup, int field_width) {
+static void printAddr(std::ostream& os, const ipv6_tuple_t& tup, int field_width, bool direction) {
+	std::string_view arrow = direction ? "<-" : "->";
 	os << std::setw(field_width) << fmt::format("{}:{}", ipv6_to_string(tup.saddr_h, tup.saddr_l), tup.sport)
-	   << std::setw(field_width) << fmt::format("{}:{}", ipv6_to_string(tup.daddr_h, tup.daddr_l), tup.dport);
+	   << arrow
+	   << std::setw(field_width) << fmt::format(" {}:{}", ipv6_to_string(tup.daddr_h, tup.daddr_l), tup.dport);
 }
 
-static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
+template <typename IPTYPE>
+static uint64_t subtract(uint64_t a, uint64_t b, std::string_view position, const IPTYPE& key) {
 	uint64_t result = 0;
 	if (a >= b) {
 		result = a - b;
-		if (incremental) {
-			b = a;
-		}
 	} else {
-		LOG_DEBUG("nonmonotonic values {} < {} pos: {}", a, b, pos);
+		LOG_INFO("nonmonotonic counter {} : {} < {} key: {}", position, a, b, to_string(key));
 	}
 	return result;
 }
@@ -270,6 +299,14 @@ static uint64_t subtract(uint64_t& a, uint64_t& b, int pos, bool incremental) {
 void NetStat::flush() {
 	*os << " " << std::endl;
 	logging::getLogger()->flush();
+}
+
+static void set_prev_metrics(Connection& el) {
+	el.bytes_received_prev = el.bytes_received;
+	el.bytes_sent_prev = el.bytes_sent;
+	el.pkts_retrans_prev = el.pkts_retrans;
+	el.pkts_sent_prev = el.pkts_sent;
+	el.pkts_received_prev = el.pkts_received;
 }
 
 template<typename IPTYPE>
@@ -282,19 +319,19 @@ void NetStat::print() {
 
 		buf.str("");
 		auto wall_now = getCurrentTimeFromSystemClock();
-		uint64_t pkts_sent = subtract(it->second.pkts_sent, it->second.pkts_sent_prev, 2, incremental);
-		uint64_t pkts_received = subtract(it->second.pkts_received, it->second.pkts_received_prev, 3, incremental);
+		uint64_t pkts_sent = subtract(it->second.pkts_sent, (incremental ? it->second.pkts_sent_prev : 0), "pkts_sent", it->first);
+		uint64_t pkts_received = subtract(it->second.pkts_received, (incremental ? it->second.pkts_received_prev : 0), "pkts_received", it->first);
 
 		buf << std::right
 			  << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
 			  << it->first
 			  << std::setw(12) << it->second.pid
 			  << std::setw(12) << it->first.netns << it->second.state
-			  << std::setw(22) << subtract( it->second.bytes_sent, it->second.bytes_sent_prev, 0, incremental) + addAvgHeaderSize<IPTYPE>( pkts_sent, add_header_mode_)
-			  << std::setw(22) << subtract( it->second.bytes_received, it->second.bytes_received_prev, 1, incremental) + addAvgHeaderSize<IPTYPE>( pkts_received, add_header_mode_ )
+			  << std::setw(22) << subtract( it->second.bytes_sent, (incremental ? it->second.bytes_sent_prev : 0), "bytes_sent", it->first) + addAvgHeaderSize<IPTYPE>( pkts_sent, add_header_mode_)
+			  << std::setw(22) << subtract( it->second.bytes_received, (incremental? it->second.bytes_received_prev: 0), "bytes_received", it->first) + addAvgHeaderSize<IPTYPE>( pkts_received, add_header_mode_ )
 		  	  << std::setw(22) << pkts_sent
 			  << std::setw(22) << pkts_received
-			  << std::setw(22) << subtract( it->second.pkts_retrans, it->second.pkts_retrans_prev, 4, incremental)
+			  << std::setw(22) << subtract( it->second.pkts_retrans, (incremental ? it->second.pkts_retrans_prev : 0), "retranmissions", it->first)
 			  << std::setw(12) << it->second.rtt
 			  << std::setw(12) << it->second.rtt_var;
 
@@ -303,9 +340,13 @@ void NetStat::print() {
 			auto duration = duration_cast<seconds>(end - it->second.start);
 			buf << std::setw(16) << duration_cast<seconds>(it->second.start.time_since_epoch()).count() << std::setw(9)
 					  << duration.count();
+		} else {
+			LOG_WARN("Unknown server for {}", to_string(it->first));
 		}
+
+		set_prev_metrics(it->second);
 		*os << buf.str() << std::endl;
-		LOG_DEBUG(buf.str());
+		LOG_TRACE(buf.str());
 	}
 }
 
@@ -322,15 +363,16 @@ template <typename IPTYPE>
 void NetStat::print_human_readable() {
 	std::unique_lock<std::mutex> l(mx);
 	auto& aggr{connections<IPTYPE>()};
-	for (const auto& it : aggr) {
+	for (auto& it : aggr) {
 
 		if (filter_loopback && shouldFilter(it.first)) {
 			continue;
 		}
 
-		printAddr(*os, it.first, field_width);
+		printAddr(*os, it.first, field_width, it.second.state.Direction);
 		*os << std::setw(field_width) << it.second.pid <<  std::setw(field_width) << it.second.bytes_sent
 			<< std::setw(field_width) << it.second.bytes_received << std::setw(field_width) << it.second.rtt << "\n";
+		set_prev_metrics(it.second);
 	}
 }
 
@@ -340,7 +382,8 @@ void NetStat::initConnection(const tcpTable<IPTYPE> &tbl){
 	for(auto &el: tbl){
 		auto &conn = aggr[el.second.ep];
 		conn.pid = el.second.pid;
-		//conn.state.Direction = (el.second.direction == ConnectionDirection::Incoming) ? 1 : 0;
+		conn.state.Direction = (el.second.direction == ConnectionDirection::Incoming) ? 1 : 0;
+		conn.state.Established = 1;
 		conn.update_time = getCurrentTimeFromSteadyClock();
 	}
 }

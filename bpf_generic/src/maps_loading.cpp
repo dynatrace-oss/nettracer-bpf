@@ -289,4 +289,18 @@ maps_config SectionLoader::getMapsConfig() {
 	return maps;
 }
  
+int calc_page_count(int max_entries){
+	constexpr int max_value_size = 64; //maximal event size: aligned  sizeof(tcp_ipv6_event_t)
+	static int page_size = getpagesize();
+	int data_size = max_value_size * max_entries;
+	int num_pages = (data_size + page_size - 1) / page_size;
+
+	//roundup to power of 2
+	int pow2_pages = 1;
+	while (pow2_pages < num_pages)
+		pow2_pages <<= 1;
+
+	return pow2_pages;
+}
+
 } // namespace bpf

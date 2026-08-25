@@ -145,9 +145,9 @@ class IPv6TupleToStringTest : public testing::TestWithParam<std::tuple<std::stri
 TEST_P(IPv4TupleToStringTest, testIPv4TupleToString) {
 	const auto& [outStrBegin, outStrEnd, addrA, addrB, portA, portB, netns] = GetParam();
 
-	EXPECT_EQ(outStrBegin + " -- "s + outStrEnd, to_string(std::make_pair(ipv4_tuple_t{addrA, addrB, portA, portB, netns}, ConnectionDirection::Unknown)));
-	EXPECT_EQ(outStrBegin + " -> "s + outStrEnd, to_string(std::make_pair(ipv4_tuple_t{addrA, addrB, portA, portB, netns}, ConnectionDirection::Outgoing)));
-	EXPECT_EQ(outStrBegin + " <- "s + outStrEnd, to_string(std::make_pair(ipv4_tuple_t{addrA, addrB, portA, portB, netns}, ConnectionDirection::Incoming)));
+	EXPECT_EQ(outStrBegin + " -- "s + outStrEnd, to_string(ipv4_tuple_t{addrA, addrB, portA, portB, netns}, ConnectionDirection::Unknown));
+	EXPECT_EQ(outStrBegin + " -> "s + outStrEnd, to_string(ipv4_tuple_t{addrA, addrB, portA, portB, netns}, ConnectionDirection::Outgoing));
+	EXPECT_EQ(outStrBegin + " <- "s + outStrEnd, to_string(ipv4_tuple_t{addrA, addrB, portA, portB, netns}, ConnectionDirection::Incoming));
 }
 
 INSTANTIATE_TEST_SUITE_P(IPv4TupleToStringTests, IPv4TupleToStringTest, testing::Values(
@@ -159,9 +159,9 @@ INSTANTIATE_TEST_SUITE_P(IPv4TupleToStringTests, IPv4TupleToStringTest, testing:
 TEST_P(IPv6TupleToStringTest, testIPv6TupleToString) {
 	const auto& [outStrBegin, outStrEnd, addrAh, addrAl, addrBh, addrBl, portA, portB, netns] = GetParam();
 
-	EXPECT_EQ(outStrBegin + " -- "s + outStrEnd, to_string(std::make_pair(ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}, ConnectionDirection::Unknown)));
-	EXPECT_EQ(outStrBegin + " -> "s + outStrEnd, to_string(std::make_pair(ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}, ConnectionDirection::Outgoing)));
-	EXPECT_EQ(outStrBegin + " <- "s + outStrEnd, to_string(std::make_pair(ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}, ConnectionDirection::Incoming)));
+	EXPECT_EQ(outStrBegin + " -- "s + outStrEnd, to_string(ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}, ConnectionDirection::Unknown));
+	EXPECT_EQ(outStrBegin + " -> "s + outStrEnd, to_string(ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}, ConnectionDirection::Outgoing));
+	EXPECT_EQ(outStrBegin + " <- "s + outStrEnd, to_string(ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}, ConnectionDirection::Incoming));
 }
 
 INSTANTIATE_TEST_SUITE_P(IPv6TupleToStringTests, IPv6TupleToStringTest, testing::Values(
@@ -194,9 +194,9 @@ TEST_P(IPv6EventToStringTest, testIPv6EventToString) {
 	const uint64_t ts{12345};
 	const uint32_t cpu{1};
 
-	EXPECT_EQ(outStrBegin + " -- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CLOSE, pid, 0, 0, 0, 0, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
-	EXPECT_EQ(outStrBegin + " -> "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CONNECT, pid, 0, 0, 0, 0, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
-	EXPECT_EQ(outStrBegin + " <- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_ACCEPT, pid, 0, 0, 0, 0, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ(outStrBegin + " -- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CLOSE, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ(outStrBegin + " -> "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CONNECT, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ(outStrBegin + " <- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_ACCEPT, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 }
 
 INSTANTIATE_TEST_SUITE_P(IPv6EventToStringTests, IPv6EventToStringTest, testing::Values(
@@ -226,7 +226,7 @@ TEST(TupleConversionTests, testIPv6EventToTuple) {
 	const uint32_t cpu{2};
 	const uint32_t pid{1234};
 
-	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_ACCEPT, pid, 0, 0, 0, 0, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
-	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CLOSE, pid, 0, 0, 0, 0, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
-	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CONNECT, pid, 0, 0, 0, 0, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_ACCEPT, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CLOSE, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CONNECT, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 }

@@ -22,6 +22,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 
@@ -42,18 +43,18 @@ struct Connection {
 	steady_clock::time_point update_time;
 	system_clock::time_point start;
 	system_clock::time_point end;
-	uint64_t bytes_sent;
+	uint64_t bytes_sent = 0;
 	uint64_t bytes_sent_prev = 0;
-	uint64_t bytes_received;
+	uint64_t bytes_received = 0;
 	uint64_t bytes_received_prev = 0;
-	uint64_t pkts_sent;
+	uint64_t pkts_sent = 0;
 	uint64_t pkts_sent_prev = 0;
-	uint64_t pkts_received;
+	uint64_t pkts_received = 0;
 	uint64_t pkts_received_prev = 0;
-	uint64_t pkts_retrans;
+	uint64_t pkts_retrans =0;
 	uint64_t pkts_retrans_prev = 0;
-	uint32_t rtt;
-	uint32_t rtt_var;
+	uint32_t rtt = 0;
+	uint32_t rtt_var = 0;
 };
 
 using ConnectionsIPv4 = std::unordered_map<ipv4_tuple_t, Connection>;
@@ -83,7 +84,7 @@ protected:
 	void initConnection(const tcpTable<IPTYPE>&);
 	void initConnections();
 
-	std::pair<unsigned, unsigned> countTcpSessions();
+	std::tuple<unsigned, unsigned, unsigned> countTcpSessions();
 	template<typename IPTYPE>
 	void update(const bpf::bpf_fds& fds);
 

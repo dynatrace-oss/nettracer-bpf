@@ -50,7 +50,7 @@
 
 namespace po = boost::program_options;
 
-static ExitCtrl exitCtrl;
+ ExitCtrl exitCtrl;
 
 void atexit_handler(int a) {
 	exitCtrl.running = false;
@@ -351,7 +351,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 
 	if (map_reader.joinable()) {
 		map_reader.join();
-	};
+	}
 	if (debugCountersThread.joinable()) {
 		debugCountersThread.join();
 	}

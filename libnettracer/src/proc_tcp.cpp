@@ -23,6 +23,8 @@
 #include <sstream>
 #include <stdexcept>
 
+namespace fs = std::filesystem;
+
 namespace {
 
 // fragment based on enum found in <include/net/tcp_states.h>
@@ -37,183 +39,6 @@ std::pair<uint64_t, uint64_t> convertIPv6(const char* ip) {
 	memcpy(&ipv6h, &tmp[2], 8);
 	return {ipv6l, ipv6h};
 }
-}
-
-namespace fs = std::filesystem;
-
-std::optional<std::pair<ipv4_tuple_t, ConnectionDetails>> parseProcIPv4ConnectionLine(const std::string& line) {
-    using std::hex;
-
-    // for now, forget about PID and netns
-    uint32_t localAddress, remoteAddress;
-    uint16_t localPort, remotePort;
-    uint16_t state;
-    int skipInt;
-
-    std::istringstream iss{line};
-    iss >> skipInt;
-    iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
-    iss >> hex >> localAddress;
-    iss.ignore(1);
-    iss >> hex >> localPort;
-    iss.ignore(1);
-    iss >> hex >> remoteAddress;
-    iss.ignore(1);
-    iss >> hex >> remotePort >> state;
-
-    if (state == TCP_ESTABLISHED) {
-        ipv4_tuple_t conn{
-            localAddress,
-            remoteAddress,
-            localPort,
-            remotePort,
-            0
-        };
-        ConnectionDetails details{
-            0,
-            ConnectionDirection::Outgoing
-        };
-        return {std::make_pair(conn, details)};
-    }
-    else if (state == TCP_LISTEN) {
-        ipv4_tuple_t conn{
-            remoteAddress,
-            localAddress,
-            remotePort,
-            localPort,
-            0
-        };
-        ConnectionDetails details{
-            0,
-            ConnectionDirection::Incoming
-        };
-        return {std::make_pair(conn, details)};
-    }
-    else { // connection is probably closing
-        return std::nullopt;
-
-    }
-}
-
-std::optional<std::pair<ipv6_tuple_t, ConnectionDetails>> parseProcIPv6ConnectionLine(const std::string& line) {
-    using std::hex;
-
-    // for now, forget about PID and netns
-    uint16_t localPort, remotePort;
-    uint16_t state;
-    char localAddressTemp[32+1];
-    char remoteAddressTemp[32+1];
-    int skipInt;
-
-    std::istringstream iss{line};
-    iss >> skipInt;
-    iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
-    iss.get(localAddressTemp, 32+1, ':');
-    iss.ignore(1);
-    iss >> hex >> localPort;
-    iss.ignore(1);
-    iss.get(remoteAddressTemp, 32+1, ':');
-    iss.ignore(1);
-    iss >> hex >> remotePort >> state;
-
-	const auto [localAddressl, localAddressh] = convertIPv6(&localAddressTemp[0]);
-	const auto [remoteAddressl, remoteAddressh] = convertIPv6(&remoteAddressTemp[0]);
-	if (state == TCP_ESTABLISHED) {
-		ipv6_tuple_t conn{
-				localAddressl,
-				localAddressh,
-				remoteAddressl,
-				remoteAddressh,
-				localPort,
-				remotePort,
-				0};
-		ConnectionDetails details{
-            0,
-            ConnectionDirection::Outgoing
-        };
-        return {std::make_pair(conn, details)};
-	} else if (state == TCP_LISTEN) {
-		ipv6_tuple_t conn{
-				remoteAddressl,
-				remoteAddressh,
-				localAddressl,
-				localAddressh,
-				remotePort,
-				localPort,
-				0};
-		ConnectionDetails details{
-            0,
-            ConnectionDirection::Incoming
-        };
-        return {std::make_pair(conn, details)};
-	} else { // connection is probably closing
-		return std::nullopt;
-	}
-}
-
-namespace {
-
-template<typename ConnectionType>
-std::string getProcConnectionTablesFileName() {
-    return "";
-}
-template<>
-std::string getProcConnectionTablesFileName<ipv4_tuple_t>() {
-    return "/proc/net/tcp";
-}
-template<>
-std::string getProcConnectionTablesFileName<ipv6_tuple_t>() {
-    return "/proc/net/tcp6";
-}
-
-template<typename ConnectionType>
-std::optional<std::pair<ConnectionType, ConnectionDetails>> parseProcConnectionLine(const std::string& line) {
-    return std::nullopt;
-}
-template<>
-std::optional<std::pair<ipv4_tuple_t, ConnectionDetails>> parseProcConnectionLine(const std::string& line) {
-    return parseProcIPv4ConnectionLine(line);
-}
-template<>
-std::optional<std::pair<ipv6_tuple_t, ConnectionDetails>> parseProcConnectionLine(const std::string& line) {
-    return parseProcIPv6ConnectionLine(line);
-}
-
-}
-
-template<typename ConnectionType>
-std::unordered_map<ConnectionType, ConnectionDetails> getCurrentConnections() {
-    auto fileName{getProcConnectionTablesFileName<ConnectionType>()};
-    if (!std::filesystem::is_regular_file(fileName)) {
-        throw std::runtime_error{"Couldn't read /proc connection tables. File name: " + fileName};
-    }
-
-    std::unordered_map<ConnectionType, ConnectionDetails> conns;
-
-    std::ifstream input{fileName};
-    std::string line;
-    std::getline(input, line); // skip header
-    unsigned omittedConnsCnt = 0;
-    LOG_DEBUG("Reading connections from {}...", fileName);
-    while (std::getline(input, line)) {
-        auto conn{parseProcConnectionLine<ConnectionType>(line)};
-        if (conn) {
-            conns.insert({conn->first, conn->second});
-            LOG_DEBUG(to_string(std::make_pair(conn->first, conn->second.direction)));
-        }
-        else {
-            ++omittedConnsCnt;
-        }
-    }
-    LOG_DEBUG("Read {:d} connections from {} (omitted {} connections)", conns.size(), fileName, omittedConnsCnt);
-
-    return conns;
-}
-
-template std::unordered_map<ipv4_tuple_t, ConnectionDetails> getCurrentConnections();
-template std::unordered_map<ipv6_tuple_t, ConnectionDetails> getCurrentConnections();
-
-namespace {
 
 template <typename IPTYPE>
 std::pair<iNode, Connection<IPTYPE>> parseLine(const std::string& line, uint32_t ns);
@@ -249,6 +74,10 @@ std::pair<iNode, Connection<ipv4_tuple_t>> parseLine(const std::string& line, ui
 	iss.ignore(1);
 	iss >> hex >> skipInt;
 	iss >> hex >> skipInt >> std::dec >> skipInt >> std::dec >> skipInt >> std::dec >> in;
+
+	if (state == TCP_LISTEN) {
+		LOG_DEBUG("tcp table found listen socket {}", to_string(conn.ep));
+	}
 	return {in, conn};
 }
 
@@ -294,11 +123,51 @@ std::pair<iNode, Connection<ipv6_tuple_t>> parseLine(const std::string& line, ui
 	iss >> hex >> skipInt;
 
 	iss >> hex >> skipInt >> std::dec >> skipInt >> std::dec >> skipInt >> std::dec >> in;
+	if (state == TCP_LISTEN) {
+		LOG_DEBUG("tcp6 table found listen socket {}", to_string(conn.ep));
+	}
 	return {in, conn};
 }
 
+void markIncomingTraffic(const std::vector<ipv4_tuple_t>& listensockets, tcpTable<ipv4_tuple_t>& table) {
+
+	for (const auto& sock : listensockets) {
+		for (auto& connection : table) {
+			if (connection.second.ep.sport == sock.sport && (connection.second.ep.saddr == sock.saddr || sock.saddr == 0)) {
+				connection.second.direction = ConnectionDirection::Incoming;
+			}
+		}
+	}
+
+	for (auto& connection : table) {
+		if (connection.second.direction == ConnectionDirection::Unknown) {
+			connection.second.direction = ConnectionDirection::Outgoing;
+		}
+	}
+}
+
+void markIncomingTraffic(const std::vector<ipv6_tuple_t>& listensockets, tcpTable<ipv6_tuple_t>& table) {
+
+	for (const auto& sock : listensockets) {
+		for (auto& connection : table) {
+
+			if (connection.second.ep.sport == sock.sport &&
+				((sock.saddr_h == 0 && sock.saddr_l == 0) ||
+				 (connection.second.ep.saddr_h == sock.saddr_h && connection.second.ep.saddr_l == sock.saddr_l))) {
+				connection.second.direction = ConnectionDirection::Incoming;
+			}
+		}
+	}
+
+	for (auto& connection : table) {
+		if (connection.second.direction == ConnectionDirection::Unknown) {
+			connection.second.direction = ConnectionDirection::Outgoing;
+		}
+	}
+}
+
 template <typename IPTYPE>
-bool readTcpFile(tcpTable<IPTYPE> & table, const fs::path& fileName, uint32_t ns, bool filter) {
+bool readTcpFile(tcpTable<IPTYPE>& table, const fs::path& fileName, uint32_t ns, bool filter) {
 	if (!fs::is_regular_file(fileName)) {
 		LOG_INFO("Couldn't read /proc connection table: " + fileName.string());
 		return false;
@@ -306,6 +175,8 @@ bool readTcpFile(tcpTable<IPTYPE> & table, const fs::path& fileName, uint32_t ns
 
 	std::ifstream input{fileName.string()};
 	std::string line;
+	std::vector<IPTYPE> listenSockets;
+	tcpTable<IPTYPE> newTable;
 	std::getline(input, line); // skip header
 	while (std::getline(input, line)) {
 		auto conn = parseLine<IPTYPE>(line, ns);
@@ -313,10 +184,14 @@ bool readTcpFile(tcpTable<IPTYPE> & table, const fs::path& fileName, uint32_t ns
 			continue;
 		}
 		if (conn.second.ep.dport && conn.first) {
-			table.insert(conn);
+			newTable.insert(conn);
+		} else {
+			listenSockets.push_back(conn.second.ep);
 		}
 	}
 
+	markIncomingTraffic(listenSockets, newTable);
+	table.merge(newTable);
 	return true;
 }
 
@@ -438,9 +313,12 @@ tcpTable<ipv6_tuple_t> readTcpTable6(const char* root, bool filter) {
 
 namespace test {
 std::pair<iNode, Connection<ipv6_tuple_t>> parseLine6(const std::string& line, uint32_t ns) {
-	return parseLine<ipv6_tuple_t>(line, ns);
+	return ::parseLine<ipv6_tuple_t>(line, ns);
 }
 std::pair<iNode, Connection<ipv4_tuple_t>> parseLine4(const std::string& line, uint32_t ns) {
-	return parseLine<ipv4_tuple_t>(line, ns);
+	return ::parseLine<ipv4_tuple_t>(line, ns);
+}
+void markIncomingTraffic(const std::vector<ipv4_tuple_t>& listensockets, tcpTable<ipv4_tuple_t>& table) {
+	return ::markIncomingTraffic(listensockets, table);
 }
 } // namespace test

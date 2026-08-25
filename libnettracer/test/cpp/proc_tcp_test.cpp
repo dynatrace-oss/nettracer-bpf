@@ -52,3 +52,13 @@ TEST(ProcTcpTest, OkParsing6) {
 	EXPECT_EQ(conn.ep.dport, 50005);
 	EXPECT_EQ(inode, 8670135);
 }
+
+TEST(ProcTcpTest, markIncomingTraffic) {
+	std::vector<ipv4_tuple_t> listensockets{{0x11111111, 0, 22, 0, 0}};
+	tcpTable<ipv4_tuple_t> table{
+			{11ul, {{0x11111111, 0x44444, 22, 6532, 0}, 12, ConnectionDirection::Unknown}},
+			{112ul, {{0x111112, 0x34, 222, 12, 0}, 12, ConnectionDirection::Unknown}}};
+	test::markIncomingTraffic(listensockets, table);
+	EXPECT_EQ(table[11ul].direction, ConnectionDirection::Incoming);
+	EXPECT_EQ(table[112ul].direction, ConnectionDirection::Outgoing);
+}
