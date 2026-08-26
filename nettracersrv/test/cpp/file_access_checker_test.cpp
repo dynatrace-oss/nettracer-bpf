@@ -10,7 +10,11 @@ namespace fs = std::filesystem;
 class FileAccessCheckerTest : public ::testing::Test {
 protected:
 	void SetUp() override {
-		testDir = fs::temp_directory_path() / "file_access_checker_tests";
+		testDir = fs::current_path() / "file_access_checker_tests";
+		// Remove old one if exist
+		std::error_code ec;
+		fs::remove_all(testDir, ec);
+		// Create new one
 		fs::create_directories(testDir);
 
 		existingFile = testDir / "test_file.txt";
