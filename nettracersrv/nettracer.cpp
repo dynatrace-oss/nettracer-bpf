@@ -70,15 +70,17 @@ inline void validate_log_path(const std::filesystem::path& path) {
 	std::error_code ec;
 	const auto status = std::filesystem::status(parent_path, ec);
 	if (ec) {
-		throw std::runtime_error("Failed to stat parent log directory '" + parent_path.string() + "': " + ec.message());
+		throw std::filesystem::filesystem_error("Failed to stat parent log directory", parent_path, ec);
 	}
 
 	if (!std::filesystem::is_directory(status)) {
-		throw std::runtime_error("Parent log directory '" + parent_path.string() + "' does not exist or is not a directory.");
+		throw std::filesystem::filesystem_error("Parent log directory does not exist or is not a directory", 
+		parent_path, std::make_error_code(std::errc::not_a_directory));
 	}
 
 	if (access(parent_path.c_str(), W_OK) != 0) {
-		throw std::runtime_error("Parent log directory '" + parent_path.string() + "' is unwritable.");
+		std::error_code access_ec(errno, std::generic_category());
+		throw std::filesystem::filesystem_error("Parent log directory access permissions validation failed", parent_path, access_ec);
 	}
 }
 
