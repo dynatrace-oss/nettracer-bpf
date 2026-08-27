@@ -132,7 +132,7 @@ std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char*
 		if (ex.kind() == po::invalid_syntax::unrecognized_line) {
 			LOG_WARN("the options configuration file contains an invalid line");
 		} else {
-			LOG_WARN("{} runing without args_file", ex.what());
+			LOG_WARN("{} running without args_file", ex.what());
 		}
 		LOG_WARN("{}", (std::stringstream{} << desc).str());
 		return {{}, ""};
