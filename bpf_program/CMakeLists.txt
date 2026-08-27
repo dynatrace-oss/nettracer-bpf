@@ -9,9 +9,11 @@ set(BPF_OPTIMIZATION "-g" "-O2")
 option(SKIP_OFFSETGUESSING "Skip building legacy BPF and offset guessing" OFF)
 
 set(ISYSTEM_KERNEL_HEADERS "")
-foreach(dir ${KERNEL_HEADERS})
-	list(APPEND ISYSTEM_KERNEL_HEADERS "-isystem" "${dir}")
-endforeach()
+if(NOT SKIP_OFFSETGUESSING)
+	foreach(dir ${KERNEL_HEADERS})
+		list(APPEND ISYSTEM_KERNEL_HEADERS "-isystem" "${dir}")
+	endforeach()
+endif()
 
 set(SOURCES
 	nettracer-bpf.c
