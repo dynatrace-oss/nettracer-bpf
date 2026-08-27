@@ -28,7 +28,6 @@
 #include "system_utils.h"
 #include "tuple_utils.h"
 #include "unified_log.h"
-#include "file_access_interface.h"
 
 #include <boost/program_options.hpp>
 #include <fmt/core.h>
@@ -58,6 +57,29 @@ void atexit_handler(int a) {
 	close(0);
 	close(1);
 	exitCtrl.cv.notify_all();
+}
+
+inline void validate_log_path(const std::filesystem::path& path) {
+	if (path.empty()) {
+		throw std::invalid_argument("Empty log path.");
+	}
+	auto parent_path = path.parent_path();
+	if (parent_path.empty()) {
+		parent_path = ".";
+	}
+	std::error_code ec;
+	const auto status = std::filesystem::status(parent_path, ec);
+	if (ec) {
+		throw std::runtime_error("Failed to stat parent log directory '" + parent_path.string() + "': " + ec.message());
+	}
+
+	if (!std::filesystem::is_directory(status)) {
+		throw std::runtime_error("Parent log directory '" + parent_path.string() + "' does not exist or is not a directory.");
+	}
+
+	if (access(parent_path.c_str(), W_OK) != 0) {
+		throw std::runtime_error("Parent log directory '" + parent_path.string() + "' is unwritable.");
+	}
 }
 
 void setUpExitBehavior() {
@@ -95,6 +117,13 @@ po::options_description getOptionsDescription() {
 }
 
 po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath) {
+	if (argsFilePath.empty()) {
+		throw std::invalid_argument("File path is empty.");
+	}
+	if (::access(argsFilePath.c_str(), R_OK) != 0) {
+		std::error_code errCode(errno, std::generic_category());
+		throw std::filesystem::filesystem_error("File access permissions validation failed", argsFilePath, errCode);
+	}
 	po::variables_map vm;
 	po::options_description desc{getOptionsDescription()};
 	po::store(po::parse_config_file<char>(argsFilePath.c_str(), desc), vm);
@@ -117,23 +146,12 @@ std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char*
 
 		if (vm.count("args_file")) {
 			auto fname = vm["args_file"].as<std::filesystem::path>();
-			if (auto accessChecker = IFileAccessChecker::create(); 
-				!accessChecker->hasAccess(fname, AccessMode::Read)) {
-				std::error_code errCode(errno, std::generic_category());
-				throw std::filesystem::filesystem_error("Access permission is missing for the specified file.", fname, errCode);	
-			}
 			return {parseArgsFile(fname), std::move(fname)};
 		}
 
 		if (vm.count("log")) {
-			if (auto logger_path = vm["log"].as<std::string>(); 
-				!logger_path.empty()) {
-				if (auto accessChecker = IFileAccessChecker::create(); 
-					!accessChecker->hasAccess(logger_path, AccessMode::Write)) {
-					std::error_code errCode(errno, std::generic_category());
-					throw std::filesystem::filesystem_error("Access permission is missing for the specified log file.", logger_path, errCode);
-				}
-			}
+			const auto logger_path = vm["log"].as<std::filesystem::path>();
+			validate_log_path(logger_path);
 		}
 
 		return {vm, ""};
