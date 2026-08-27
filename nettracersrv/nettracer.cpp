@@ -152,7 +152,7 @@ std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char*
 		}
 
 		if (vm.count("log")) {
-			const auto logger_path = vm["log"].as<std::filesystem::path>();
+			const auto logger_path = vm["log"].as<std::string>();
 			validate_log_path(logger_path);
 		}
 
