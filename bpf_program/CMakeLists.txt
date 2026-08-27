@@ -6,6 +6,8 @@ endif()
 
 set(BPF_OPTIMIZATION "-g" "-O2")
 
+option(SKIP_OFFSETGUESSING "Skip building legacy BPF and offset guessing" OFF)
+
 set(ISYSTEM_KERNEL_HEADERS "")
 foreach(dir ${KERNEL_HEADERS})
 	list(APPEND ISYSTEM_KERNEL_HEADERS "-isystem" "${dir}")
@@ -25,42 +27,46 @@ set(HEADERS
 	tuples_utilities.h
 )
 
-list(APPEND HEADERS_LEGACY_BPF
-	legacy/asm_inline.h
-	legacy/bpf_helpers.h
-	legacy/maps.h
-	legacy/offset_guessing.h
-	legacy/other.h
-	${HEADERS}
-)
+set(LEGACY_DEPENDENCY "")
+if(NOT SKIP_OFFSETGUESSING)
+	list(APPEND HEADERS_LEGACY_BPF
+		legacy/asm_inline.h
+		legacy/bpf_helpers.h
+		legacy/maps.h
+		legacy/offset_guessing.h
+		legacy/other.h
+		${HEADERS}
+	)
 
-set(CLANG_LEGACY_COMMAND ${LLVM_BINDIR}/clang
-	-D__KERNEL__ -D__TARGET_ARCH_${ARCH} -DLEGACY_BPF=1 -DUSE_RODATA=0 -DBPF_DEBUG=${BPF_DEBUG}
-	-D${BUILD_TYPE_MACRO}
-	-fno-jump-tables -fno-builtin
-	-Wall -Wpadded -Werror
-	${BPF_OPTIMIZATION} -emit-llvm
-	-c "${CMAKE_CURRENT_LIST_DIR}/nettracer-bpf.c"
-	-nostdinc
-	-I "${CMAKE_CURRENT_LIST_DIR}"
-	-isystem ${LLVM_INCLUDE}
-	${ISYSTEM_KERNEL_HEADERS}
-	-o nettracer-bpf.c.o
-)
+	set(CLANG_LEGACY_COMMAND ${LLVM_BINDIR}/clang
+		-D__KERNEL__ -D__TARGET_ARCH_${ARCH} -DLEGACY_BPF=1 -DUSE_RODATA=0 -DBPF_DEBUG=${BPF_DEBUG}
+		-D${BUILD_TYPE_MACRO}
+		-fno-jump-tables -fno-builtin
+		-Wall -Wpadded -Werror
+		${BPF_OPTIMIZATION} -emit-llvm
+		-c "${CMAKE_CURRENT_LIST_DIR}/nettracer-bpf.c"
+		-nostdinc
+		-I "${CMAKE_CURRENT_LIST_DIR}"
+		-isystem ${LLVM_INCLUDE}
+		${ISYSTEM_KERNEL_HEADERS}
+		-o nettracer-bpf.c.o
+	)
 
-set(BPF_LEGACY_OUTPUT_FILE "nettracer-bpf.o")
-set(LLC_LEGACY_COMMAND ${LLVM_BINDIR}/llc
-	nettracer-bpf.c.o
-	-march=bpf -filetype=obj
-	-o "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_LEGACY_OUTPUT_FILE}"
-)
+	set(BPF_LEGACY_OUTPUT_FILE "nettracer-bpf.o")
+	set(LLC_LEGACY_COMMAND ${LLVM_BINDIR}/llc
+		nettracer-bpf.c.o
+		-march=bpf -filetype=obj
+		-o "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_LEGACY_OUTPUT_FILE}"
+	)
 
-set(FULL_LEGACY_COMMAND ${CLANG_LEGACY_COMMAND} && ${LLC_LEGACY_COMMAND})
+	set(FULL_LEGACY_COMMAND ${CLANG_LEGACY_COMMAND} && ${LLC_LEGACY_COMMAND})
 
-add_custom_command(OUTPUT "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_LEGACY_OUTPUT_FILE}"
-	COMMAND ${FULL_LEGACY_COMMAND}
-	DEPENDS ${SOURCES_FULL} ${HEADERS_LEGACY_BPF}
-)
+	add_custom_command(OUTPUT "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_LEGACY_OUTPUT_FILE}"
+		COMMAND ${FULL_LEGACY_COMMAND}
+		DEPENDS ${SOURCES_FULL} ${HEADERS_LEGACY_BPF}
+	)
+	set(LEGACY_DEPENDENCY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_LEGACY_OUTPUT_FILE}")
+endif()
 
 list(APPEND HEADERS_BTF
 	maps.h ${HEADERS}
@@ -100,9 +106,11 @@ add_custom_command(OUTPUT ${BPF_OUTPUT_FILE}
 
 add_custom_target(bpf_program
 	ALL
-	DEPENDS ${SKELETON_INCLUDE} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_LEGACY_OUTPUT_FILE}" ${BPF_OUTPUT_FILE}
+	DEPENDS ${SKELETON_INCLUDE} ${BPF_OUTPUT_FILE} ${LEGACY_DEPENDENCY}
 )
 
-install(FILES "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_LEGACY_OUTPUT_FILE}"
-	DESTINATION "bin"
-)
+if(NOT SKIP_OFFSETGUESSING)
+	install(FILES "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${BPF_LEGACY_OUTPUT_FILE}"
+		DESTINATION "bin"
+	)
+endif()
