@@ -135,7 +135,7 @@ std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char*
 			LOG_WARN("{} running without args_file", ex.what());
 		}
 		LOG_WARN("{}", (std::stringstream{} << desc).str());
-		return {{}, ""};
+		exit(1);
 	} catch (const po::error& ex) {
 		std::cout << ex.what() << '\n';
 		std::cout << desc << '\n';
