@@ -29,8 +29,7 @@ spdlog::level::level_enum loglevelFromConfig(const boost::program_options::varia
 	}
 }
 
-static void validate_log_path(const std::filesystem::path& path) {
-	const auto target_path = path.empty() ? std::filesystem::path(".") : path;
+static void validate_log_path(const std::filesystem::path& target_path) {
 	std::error_code ec;
 	const auto status = std::filesystem::status(target_path, ec);
 	if (ec) {
