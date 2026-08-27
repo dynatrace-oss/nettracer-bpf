@@ -59,31 +59,6 @@ void atexit_handler(int a) {
 	exitCtrl.cv.notify_all();
 }
 
-inline void validate_log_path(const std::filesystem::path& path) {
-	if (path.empty()) {
-		throw std::invalid_argument("Empty log path.");
-	}
-	auto parent_path = path.parent_path();
-	if (parent_path.empty()) {
-		parent_path = ".";
-	}
-	std::error_code ec;
-	const auto status = std::filesystem::status(parent_path, ec);
-	if (ec) {
-		throw std::filesystem::filesystem_error("Failed to stat parent log directory", parent_path, ec);
-	}
-
-	if (!std::filesystem::is_directory(status)) {
-		throw std::filesystem::filesystem_error("Parent log directory does not exist or is not a directory", 
-		parent_path, std::make_error_code(std::errc::not_a_directory));
-	}
-
-	if (access(parent_path.c_str(), W_OK) != 0) {
-		std::error_code access_ec(errno, std::generic_category());
-		throw std::filesystem::filesystem_error("Parent log directory access permissions validation failed", parent_path, access_ec);
-	}
-}
-
 void setUpExitBehavior() {
 	struct sigaction action {};
 	action.sa_handler = atexit_handler;
@@ -120,7 +95,8 @@ po::options_description getOptionsDescription() {
 
 po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath) {
 	if (argsFilePath.empty()) {
-		throw std::invalid_argument("File path is empty.");
+		LOG_INFO("args_file provided but empty");
+		return {};
 	}
 	if (::access(argsFilePath.c_str(), R_OK) != 0) {
 		std::error_code errCode(errno, std::generic_category());
@@ -149,11 +125,6 @@ std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char*
 		if (vm.count("args_file")) {
 			auto fname = vm["args_file"].as<std::filesystem::path>();
 			return {parseArgsFile(fname), std::move(fname)};
-		}
-
-		if (vm.count("log")) {
-			const auto logger_path = vm["log"].as<std::string>();
-			validate_log_path(logger_path);
 		}
 
 		return {vm, ""};

@@ -29,10 +29,36 @@ spdlog::level::level_enum loglevelFromConfig(const boost::program_options::varia
 	}
 }
 
+static void validate_log_path(const std::filesystem::path& path) {
+	auto parent_path = path.parent_path();
+	if (parent_path.empty()) {
+		parent_path = ".";
+	}
+	std::error_code ec;
+	const auto status = std::filesystem::status(parent_path, ec);
+	if (ec) {
+		throw std::filesystem::filesystem_error("Failed to stat parent log directory", parent_path, ec);
+	}
+
+	if (!std::filesystem::is_directory(status)) {
+		throw std::filesystem::filesystem_error(
+				"Parent log directory does not exist or is not a directory", parent_path, std::make_error_code(std::errc::not_a_directory));
+	}
+
+	if (access(parent_path.c_str(), W_OK) != 0) {
+		std::error_code access_ec(errno, std::generic_category());
+		throw std::filesystem::filesystem_error("Parent log directory access permissions validation failed", parent_path, access_ec);
+	}
+}
+
 bool setUpLogging(const boost::program_options::variables_map& vm) {
 	std::string logger_path = vm["log"].as<std::string>();
 	bool noStdoutLog = vm.count("no_stdout_log");
 	bool noFileLog =  logger_path.empty();
+
+	if (!noFileLog) {
+		validate_log_path(logger_path);
+	}
 
 	logging::setUpLogger(logger_path, !noStdoutLog);
 	auto level = loglevelFromConfig(vm);
