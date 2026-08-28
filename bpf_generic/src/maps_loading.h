@@ -14,22 +14,56 @@
 * limitations under the License.
 */
 #pragma once
-
-
-#include <llvm/Object/ELF.h>
-#include <llvm/Object/ELFObjectFile.h>
-#include <llvm/Support/Error.h>
-
+#include <gelf.h>
+#include <libelf.h>
 #include "classic_loader.h"
 #include "maps_def.h"
 #include <memory>
 #include <unordered_map>
+#include <fcntl.h>
 
 namespace bpf {
 
-bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper, const llvm::object::SectionRef* rodataSec);
+struct elfSection {
+	std::string shname;
+	GElf_Shdr shdr{};
+	Elf_Data* data{nullptr};
+	unsigned indx{};
+	bool processed{false};
+};
 
-using MapsSymbols = std::unordered_map<uintptr_t, std::string_view>;
+bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper, const elfSection* rodataSec);
+
+using MapsSymbols = std::unordered_map<uintptr_t, std::string>;
+
+struct ElfFile {
+	int fd{};
+	Elf* elf{nullptr};
+	GElf_Ehdr ehdr;
+
+	explicit ElfFile(const std::string& path) {
+		if (elf_version(EV_CURRENT) == EV_NONE)
+			throw std::runtime_error{"Cannot read elf version"};
+
+		fd = ::open(path.c_str(), O_RDONLY);
+		if (fd < 0)
+			throw std::runtime_error{"cannot open file: " + path};
+
+		elf = elf_begin(fd, ELF_C_READ, nullptr);
+		if (!elf)
+			throw std::runtime_error{"Cannot read elf " + path};
+
+		if (gelf_getehdr(elf, &ehdr) != &ehdr)
+			throw std::runtime_error{"Cannot read elf header"};
+	}
+	ElfFile(const ElfFile&) = delete;
+    ElfFile& operator=(const ElfFile&) = delete;
+
+	~ElfFile() {
+		elf_end(elf);
+		close(fd);
+	}
+};
 
 class SectionLoader {
 public:
@@ -37,23 +71,26 @@ public:
 	bool loadSections();
 	bool relocateData(maps_config& maps);
 
-	const llvm::object::SectionRef* getRodataSection() const { return sections.rodata.get(); }
+	const elfSection* getRodataSection() const {
+		return (sections.rodata.processed)? &sections.rodata : nullptr;
+	}
+
 	maps_config getMapsConfig();
 	BpfPrograms& getBpfPrograms(){ return bpfPrograms;}
-	const char* getLicense(){ return sections.license->getContents()->data();}
+	const char* getLicense(){ return sections.license.c_str();}
 private:
 	struct {
-		std::unordered_map<std::string_view, llvm::object::SectionRef> kprobes{};
-		std::unordered_map<std::string_view, llvm::object::SectionRef> rel{};
-		std::unique_ptr<llvm::object::SectionRef> maps{};
-		std::unique_ptr<llvm::object::SectionRef> license{};
-		std::unique_ptr<llvm::object::SectionRef> rodata{};
-	} sections{};
+		std::unordered_map<std::string, elfSection> kprobes;
+		std::unordered_map<std::string, elfSection> rel;
+		elfSection maps;
+		std::string license;
+		elfSection rodata;
+	} sections;
 	MapsSymbols mapsRelSymOffsToName;
-
-	llvm::object::OwningBinary<llvm::object::Binary> binary;
-	llvm::object::ELFObjectFileBase *ELFobj;
+	ElfFile elfFile;
 	BpfPrograms bpfPrograms;
+	Elf_Data* symdata{nullptr};
+	size_t symstrndx{};
 };
 
 } // namespace bpf
