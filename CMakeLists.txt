@@ -21,7 +21,7 @@ endif(NOT UNIX)
 
 project(nettracer LANGUAGES C CXX DESCRIPTION "")
 
-option(SKIP_OFFSETGUESSING "Skip building legacy BPF and offset guessing" OFF)
+option(SKIP_OFFSETGUESSING "Skip building legacy ofsetguessed BPF programs" OFF)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
