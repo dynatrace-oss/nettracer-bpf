@@ -94,6 +94,14 @@ po::options_description getOptionsDescription() {
 }
 
 po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath) {
+	if (argsFilePath.empty()) {
+		LOG_INFO("args_file provided but empty");
+		return {};
+	}
+	if (::access(argsFilePath.c_str(), R_OK) != 0) {
+		std::error_code errCode(errno, std::generic_category());
+		throw std::filesystem::filesystem_error("File access permissions validation failed", argsFilePath, errCode);
+	}
 	po::variables_map vm;
 	po::options_description desc{getOptionsDescription()};
 	po::store(po::parse_config_file<char>(argsFilePath.c_str(), desc), vm);
@@ -120,6 +128,14 @@ std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char*
 		}
 
 		return {vm, ""};
+	} catch (const po::invalid_syntax& ex){
+		if (ex.kind() == po::invalid_syntax::unrecognized_line) {
+			LOG_WARN("the options configuration file contains an invalid line");
+		} else {
+			LOG_WARN("{} running without args_file", ex.what());
+		}
+		LOG_WARN("{}", (std::stringstream{} << desc).str());
+		exit(1);
 	} catch (const po::error& ex) {
 		std::cout << ex.what() << '\n';
 		std::cout << desc << '\n';
