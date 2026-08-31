@@ -24,3 +24,9 @@ git submodule update --init --recursive
 cmake -DCMAKE_BUILD_TYPE=<build type> -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -S . -B <build dir>
 cmake --build <build dir>
 ```
+
+You can also build nettracer without kernel_headers dependency. Ten legacy offsetguessed BPF programs are not built. In that case use the -DSKIP_OFFSETGUESSING=ON flag, e.g.
+```
+cmake -DSKIP_OFFSETGUESSING=ON -DCMAKE_BUILD_TYPE=<build type> -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -S . -B <build dir>
+cmake --build <build dir>
+```

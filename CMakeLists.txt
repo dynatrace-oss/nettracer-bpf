@@ -21,6 +21,8 @@ endif(NOT UNIX)
 
 project(nettracer LANGUAGES C CXX DESCRIPTION "")
 
+option(SKIP_OFFSETGUESSING "Skip building legacy ofsetguessed BPF programs" OFF)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_VERBOSE_MAKEFILE TRUE)
@@ -38,8 +40,10 @@ else ()
 	)
 endif ()
 
-if(NOT DEFINED KERNEL_VERSION)
-	execute_process(COMMAND uname -r OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE KERNEL_VERSION)
+if(NOT SKIP_OFFSETGUESSING)
+	if(NOT DEFINED KERNEL_VERSION)
+		execute_process(COMMAND uname -r OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE KERNEL_VERSION)
+	endif()
 endif()
 
 find_package(LLVM 17 REQUIRED CONFIG)
@@ -83,6 +87,8 @@ else()
 	set(BPF_DEBUG 0)
 endif()
 
+set(KERNEL_HEADERS "")
+if(NOT SKIP_OFFSETGUESSING)
 # we need to detect locations of kernel headers
 # first, we define base directories:
 # - the one related to the current version & arch
@@ -137,6 +143,10 @@ arch/${ARCH}/include/generated/uapi")
 	set(${out_dirs} "${COMBINED}" PARENT_SCOPE)
 endfunction()
 collect_kernel_headers_dirs("${KERNEL_HEADERS_BASE}" KERNEL_HEADERS)
+
+else()
+	message(STATUS "Skipping Linux headers detection because SKIP_OFFSETGUESSING=ON")
+endif()
 
 # Must add include paths here because includes are applied before flags in CMake and -nostdinc messes things up
 add_compile_options(-Wall -I/usr/include -I/usr/include/${ARCHITECTURE}-linux-gnu)
