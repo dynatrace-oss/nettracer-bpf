@@ -38,7 +38,6 @@
 #include <sys/sysinfo.h>
 #include <unistd.h>
 #include <vector>
-#include <llvm/ADT/StringRef.h>
 #include "log.h"
 
 #define DEBUGFS "/sys/kernel/debug/tracing/"

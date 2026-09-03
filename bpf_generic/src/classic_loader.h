@@ -22,9 +22,6 @@
 #include <vector>
 #include <unordered_map>
 
-namespace llvm {
-class StringRef;
-}
 
 namespace bpf {
 
