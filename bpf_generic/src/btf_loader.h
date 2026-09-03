@@ -33,7 +33,7 @@ class BTFLoader : public Ibpf {
 	bool tryAttachProbes();
 	void set_maps_max_entries(uint32_t map_max_entries);
 public:
-	BTFLoader() = default;
+	BTFLoader();
 	bool load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion)  override;
 	int get_map_fd(const std::string& name) override;
 	map_data get_perf_map(const std::string& name) override;

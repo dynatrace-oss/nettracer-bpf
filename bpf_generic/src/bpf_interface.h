@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 namespace bpf {
@@ -32,6 +33,12 @@ public:
 	virtual map_data get_perf_map(const std::string& name) = 0;
 	virtual bool needs_offset_guessing() const = 0;
 	virtual ~Ibpf() = default;
+};
+
+class BTFexception : public std::runtime_error {
+public:
+	explicit BTFexception(const std::string& msg) : std::runtime_error(msg) {
+	}
 };
 
 std::unique_ptr<Ibpf> createOffsetGuessedBPF();
