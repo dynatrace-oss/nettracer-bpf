@@ -22,17 +22,17 @@ void BTFLoader::set_maps_max_entries(uint32_t map_max_entries) {
 	bpf_map__set_max_entries(skel->maps.tcp_event_ipv6, map_max_entries);
 }
 
-bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t kernVersion){
-
+BTFLoader::BTFLoader() {
 	openOpts = {};
 	openOpts.sz = sizeof(openOpts);
 
 	LOG_INFO("Ensuring BTF for CO-RE.");
 	if (const auto res{ensure_core_btf(&openOpts)}) {
-		LOG_ERROR("Failed to fetch necessary BTF for CO-RE: {}", strerror(-res));
-		return false;
+		throw BTFexception(fmt::format("Failed to fetch necessary BTF for CO-RE: {}", strerror(-res)));
 	}
+}
 
+bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t kernVersion){
 	LOG_TRACE("Opening BPF object.");
 	skel = nettracer_bpf_core__open_opts(&openOpts);
 	if (skel == nullptr) {

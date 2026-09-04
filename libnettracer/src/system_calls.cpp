@@ -55,9 +55,13 @@ std::unique_ptr<bpf::Ibpf> createBPFinterface(int kernelVersion, std::string_vie
 			// don't return, see what happens
 		}
 
-		auto btf = bpf::createBTFBPF();
-		if (btf) {
-			return btf;
+		try {
+			auto btf = bpf::createBTFBPF();
+			if (btf) {
+				return btf;
+			}
+		} catch (bpf::BTFexception& e) {
+			LOG_ERROR("{}", e.what());
 		}
 		LOG_INFO("Fallback to ofsetguessing");
 		return bpf::createOffsetGuessedBPF();
