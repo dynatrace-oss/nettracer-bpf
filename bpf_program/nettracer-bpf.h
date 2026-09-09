@@ -23,7 +23,8 @@
 enum tcp_event_type {
 	TCP_EVENT_TYPE_CONNECT,
 	TCP_EVENT_TYPE_ACCEPT,
-	TCP_EVENT_TYPE_CLOSE
+	TCP_EVENT_TYPE_CLOSE,
+	TCP_EVENT_TYPE_SYN_ATTEMPT
 };
 
 struct tcp_ipv4_event_t {
