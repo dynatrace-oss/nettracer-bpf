@@ -12,7 +12,6 @@ set(SOURCES
 	system_calls.cpp
 	system_utils.cpp
 	tuple_utils.cpp
-	unified_log.cpp
 	netstat.cpp
 )
 
@@ -30,7 +29,6 @@ set(HEADERS
 	system_calls.h
 	system_utils.h
 	tuple_utils.h
-	unified_log.h
 	netstat.h
 )
 

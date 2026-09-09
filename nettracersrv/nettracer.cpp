@@ -134,9 +134,8 @@ ReturnCodes startNetTracer(config_watcher& cw, Configuration& config) {
 		return ReturnCodes::Success;
 	}
 
-	bool noStdoutLog = config.setupLogger();
+	bool eventsOnly = config.logEventsOnly();
 	LOG_INFO("Starting NetTracer v{}", nettracerVersionStr);
-
 	if (!increaseMemoryLimit()) {
 		return ReturnCodes::InsufficientCapabilities;
 	}
@@ -219,7 +218,7 @@ ReturnCodes startNetTracer(config_watcher& cw, Configuration& config) {
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
 	std::function<void(std::promise<bool>&&)> map_reading;
 
-	if (noStdoutLog) {
+	if (eventsOnly) {
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst.event<ipv4_tuple_t>(evt); };
 		if (monitorIPv6) {
 			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
@@ -230,11 +229,10 @@ ReturnCodes startNetTracer(config_watcher& cw, Configuration& config) {
 			promise.set_value(ret);
 		};
 	} else {
-		static ConnectionsState<ipv4_tuple_t> ipv4Connections;
-		static ConnectionsState<ipv6_tuple_t> ipv6Connections;
-		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { updateConnectionsAfterEvent(evt, ipv4Connections); };
+		LOG_INFO("Only TCP events are output");
+		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { processEvent(evt); };
 		if (monitorIPv6) {
-			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { updateConnectionsAfterEvent(evt, ipv6Connections); };
+			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { processEvent(evt); };
 		}
 		map_reading = [&](std::promise<bool>&& promise) {
 			while (exitCtrl.running) {
@@ -243,9 +241,9 @@ ReturnCodes startNetTracer(config_watcher& cw, Configuration& config) {
 					break;
 				}
 
-				updateConnectionsFromMaps(ipv4Connections, ipv4_fds, mapsWrapper);
+				ignoreConnectionsFromMaps<ipv4_tuple_t>(ipv4_fds, mapsWrapper);
 				if (monitorIPv6) {
-					updateConnectionsFromMaps(ipv6Connections, ipv6_fds, mapsWrapper);
+					ignoreConnectionsFromMaps<ipv6_tuple_t>(ipv6_fds, mapsWrapper);
 				}
 
 				std::unique_lock<std::mutex> lk{exitCtrl.m};

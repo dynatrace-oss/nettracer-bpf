@@ -178,25 +178,43 @@ TEST_P(IPv4EventToStringTest, testIPv4EventToString) {
 	const uint64_t ts{12345};
 	const uint32_t cpu{1};
 
-	EXPECT_EQ(outStrBegin + " -- "s + outStrEnd, to_string(tcp_ipv4_event_t{ts, cpu, TCP_EVENT_TYPE_CLOSE, pid, addrA, addrB, portA, portB, netns}));
-	EXPECT_EQ(outStrBegin + " -> "s + outStrEnd, to_string(tcp_ipv4_event_t{ts, cpu, TCP_EVENT_TYPE_CONNECT, pid, addrA, addrB, portA, portB, netns}));
-	EXPECT_EQ(outStrBegin + " <- "s + outStrEnd, to_string(tcp_ipv4_event_t{ts, cpu, TCP_EVENT_TYPE_ACCEPT, pid, addrA, addrB, portA, portB, netns}));
+	EXPECT_EQ("type: close " + outStrBegin + " -- "s + outStrEnd, to_string(tcp_ipv4_event_t{ts, cpu, TCP_EVENT_TYPE_CLOSE, pid, addrA, addrB, portA, portB, netns}));
+	EXPECT_EQ(
+			"type: connect " + outStrBegin + " -> "s + outStrEnd,
+			to_string(tcp_ipv4_event_t{ts, cpu, TCP_EVENT_TYPE_CONNECT, pid, addrA, addrB, portA, portB, netns}));
+	EXPECT_EQ(
+			"type: accept " + outStrBegin + " <- "s + outStrEnd,
+			to_string(tcp_ipv4_event_t{ts, cpu, TCP_EVENT_TYPE_ACCEPT, pid, addrA, addrB, portA, portB, netns}));
 }
 
-INSTANTIATE_TEST_SUITE_P(IPv4EventToStringTests, IPv4EventToStringTest, testing::Values(
-	std::make_tuple("127.0.0.1:50000"s, "0.0.0.0:80 NS:1000 PID:100"s, 0x0100007F, 0x0, 50000, 80, 1000, 100),
-	std::make_tuple("100.100.100.100:44444"s, "255.255.255.255:40000 NS:55555 PID:99999"s, 0x64646464, 0xFFFFFFFF, 44444, 40000, 55555, 99999),
-	std::make_tuple("1.1.1.1:12"s, "5.6.7.8:88 NS:0 PID:0"s, 0x01010101, 0x08070605, 12, 88, 0, 0)
-));
+INSTANTIATE_TEST_SUITE_P(
+		IPv4EventToStringTests,
+		IPv4EventToStringTest,
+		testing::Values(
+				std::make_tuple("127.0.0.1:50000"s, "0.0.0.0:80 NS:1000 PID:100"s, 0x0100007F, 0x0, 50000, 80, 1000, 100),
+				std::make_tuple(
+						"100.100.100.100:44444"s,
+						"255.255.255.255:40000 NS:55555 PID:99999"s,
+						0x64646464,
+						0xFFFFFFFF,
+						44444,
+						40000,
+						55555,
+						99999),
+				std::make_tuple("1.1.1.1:12"s, "5.6.7.8:88 NS:0 PID:0"s, 0x01010101, 0x08070605, 12, 88, 0, 0)));
 
 TEST_P(IPv6EventToStringTest, testIPv6EventToString) {
 	const auto& [outStrBegin, outStrEnd, addrAh, addrAl, addrBh, addrBl, portA, portB, netns, pid] = GetParam();
 	const uint64_t ts{12345};
 	const uint32_t cpu{1};
 
-	EXPECT_EQ(outStrBegin + " -- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CLOSE, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
-	EXPECT_EQ(outStrBegin + " -> "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CONNECT, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
-	EXPECT_EQ(outStrBegin + " <- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_ACCEPT, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ("type: close " + outStrBegin + " -- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CLOSE, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ(
+			"type: connect " + outStrBegin + " -> "s + outStrEnd,
+			to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CONNECT, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ(
+			"type: accept " + outStrBegin + " <- "s + outStrEnd,
+			to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_ACCEPT, pid, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 }
 
 INSTANTIATE_TEST_SUITE_P(IPv6EventToStringTests, IPv6EventToStringTest, testing::Values(

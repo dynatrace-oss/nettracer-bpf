@@ -160,6 +160,7 @@ bool BTFLoader::tryAttachProbes() {
 			(skel->links.kprobe__tcp_cleanup_rbuf = attachKprobe(skel->progs.kprobe__tcp_cleanup_rbuf, "tcp_cleanup_rbuf")) != nullptr;
 	anySuccess |= (skel->links.kprobe__tcp_retransmit_skb = attachKprobe(skel->progs.kprobe__tcp_retransmit_skb, "tcp_retransmit_skb")) !=
 				  nullptr;
+	anySuccess |= (skel->links.handle_syn = attachKprobe(skel->progs.handle_syn, "tcp_v4_conn_request")) != nullptr;
 	return anySuccess;
 }
 

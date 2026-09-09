@@ -15,11 +15,14 @@
 */
 #pragma once
 
+#include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_program/nettracer-bpf.h"
-#include "connections_printing.h"
+#include "configuration.h"
+#include "proc_tcp.h"
+#include "tuple_utils.h"
 #include <chrono>
-#include <ostream>
 #include <mutex>
+#include <ostream>
 #include <string>
 #include <thread>
 #include <tuple>

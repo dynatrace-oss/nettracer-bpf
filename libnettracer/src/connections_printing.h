@@ -1,5 +1,5 @@
 /*
-* Copyright 2025 Dynatrace LLC
+* Copyright 2026 Dynatrace LLC
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -16,29 +16,10 @@
 #pragma once
 
 #include "bpf_generic/src/bpf_wrapper.h"
-#include "bpf_generic/src/log.h"
-#include "tuple_utils.h"
-#include "proc_tcp.h"
-#include <unordered_set>
-#include <tuple>
-#include <condition_variable>
 
 
-template<typename T>
-struct ConnectionsState {
-	MapTuple2Details<T> connsDetails;
-	std::vector<T> connsClosed;
-	std::mutex mutex;
-};
-
-struct ExitCtrl {
-	bool running{true};
-	std::mutex m;
-	std::condition_variable cv;
-	unsigned wait_time;
-};
 
 template<typename Tuple>
-void updateConnectionsFromMaps(ConnectionsState<Tuple>& connsState, const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
-template<typename Tuple, typename Event>
-void updateConnectionsAfterEvent(const Event& evt, ConnectionsState<Tuple>& connsState);
+void ignoreConnectionsFromMaps(const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
+template<typename Event>
+void processEvent(const Event& evt);

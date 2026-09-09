@@ -15,7 +15,7 @@
 */
 #include "bpf_events.h"
 #include "bpf_generic/src/perf_event.h"
-#include "connections_printing.h"
+#include "configuration.h"
 #include "config_watcher.h"
 #include <algorithm>
 #include <exception>

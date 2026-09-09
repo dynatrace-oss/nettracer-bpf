@@ -23,7 +23,6 @@
 #include <tuple>
 #include <utility>
 
-constexpr std::array<const char*, 5> name_of_evt = {"connect", "accept", "close", ""};
 
 inline bool operator==(const ipv4_tuple_t& lhs, const ipv4_tuple_t& rhs) {
 	return std::tie(lhs.saddr, lhs.daddr, lhs.sport, lhs.dport, lhs.netns) ==
