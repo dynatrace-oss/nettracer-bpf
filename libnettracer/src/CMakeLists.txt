@@ -1,6 +1,7 @@
 set(SOURCES
     bpf_events.cpp
 	bpf_debug_counters.cpp
+	configuration.cpp
 	config_watcher.cpp
 	connections_printing.cpp
 	inotify_watcher.cpp
@@ -11,12 +12,14 @@ set(SOURCES
 	system_calls.cpp
 	system_utils.cpp
 	tuple_utils.cpp
+	unified_log.cpp
 	netstat.cpp
 )
 
 set(HEADERS
     bpf_events.h
 	bpf_debug_counters.h
+	configuration.h
 	config_watcher.h
 	connections_printing.h
 	inotify_watcher.h
@@ -27,6 +30,7 @@ set(HEADERS
 	system_calls.h
 	system_utils.h
 	tuple_utils.h
+	unified_log.h
 	netstat.h
 )
 
@@ -41,3 +45,4 @@ target_include_directories(libnettracer
 add_dependencies(libnettracer bpf_program)
 target_link_libraries(libnettracer bpf_generic)
 target_link_libraries(libnettracer /usr/lib/${ARCHITECTURE}-linux-gnu/libtinfo.a)
+target_link_libraries(libnettracer CONAN_PKG::boost)
