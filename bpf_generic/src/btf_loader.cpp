@@ -162,6 +162,7 @@ bool BTFLoader::tryAttachProbes(bool enableConnectivity) {
 	if (enableConnectivity) {
 		LOG_INFO("Loading Connectivity");
 		anySuccess |= (skel->links.handle_syn = attachKprobe(skel->progs.handle_syn, "tcp_v4_conn_request")) != nullptr;
+		anySuccess |= (skel->links.handle_syn6 = attachKprobe(skel->progs.handle_syn6, "tcp_v6_conn_request")) != nullptr;
 	}
 	return anySuccess;
 }

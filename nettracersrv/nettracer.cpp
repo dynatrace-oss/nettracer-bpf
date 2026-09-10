@@ -230,9 +230,9 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		};
 	} else {
 		LOG_INFO("Only TCP events are output");
-		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { processEvent(evt); };
+		ipv4_event_update = [](const tcp_ipv4_event_t& evt) { processEvent(evt); };
 		if (monitorIPv6) {
-			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { processEvent(evt); };
+			ipv6_event_update = [](const tcp_ipv6_event_t& evt) { processEvent(evt); };
 		}
 		map_reading = [&](std::promise<bool>&& promise) {
 			while (exitCtrl.running) {

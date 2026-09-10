@@ -36,7 +36,7 @@ class Configuration {
 	uint32_t mapsSize;
 	po::options_description getOptionsDescription() const;
 	po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath);
-	bool setUpLogging(const boost::program_options::variables_map& vm);
+	bool setUpLogging(const boost::program_options::variables_map& vm) const;
 
 public:
 	std::filesystem::path parseOptions(int argc, char* argv[]);
@@ -51,13 +51,12 @@ public:
 	unsigned mainLoopTimeInterval() const {
 		return vm["time_interval"].as<unsigned>();
 	}
-	unsigned countersInterval() {
+	unsigned countersInterval() const {
 		return vm["counters_interval"].as<unsigned>();
 	}
 	bool testRun() const {
 		return vm.count("test") > 0;
 	}
-
 	bool deltaMetricsEnabled() const {
 		return vm.count("incremental") > 0;
 	}
