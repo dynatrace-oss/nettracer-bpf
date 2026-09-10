@@ -61,43 +61,39 @@ SEC("kprobe/tcp_v4_conn_request")
 int handle_syn(struct pt_regs *ctx)
 {
     struct sock *sk = (struct sock *)PT_REGS_PARM1(ctx);
-	//struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM2(ctx);
     struct inet_connection_sock *icsk = (struct inet_connection_sock *)sk;
-	struct ipv4_tuple_t t = { };
+	struct tcp_ipv4_event_t evt = {.type = TCP_EVENT_TYPE_SYN_ATTEMPT, .timestamp = bpf_ktime_get_ns()};
 	 //local port
-    t.dport = BPF_CORE_READ(sk, __sk_common.skc_num);
-    t.daddr = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
+    evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
+    evt.saddr = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
 
-    // IP i port klienta — z nagłówka IP/TCP w skb
+    //commented because reading src and dst IPs and cleint port — requires reading IP/TCP from skb
+	// which are not port of BTF
+	//struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM2(ctx);
     //u16 network_header = BPF_CORE_READ(skb, network_header);
     //unsigned char *head = BPF_CORE_READ(skb, head);
-
     //struct iphdr iph;
     //bpf_probe_read_kernel(&iph, sizeof(iph), head + network_header);
-    //t.saddr = iph.saddr;
-
+    //evt.saddr = iph.saddr;
     //struct tcphdr tcph;
     //bpf_probe_read_kernel(&tcph, sizeof(tcph), head + network_header + iph.ihl * 4);
-    //t.sport = bpf_ntohs(tcph.source);
-	struct net *net_ptr = NULL;
+    //evt.sport = bpf_ntohs(tcph.source);
 
+	struct net *net_ptr = NULL;
 	bpf_core_read(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
 	if (net_ptr) {
-		bpf_core_read(&t.netns, sizeof(t.netns), &net_ptr->ns.inum);
+		bpf_core_read(&evt.netns, sizeof(evt.netns), &net_ptr->ns.inum);
 	}
-
-	//if(filter_ipv4(&t)){
-	//	return 0;
-	//}
 
     u32 syn_qlen  = BPF_CORE_READ(icsk, icsk_accept_queue.qlen.counter);
     u32 ack_backlog = BPF_CORE_READ(sk, sk_ack_backlog);
     u32 max_backlog = BPF_CORE_READ(sk, sk_max_ack_backlog);
+	uint32_t cpu = bpf_get_smp_processor_id();
 
     bpf_printk("SYN queue: %u, accept queue: %u/%u\n",
                syn_qlen, ack_backlog, max_backlog);
-	uint32_t cpu = bpf_get_smp_processor_id();
-	struct tcp_ipv4_event_t evt = convert_ipv4_tuple_to_event(t, cpu, TCP_EVENT_TYPE_SYN_ATTEMPT, 0);
+	evt.cpu = cpu;
+	evt.synqueuelen = syn_qlen;
 	if (bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt)) < 0) {
 		bpf_printk("SYN error\n");
 		INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_failures);

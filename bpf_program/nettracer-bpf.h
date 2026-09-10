@@ -37,7 +37,8 @@ struct tcp_ipv4_event_t {
 	uint16_t sport;
 	uint16_t dport;
 	uint32_t netns;
-	uint8_t padding[4];
+	uint16_t synqueuelen;
+	uint8_t padding[2];
  };
 
 struct tcp_ipv6_event_t {
@@ -45,7 +46,8 @@ struct tcp_ipv6_event_t {
 	uint32_t cpu;
 	enum tcp_event_type type;
 	uint32_t pid;
-	uint8_t padding[4];
+	uint16_t synqueuelen;
+	uint8_t padding[2];
 	uint64_t saddr_h;
 	uint64_t saddr_l;
 	uint64_t daddr_h;

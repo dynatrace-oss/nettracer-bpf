@@ -71,8 +71,9 @@ std::string to_string(const tcp_ipv4_event_t& tuple) {
 
 	std::string etype = eventTypeToName[tuple.type];
 
-	return fmt::format(
-			"type: {} {}:{:d} {} {}:{:d} NS:{:d} PID:{:d}", etype,
+	auto desc = fmt::format(
+			"type: {} {}:{:d} {} {}:{:d} NS:{:d} PID:{:d}",
+			etype,
 			ipv4_to_string(tuple.saddr),
 			tuple.sport,
 			directionSigns[static_cast<size_t>(direction)],
@@ -80,6 +81,8 @@ std::string to_string(const tcp_ipv4_event_t& tuple) {
 			tuple.dport,
 			tuple.netns,
 			tuple.pid);
+
+	return (tuple.type == TCP_EVENT_TYPE_SYN_ATTEMPT) ? desc + fmt::format(" synqueuelen: {}", tuple.synqueuelen) : desc;
 }
 
 std::string to_string(const tcp_ipv6_event_t& tuple) {
@@ -92,8 +95,9 @@ std::string to_string(const tcp_ipv6_event_t& tuple) {
 
 	std::string etype = eventTypeToName[tuple.type];
 
-	return fmt::format(
-			"type: {} {}:{:d} {} {}:{:d} NS:{:d} PID:{:d}", etype,
+	auto desc = fmt::format(
+			"type: {} {}:{:d} {} {}:{:d} NS:{:d} PID:{:d}",
+			etype,
 			ipv6_to_string(tuple.saddr_h, tuple.saddr_l),
 			tuple.sport,
 			directionSigns[static_cast<size_t>(direction)],
@@ -101,6 +105,8 @@ std::string to_string(const tcp_ipv6_event_t& tuple) {
 			tuple.dport,
 			tuple.netns,
 			tuple.pid);
+
+	return (tuple.type == TCP_EVENT_TYPE_SYN_ATTEMPT) ? desc + fmt::format(" synqueuelen: {}", tuple.synqueuelen) : desc;
 }
 
 ipv4_tuple_t eventToTuple(const tcp_ipv4_event_t& evt) {
