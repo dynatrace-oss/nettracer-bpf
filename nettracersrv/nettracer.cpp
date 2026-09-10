@@ -22,7 +22,7 @@
 #include "bpf_events.h"
 #include "configuration.h"
 #include "config_watcher.h"
-#include "connections_printing.h"
+#include "event_mode.h"
 #include "netstat.h"
 #include "offsetguess.h"
 #include "proc_tcp.h"

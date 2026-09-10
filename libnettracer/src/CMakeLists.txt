@@ -3,7 +3,7 @@ set(SOURCES
 	bpf_debug_counters.cpp
 	configuration.cpp
 	config_watcher.cpp
-	connections_printing.cpp
+	event_mode.cpp
 	inotify_watcher.cpp
 	localsock.cpp
 	localsock6.cpp
@@ -20,7 +20,7 @@ set(HEADERS
 	bpf_debug_counters.h
 	configuration.h
 	config_watcher.h
-	connections_printing.h
+	event_mode.h
 	inotify_watcher.h
 	localsock.h
 	localsock6.h
