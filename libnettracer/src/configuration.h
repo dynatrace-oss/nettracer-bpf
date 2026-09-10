@@ -20,6 +20,8 @@
 #include <filesystem>
 #include <mutex>
 
+namespace config {
+
 struct ExitCtrl {
 	bool running{true};
 	std::mutex m;
@@ -32,7 +34,7 @@ class Configuration {
 	po::variables_map vm;
 	bool noStdoutLog;
 	uint32_t mapsSize;
-	po::options_description getOptionsDescription();
+	po::options_description getOptionsDescription() const;
 	po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath);
 	bool setUpLogging(const boost::program_options::variables_map& vm);
 
@@ -78,3 +80,4 @@ public:
 		return vm["bpf"].as<std::string>();
 	}
 };
+}

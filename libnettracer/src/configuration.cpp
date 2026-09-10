@@ -16,7 +16,9 @@
 #include "configuration.h"
 #include <iostream>
 
-po::options_description Configuration::getOptionsDescription() {
+namespace config {
+
+po::options_description Configuration::getOptionsDescription() const {
 	po::options_description desc{"Options"};
 	// clang-format off
 	desc.add_options()
@@ -136,16 +138,17 @@ static void validate_log_path(const std::filesystem::path& target_path) {
 
 bool Configuration::setUpLogging(const boost::program_options::variables_map& vm) {
 	std::string logger_path = vm["log"].as<std::string>();
-	bool noStdoutLog = vm.count("no_stdout_log");
+	bool noStdOut = vm.count("no_stdout_log");
 	bool noFileLog = logger_path.empty();
 
 	if (!noFileLog) {
 		validate_log_path(logger_path);
 	}
 
-	logging::setUpLogger(logger_path, !noStdoutLog);
+	logging::setUpLogger(logger_path, !noStdOut);
 	auto level = loglevelFromConfig(vm);
 	logging::getLogger()->set_level(level);
 
-	return noStdoutLog;
+	return noStdOut;
+}
 }

@@ -48,7 +48,7 @@
 
 
 
- ExitCtrl exitCtrl;
+ config::ExitCtrl exitCtrl;
 
 void atexit_handler(int a) {
 	exitCtrl.running = false;
@@ -126,7 +126,7 @@ std::thread startDebugCountersThread(bpf::Ibpf* ebpf, const bpf::BPFMapsWrapper&
 	return std::thread{runDebugCountersLoop, mapFd, numPossibleCpus, intervalSeconds, std::cref(mapsWrapper)};
 }
 
-ReturnCodes startNetTracer(config_watcher& cw, Configuration& config) {
+ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 	const std::string nettracerVersionStr{
 			fmt::format("{}.{}.{}", NETTRACER_VERSION_MAJOR, NETTRACER_VERSION_MINOR, NETTRACER_VERSION_PATCH)};
 	if (config.printVersion()) {
@@ -290,7 +290,7 @@ int main(int argc, char* argv[]) {
 	setUpExitBehavior();
 	ReturnCodes rc;
 	config_watcher cw{};
-	Configuration config;
+	config::Configuration config;
 	do {
 		auto argsFilePath{config.parseOptions(argc, argv)};
 		if (!cw) {

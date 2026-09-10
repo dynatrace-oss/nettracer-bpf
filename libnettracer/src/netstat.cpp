@@ -16,7 +16,6 @@
 #include "netstat.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
-#include "proc_tcp.h"
 #include <iomanip>
 #include <iostream>
 #include <poll.h>
@@ -410,7 +409,7 @@ steady_clock::time_point NetStat::getCurrentTimeFromSteadyClock() const {
 	return steady_clock::now();
 }
 
-NetStat::NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback)
+NetStat::NetStat(config::ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback)
 		: exitCtrl(e), incremental(deltaMode), add_header_mode_(headerMode), os(&std::cout), filter_loopback(filterLoopback) {
 	interactive = ((isatty(STDIN_FILENO) == 1) && !nonInteractive);
 	if (interactive) {

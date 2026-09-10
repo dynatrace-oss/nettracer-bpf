@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-extern ExitCtrl exitCtrl;
+extern config::ExitCtrl exitCtrl;
 
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz){
 	evt_descr *desc = static_cast<evt_descr*>(ctx);
