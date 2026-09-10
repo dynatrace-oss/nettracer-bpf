@@ -73,6 +73,9 @@ public:
 	bool eventsEnabled() const {
 		return vm["events"].as<unsigned>() == 1;
 	}
+	bool connectivityEnabled() const {
+		return vm.count("connectivity") > 0;
+	}
 	std::string bpfProgram() const {
 		return vm["program"].as<std::string>();
 	}

@@ -165,7 +165,7 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		uint32_t nn_entries = config.getMapsSize();
 		LOG_INFO("map_size: {}", nn_entries);
 		netst.set_max_map_size(nn_entries);
-		if (!ebpf->load_bpf(config.bpfProgram(), nn_entries, *kernelVersion)) {
+		if (!ebpf->load_bpf(config.bpfProgram(), nn_entries, *kernelVersion, config.connectivityEnabled())) {
 			return ReturnCodes::GenericError;
 		}
 	} catch (const InsufficientCapabilitiesError& e) {

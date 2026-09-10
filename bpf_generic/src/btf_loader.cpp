@@ -32,7 +32,7 @@ BTFLoader::BTFLoader() {
 	}
 }
 
-bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t kernVersion){
+bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t kernVersion, bool enableConnectivity) {
 	LOG_TRACE("Opening BPF object.");
 	skel = nettracer_bpf_core__open_opts(&openOpts);
 	if (skel == nullptr) {
@@ -49,7 +49,7 @@ bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t
 	}
 
 	LOG_TRACE("Attaching BPF probes");
-	if (!tryAttachProbes()) {
+	if (!tryAttachProbes(enableConnectivity)) {
 		LOG_ERROR("Failed to attach all BPF probes");
 		return false;
 	}
@@ -72,7 +72,6 @@ BTFLoader::~BTFLoader() {
 		cleanup_core_btf(&openOpts);
 		LOG_INFO("BPF destroyed");
 	}
-
 }
 
 int BTFLoader::get_map_fd(const std::string& id) {
@@ -142,7 +141,7 @@ static bpf_link* attachKretprobe(bpf_program* prog, const std::string& funcName)
 	return link;
 }
 
-bool BTFLoader::tryAttachProbes() {
+bool BTFLoader::tryAttachProbes(bool enableConnectivity) {
 	bool anySuccess = false;
 	anySuccess |= (skel->links.kprobe__tcp_v4_connect = attachKprobe(skel->progs.kprobe__tcp_v4_connect, "tcp_v4_connect")) != nullptr;
 	anySuccess |=
@@ -160,7 +159,10 @@ bool BTFLoader::tryAttachProbes() {
 			(skel->links.kprobe__tcp_cleanup_rbuf = attachKprobe(skel->progs.kprobe__tcp_cleanup_rbuf, "tcp_cleanup_rbuf")) != nullptr;
 	anySuccess |= (skel->links.kprobe__tcp_retransmit_skb = attachKprobe(skel->progs.kprobe__tcp_retransmit_skb, "tcp_retransmit_skb")) !=
 				  nullptr;
-	anySuccess |= (skel->links.handle_syn = attachKprobe(skel->progs.handle_syn, "tcp_v4_conn_request")) != nullptr;
+	if (enableConnectivity) {
+		LOG_INFO("Loading Connectivity");
+		anySuccess |= (skel->links.handle_syn = attachKprobe(skel->progs.handle_syn, "tcp_v4_conn_request")) != nullptr;
+	}
 	return anySuccess;
 }
 

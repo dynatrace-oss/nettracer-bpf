@@ -238,7 +238,7 @@ void ClassicLoader::set_maps_max_entries(uint32_t map_max_entries) {
 	}
 }
 
-bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) {
+bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion, [[maybe_unused]] bool enableConnectivity) {
 
 	std::error_code ec;
 	bool exists = std::filesystem::exists(path, ec);
