@@ -24,13 +24,6 @@ using namespace std::chrono_literals;
 
 namespace {
 
-template<typename Tuple>
-bool areTuplesEqualDisregardingNamespace(const Tuple& a, const Tuple& b) {
-	Tuple c{a};
-	c.netns = b.netns;
-	return c == b;
-}
-
 template<typename Tuple, typename T, typename F>
 void processBPFMap(int fd, bpf::BPFMapsWrapper& mapsWrapper, F func) {
 	Tuple previousKey{};
@@ -52,18 +45,19 @@ void ignoreConnectionsFromMaps(const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& map
 	const int statsFd{fds.stats_fd};
 	const int tcpStatsFd{fds.tcp_stats_fd};
 
-	processBPFMap<Tuple, pid_comm_t>(detailsFd, mapsWrapper, [&](const Tuple& key, const pid_comm_t& val){
-		mapsWrapper.removeElement(detailsFd, &key);
-	});
+	processBPFMap<Tuple, pid_comm_t>(
+			detailsFd, mapsWrapper, [&mapsWrapper, detailsFd](const Tuple& key, [[maybe_unused]] const pid_comm_t& val) {
+				mapsWrapper.removeElement(detailsFd, &key);
+			});
 
-	processBPFMap<Tuple, stats_t>(statsFd, mapsWrapper, [&](const Tuple& key, const stats_t& val) {
+	processBPFMap<Tuple, stats_t>(statsFd, mapsWrapper, [&mapsWrapper, statsFd](const Tuple& key, [[maybe_unused]] const stats_t& val) {
 		mapsWrapper.removeElement(statsFd, &key);
 	});
 
-	processBPFMap<Tuple, tcp_stats_t>(tcpStatsFd, mapsWrapper, [&](const Tuple& key, const tcp_stats_t& val) {
-		mapsWrapper.removeElement(tcpStatsFd, &key);
-
-	});
+	processBPFMap<Tuple, tcp_stats_t>(
+			tcpStatsFd, mapsWrapper, [&mapsWrapper, tcpStatsFd](const Tuple& key, [[maybe_unused]] const tcp_stats_t& val) {
+				mapsWrapper.removeElement(tcpStatsFd, &key);
+			});
 }
 
 template<typename Event>

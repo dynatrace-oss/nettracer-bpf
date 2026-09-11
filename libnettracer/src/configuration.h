@@ -31,55 +31,55 @@ struct ExitCtrl {
 
 namespace po = boost::program_options;
 class Configuration {
-	po::variables_map vm;
+	po::variables_map variablesMap;
 	bool noStdoutLog;
 	uint32_t mapsSize;
 	po::options_description getOptionsDescription() const;
 	po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath);
-	bool setUpLogging(const boost::program_options::variables_map& vm) const;
+	bool setUpLogging() const;
 
 public:
 	std::filesystem::path parseOptions(int argc, char* argv[]);
 
 	uint32_t getMapsSize();
 	bool printVersion() const {
-		return vm.count("version") > 0;
+		return variablesMap.count("version") > 0;
 	}
 	bool logEventsOnly() const {
 		return noStdoutLog;
 	}
 	unsigned mainLoopTimeInterval() const {
-		return vm["time_interval"].as<unsigned>();
+		return variablesMap["time_interval"].as<unsigned>();
 	}
 	unsigned countersInterval() const {
-		return vm["counters_interval"].as<unsigned>();
+		return variablesMap["counters_interval"].as<unsigned>();
 	}
 	bool testRun() const {
-		return vm.count("test") > 0;
+		return variablesMap.count("test") > 0;
 	}
 	bool deltaMetricsEnabled() const {
-		return vm.count("incremental") > 0;
+		return variablesMap.count("incremental") > 0;
 	}
 	bool addHeadersToMetrics() const {
-		return vm.count("header") > 0;
+		return variablesMap.count("header") > 0;
 	}
 	bool noninteractiveEnabled() const {
-		return vm.count("noninteractive") > 0;
+		return variablesMap.count("noninteractive") > 0;
 	}
 	bool filterLoopback() const {
-		return vm.count("with_loopback") == 0;
+		return variablesMap.count("with_loopback") == 0;
 	}
 	bool eventsEnabled() const {
-		return vm["events"].as<unsigned>() == 1;
+		return variablesMap["events"].as<unsigned>() == 1;
 	}
 	bool connectivityEnabled() const {
-		return vm.count("connectivity") > 0;
+		return variablesMap.count("connectivity") > 0;
 	}
 	std::string bpfProgram() const {
-		return vm["program"].as<std::string>();
+		return variablesMap["program"].as<std::string>();
 	}
 	std::string bpfType() const {
-		return vm["bpf"].as<std::string>();
+		return variablesMap["bpf"].as<std::string>();
 	}
 };
 }

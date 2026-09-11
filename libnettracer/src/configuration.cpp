@@ -46,19 +46,18 @@ po::options_description Configuration::getOptionsDescription() const {
 std::filesystem::path Configuration::parseOptions(int argc, char* argv[]) {
 	po::options_description desc{getOptionsDescription()};
 	// clang-format on
-	//po::variables_map vm;
 	try {
-		po::store(po::parse_command_line(argc, argv, desc), vm);
-		po::notify(vm);
+		po::store(po::parse_command_line(argc, argv, desc), variablesMap);
+		po::notify(variablesMap);
 
-		if (vm.count("help")) {
+		if (variablesMap.count("help")) {
 			std::cout << desc << '\n';
 			exit(0);
 		}
-		noStdoutLog = setUpLogging(vm);
-		if (vm.count("args_file")) {
-			auto fname = vm["args_file"].as<std::filesystem::path>();
-			vm = parseArgsFile(fname);
+		noStdoutLog = setUpLogging();
+		if (variablesMap.count("args_file")) {
+			auto fname = variablesMap["args_file"].as<std::filesystem::path>();
+			variablesMap = parseArgsFile(fname);
 			return fname;
 		}
 
@@ -98,7 +97,7 @@ po::variables_map Configuration::parseArgsFile(const std::filesystem::path& args
 }
 
 uint32_t Configuration::getMapsSize() {
-	mapsSize = vm["map_size"].as<uint32_t>();
+	mapsSize = variablesMap["map_size"].as<uint32_t>();
 	const int MAX_MAP_SIZE = 1024 * 1024;
 	if (mapsSize > MAX_MAP_SIZE) {
 		LOG_INFO("map_size too large: {}, using maximum value allowed: {}", mapsSize, MAX_MAP_SIZE);
@@ -136,9 +135,9 @@ static void validate_log_path(const std::filesystem::path& target_path) {
 	}
 }
 
-bool Configuration::setUpLogging(const boost::program_options::variables_map& vm) const {
-	std::string logger_path = vm["log"].as<std::string>();
-	bool noStdOut = vm.count("no_stdout_log");
+bool Configuration::setUpLogging() const {
+	std::string logger_path = variablesMap["log"].as<std::string>();
+	bool noStdOut = variablesMap.count("no_stdout_log");
 	bool noFileLog = logger_path.empty();
 
 	if (!noFileLog) {
@@ -146,7 +145,7 @@ bool Configuration::setUpLogging(const boost::program_options::variables_map& vm
 	}
 
 	logging::setUpLogger(logger_path, !noStdOut);
-	auto level = loglevelFromConfig(vm);
+	auto level = loglevelFromConfig(variablesMap);
 	logging::getLogger()->set_level(level);
 
 	return noStdOut;
