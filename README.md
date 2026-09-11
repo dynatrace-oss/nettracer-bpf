@@ -91,6 +91,18 @@ SLAs don't apply for GitHub tickets
 
 SLAs apply according to the customer's support level.
 
+## Related repositories
+
+- [`ebpf-common`](https://github.com/dynatrace-oss/ebpf-common) provides the pinned
+  `bpftool`/`libbpf` build setup and BTF compatibility helpers used by NetTracer.
+- [`eBPF-Discovery`](https://github.com/dynatrace-oss/eBPF-Discovery) is a separate
+  application for discovering services, processes, and managed-runtime library
+  loads. It also consumes `ebpf-common`, but does not share NetTracer's
+  application-specific tracing or metrics code.
+- [`ebpf-dump`](https://github.com/dynatrace-oss/ebpf-dump) is an archived,
+  unsupported Kubernetes traffic-capture experiment. It is not a NetTracer
+  component or dependency.
+
 ## Contributing
 
 See CONTRIBUTING.md for details on submitting changes.
