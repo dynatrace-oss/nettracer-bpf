@@ -58,57 +58,54 @@ int BPF_KPROBE(kprobe__tcp_v4_connect, struct sock *sk, struct sockaddr *uaddr, 
 }
 
 SEC("kprobe/tcp_v4_conn_request")
-int handle_syn(struct pt_regs *ctx)
-{
-    struct sock *sk = (struct sock *)PT_REGS_PARM1(ctx);
-    struct inet_connection_sock *icsk = (struct inet_connection_sock *)sk;
+int handle_syn(struct pt_regs* ctx) {
+	struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
 	struct tcp_ipv4_event_t evt = {.type = TCP_EVENT_TYPE_SYN_ATTEMPT, .timestamp = bpf_ktime_get_ns()};
-	 //local port
-    evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
-    evt.saddr = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
+	// local port
+	evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
+	evt.saddr = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
 
-	struct net *net_ptr = NULL;
+	struct net* net_ptr = NULL;
 	bpf_core_read(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
 	if (net_ptr) {
 		bpf_core_read(&evt.netns, sizeof(evt.netns), &net_ptr->ns.inum);
 	}
 
-    u32 syn_qlen  = BPF_CORE_READ(icsk, icsk_accept_queue.qlen.counter);
+	u32 syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
 	uint32_t cpu = bpf_get_smp_processor_id();
 
 	evt.cpu = cpu;
 	evt.synqueuelen = syn_qlen;
 	if (bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt)) < 0) {
-		INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_failures);
+		INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_attempt_failures);
 	}
 
-    return 0;
+	return 0;
 }
 
 SEC("kprobe/tcp_v6_conn_request")
-int handle_syn6(struct pt_regs *ctx)
-{
-    struct sock *sk = (struct sock *)PT_REGS_PARM1(ctx);
-    struct inet_connection_sock *icsk = (struct inet_connection_sock *)sk;
+int handle_syn6(struct pt_regs* ctx) {
+	struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
 	struct tcp_ipv6_event_t evt = {.type = TCP_EVENT_TYPE_SYN_ATTEMPT, .timestamp = bpf_ktime_get_ns()};
-	 //local port
-    evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
+	// local port
+	evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
 
-	struct net *net_ptr = NULL;
+	struct net* net_ptr = NULL;
 	bpf_core_read(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
 	if (net_ptr) {
 		bpf_core_read(&evt.netns, sizeof(evt.netns), &net_ptr->ns.inum);
 	}
 
-    u32 syn_qlen  = BPF_CORE_READ(icsk, icsk_accept_queue.qlen.counter);
+
+	u32 syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
 	uint32_t cpu = bpf_get_smp_processor_id();
 	evt.cpu = cpu;
 	evt.synqueuelen = syn_qlen;
 	if (bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt)) < 0) {
-		INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_failures);
+		INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_attempt_failures);
 	}
 
-    return 0;
+	return 0;
 }
 
 #endif

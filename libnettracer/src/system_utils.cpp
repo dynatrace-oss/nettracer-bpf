@@ -171,6 +171,7 @@ static uint64_t get_ktime_offset() {
 	return wall_ns - mono_ns;
 }
 
+// functions add static offset to bpfTimestamp
 std::chrono::system_clock::time_point bpfTimeToSystemTime(uint64_t bpfTimestamp) {
 	static uint64_t offset = get_ktime_offset();
 	uint64_t wall_ns = bpfTimestamp + offset;

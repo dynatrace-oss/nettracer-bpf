@@ -3,7 +3,7 @@
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -64,8 +64,8 @@ template<typename Event>
 void processEvent(const Event& evt) {
 	auto recv = std::chrono::steady_clock::now();
 	uint64_t recv_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(recv.time_since_epoch()).count();
-	uint64_t latency_us = (recv_ns - evt.timestamp) / 1000;
-	LOG_INFO("Event {} latency: {}us", to_string(evt), latency_us);
+	int64_t latency_us = (static_cast<int64_t>(recv_ns) - static_cast<int64_t>(evt.timestamp)) / 1000;
+	LOG_INFO("Event {} latency: {}us", to_string(evt), (latency_us >= 0) ? latency_us : 0);
 }
 
 template void ignoreConnectionsFromMaps<ipv4_tuple_t>(const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);

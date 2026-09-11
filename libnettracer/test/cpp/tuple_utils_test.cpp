@@ -208,13 +208,13 @@ TEST_P(IPv6EventToStringTest, testIPv6EventToString) {
 	const uint64_t ts{12345};
 	const uint32_t cpu{1};
 
-	EXPECT_EQ("type: close " + outStrBegin + " -- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CLOSE, pid, 1, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ("type: close " + outStrBegin + " -- "s + outStrEnd, to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CLOSE, pid, 1, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 	EXPECT_EQ(
 			"type: connect " + outStrBegin + " -> "s + outStrEnd,
-			to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CONNECT, pid, 2, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+			to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_CONNECT, pid, 2, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 	EXPECT_EQ(
 			"type: accept " + outStrBegin + " <- "s + outStrEnd,
-			to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_ACCEPT, pid, 3, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+			to_string(tcp_ipv6_event_t{ts, cpu, TCP_EVENT_TYPE_ACCEPT, pid, 3, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 }
 
 INSTANTIATE_TEST_SUITE_P(IPv6EventToStringTests, IPv6EventToStringTest, testing::Values(
@@ -244,7 +244,7 @@ TEST(TupleConversionTests, testIPv6EventToTuple) {
 	const uint32_t cpu{2};
 	const uint32_t pid{1234};
 
-	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_ACCEPT, pid, 1, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
-	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CLOSE, pid, 2, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
-	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CONNECT, pid, 3, {0}, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_ACCEPT, pid, 1, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CLOSE, pid, 2, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
+	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CONNECT, pid, 3, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 }

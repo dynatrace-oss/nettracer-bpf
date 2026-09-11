@@ -3,7 +3,7 @@
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -25,7 +25,7 @@
 namespace {
 
 constexpr std::array<const char*, 3> directionSigns = {"--", "<-", "->"};
-constexpr std::array<const char*, 5> eventTypeToName = {"connect", "accept", "close", "syn"};
+constexpr std::array<const char*, 4> eventTypeToName = {"connect", "accept", "close", "syn"};
 }
 
 std::string ipv6_to_string(uint64_t h, uint64_t l) {

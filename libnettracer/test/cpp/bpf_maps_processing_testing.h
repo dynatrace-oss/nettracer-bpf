@@ -67,30 +67,6 @@ protected:
 	}
 
 	template<typename Tuple>
-	static void addConns(std::unordered_map<Tuple, pid_comm_t>& pidsMap, ConnectionsState<Tuple>& connsState, const std::vector<Tuple>& tuples) {
-		std::vector<std::pair<Tuple, pid_comm_t>> conns{
-			std::make_pair(tuples[0], pid_comm_t{pidMax, CONN_ACTIVE}),
-			std::make_pair(tuples[1], pid_comm_t{0, CONN_ACTIVE}),
-			std::make_pair(tuples[2], pid_comm_t{pidMax, CONN_ACTIVE}),
-			std::make_pair(tuples[3], pid_comm_t{pidMax, CONN_ACTIVE})
-		};
-
-		for (const auto& tupleAndPIDComm : conns) {
-			pidsMap.insert(tupleAndPIDComm);
-		}
-
-		insertConnsIntoConnsState(conns, connsState);
-	}
-
-	void addIPv4Conns() {
-		addConns(*ipv4PIDsMap, *ipv4ConnsState, getIPv4Tuples());
-	}
-
-	void addIPv6Conns() {
-		addConns(*ipv6PIDsMap, *ipv6ConnsState, getIPv6Tuples());
-	}
-
-	template<typename Tuple>
 	static void addStats(std::unordered_map<Tuple, stats_t>& statsMap, const std::vector<Tuple>& tuples) {
 		statsMap.insert(std::make_pair(tuples[0], stats_t{0, 0}));
 		statsMap.insert(std::make_pair(tuples[1], stats_t{0, 0}));
