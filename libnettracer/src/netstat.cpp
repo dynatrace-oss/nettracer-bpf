@@ -16,6 +16,8 @@
 #include "netstat.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
+#include "proc_tcp.h"
+#include "system_utils.h"
 #include <iomanip>
 #include <iostream>
 #include <poll.h>
@@ -237,7 +239,7 @@ void NetStat::clean() {
 template<typename IPTYPE, typename EventIPTYPE>
 void NetStat::event(const EventIPTYPE& evt) {
 	auto key{eventToTuple(evt)};
-	auto time = getCurrentTimeFromSystemClock();
+	auto time = bpfTimeToSystemTime(evt.timestamp);
 
 	std::unique_lock<std::mutex> l(mx);
 	auto& el = connections<IPTYPE>()[key];

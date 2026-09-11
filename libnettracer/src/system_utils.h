@@ -16,6 +16,7 @@
 #pragma once
 
 #include "system_calls.h"
+#include <chrono>
 #include <optional>
 #include <string>
 
@@ -33,3 +34,4 @@ std::string kernelVersionToString(int kernelVersion);
 // parsed.
 std::optional<unsigned> getNumPossibleCpus(const ISystemCalls& sysCalls);
 
+std::chrono::system_clock::time_point bpfTimeToSystemTime(uint64_t bpfTimestamp);

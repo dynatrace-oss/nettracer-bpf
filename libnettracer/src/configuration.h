@@ -66,7 +66,7 @@ public:
 	bool noninteractiveEnabled() const {
 		return vm.count("noninteractive") > 0;
 	}
-	bool loopbackEnabled() const {
+	bool filterLoopback() const {
 		return vm.count("with_loopback") == 0;
 	}
 	bool eventsEnabled() const {

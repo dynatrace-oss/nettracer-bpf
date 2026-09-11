@@ -159,7 +159,7 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 	bpf::BPFMapsWrapper mapsWrapper;
 
 	netstat::NetStat netst(
-			exitCtrl, config.deltaMetricsEnabled(), config.addHeadersToMetrics(), config.noninteractiveEnabled(), config.loopbackEnabled());
+			exitCtrl, config.deltaMetricsEnabled(), config.addHeadersToMetrics(), config.noninteractiveEnabled(), config.filterLoopback());
 
 	try {
 		uint32_t nn_entries = config.getMapsSize();
