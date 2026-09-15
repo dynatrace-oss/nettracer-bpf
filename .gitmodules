@@ -1,4 +1,3 @@
 [submodule "ebpf-common"]
 	path = ebpf-common
 	url = https://github.com/dynatrace-oss/ebpf-common.git
-	branch = repo_init
