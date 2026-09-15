@@ -34,7 +34,10 @@ class Configuration {
 	po::variables_map variablesMap;
 	bool noStdoutLog;
 	uint32_t mapsSize;
-	po::options_description getOptionsDescription() const;
+	bool connectivity{false};
+	bool disableEvents{false};
+	bool testrun{false};
+	po::options_description getOptionsDescription();
 	po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath);
 	bool setUpLogging() const;
 
@@ -55,7 +58,7 @@ public:
 		return variablesMap["counters_interval"].as<unsigned>();
 	}
 	bool testRun() const {
-		return variablesMap.count("test") > 0;
+		return testrun;
 	}
 	bool deltaMetricsEnabled() const {
 		return variablesMap.count("incremental") > 0;
@@ -69,11 +72,9 @@ public:
 	bool filterLoopback() const {
 		return variablesMap.count("with_loopback") == 0;
 	}
-	bool eventsEnabled() const {
-		return variablesMap["events"].as<unsigned>() == 1;
-	}
+	bool eventsEnabled() const;
 	bool connectivityEnabled() const {
-		return variablesMap.count("connectivity") > 0;
+		return connectivity;
 	}
 	std::string bpfProgram() const {
 		return variablesMap["program"].as<std::string>();

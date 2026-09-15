@@ -1,5 +1,6 @@
 
 set(SOURCES
+	configuration_test.cpp
 	bpf_debug_counters_test.cpp
 	mock_bpf_maps_test.cpp
 	#netstat_test.cpp

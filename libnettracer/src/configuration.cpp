@@ -18,13 +18,13 @@
 
 namespace config {
 
-po::options_description Configuration::getOptionsDescription() const {
+po::options_description Configuration::getOptionsDescription() {
 	po::options_description desc{"Options"};
 	// clang-format off
 	desc.add_options()
-			("connectivity,c", "Enable connectivity")
+			("connectivity,c", po::bool_switch(&connectivity), "Enable connectivity")
 			("debug,d", po::value<std::string>()->default_value("info"), "Enable debug logs")
-			("events,e", po::value<unsigned>()->default_value(1), "Enable events")
+			("disable_events", po::bool_switch(&disableEvents), "Disable events")
 			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
 			("log,l", po::value<std::string>()->default_value(""), "Logger path")
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
@@ -37,7 +37,7 @@ po::options_description Configuration::getOptionsDescription() const {
 			("header,s", "Add average header size to traffic")
 			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
 			("args_file", po::value<std::filesystem::path>(), "Arguments file")
-			("test", "Check if NetTracer can start properly, then exit")
+			("test",  po::bool_switch(&testrun), "Check if NetTracer can start properly, then exit")
 			("version,v", "Print version")
 			("help,h", "Print this help screen");
 	return desc;
@@ -149,5 +149,12 @@ bool Configuration::setUpLogging() const {
 	logging::getLogger()->set_level(level);
 
 	return noStdOut;
+}
+
+bool Configuration::eventsEnabled() const {
+	if (connectivity && disableEvents) {
+		throw po::invalid_option_value("With connectivity events must be enabled");
+	}
+	return !disableEvents;
 }
 }
