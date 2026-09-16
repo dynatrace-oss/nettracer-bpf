@@ -185,6 +185,12 @@ struct bpf_debug_counters_t {
 	uint64_t map_sends_update_failures;
 };
 
+struct nettracer_params_t {
+	uint32_t syn_queue_size;
+	uint32_t syn6_queue_size;
+	uint32_t netns;
+};
+
 // Helper to safely increment a field of bpf_debug_counters_t from BPF code.
 // Relies on bpf_debug_counters being a PERCPU_ARRAY map of size 1 at key 0,
 // so plain ++ is race-free across CPUs (no __sync_fetch_and_add needed).

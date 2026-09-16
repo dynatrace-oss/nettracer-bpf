@@ -72,6 +72,7 @@ int handle_syn(struct pt_regs* ctx) {
 	}
 
 	u32 syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
+	u32 max_backlog = BPF_CORE_READ(sk, sk_max_ack_backlog);
 	uint32_t cpu = bpf_get_smp_processor_id();
 
 	evt.cpu = cpu;
@@ -79,6 +80,10 @@ int handle_syn(struct pt_regs* ctx) {
 	if (bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt)) < 0) {
 		INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_attempt_failures);
 	}
+
+	u32 key = 0;
+	struct nettracer_params_t val = {.syn_queue_size = max_backlog, .netns = evt.netns};
+	bpf_map_update_elem(&nettracer_params, &key, &val, BPF_NOEXIST);
 
 	return 0;
 }
@@ -98,12 +103,18 @@ int handle_syn6(struct pt_regs* ctx) {
 
 
 	u32 syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
+	u32 max_backlog = BPF_CORE_READ(sk, sk_max_ack_backlog);
 	uint32_t cpu = bpf_get_smp_processor_id();
+
 	evt.cpu = cpu;
 	evt.synqueuelen = syn_qlen;
 	if (bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt)) < 0) {
 		INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_attempt_failures);
 	}
+
+	u32 key = 0;
+	struct nettracer_params_t val = {.syn6_queue_size = max_backlog, .netns = evt.netns};
+	bpf_map_update_elem(&nettracer_params, &key, &val, BPF_NOEXIST);
 
 	return 0;
 }
