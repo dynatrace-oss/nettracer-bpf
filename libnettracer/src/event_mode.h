@@ -1,9 +1,9 @@
 /*
-* Copyright 2025 Dynatrace LLC
+* Copyright 2026 Dynatrace LLC
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -15,9 +15,11 @@
 */
 #pragma once
 
-#include "bpf_generic/src/log.h"
-#include "bpf_program/nettracer-bpf.h"
-#include <boost/program_options.hpp>
+#include "bpf_generic/src/bpf_wrapper.h"
 
-spdlog::level::level_enum  loglevelFromConfig(const boost::program_options::variables_map& vm);
-bool setUpLogging(const boost::program_options::variables_map& vm);
+
+
+template<typename Tuple>
+void ignoreConnectionsFromMaps(const bpf::bpf_fds& fds, bpf::BPFMapsWrapper& mapsWrapper);
+template<typename Event>
+void processEvent(const Event& evt);

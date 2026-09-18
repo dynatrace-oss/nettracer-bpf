@@ -238,7 +238,7 @@ void ClassicLoader::set_maps_max_entries(uint32_t map_max_entries) {
 	}
 }
 
-bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion) {
+bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion, bool enableConnectivity) {
 
 	std::error_code ec;
 	bool exists = std::filesystem::exists(path, ec);
@@ -247,7 +247,10 @@ bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, 
 		return false;
 	}
 
-	LOG_INFO("Loading Classic BPF {}");
+	LOG_INFO("Loading Classic BPF");
+	if (enableConnectivity) {
+		LOG_WARN("Connectivity not supported");
+	}
 	SectionLoader sectionloader(path);
 	if (!sectionloader.loadSections()) {
 		LOG_ERROR("Error loading sections from elf");

@@ -163,3 +163,18 @@ std::optional<unsigned> getNumPossibleCpus(const ISystemCalls& sysCalls) {
 	return total;
 }
 
+static uint64_t get_ktime_offset() {
+	struct timespec mono;
+	clock_gettime(CLOCK_MONOTONIC, &mono);
+	uint64_t mono_ns = mono.tv_sec * 1000000000ULL + mono.tv_nsec;
+	uint64_t wall_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+	return wall_ns - mono_ns;
+}
+
+// functions add static offset to bpfTimestamp
+std::chrono::system_clock::time_point bpfTimeToSystemTime(uint64_t bpfTimestamp) {
+	static uint64_t offset = get_ktime_offset();
+	uint64_t wall_ns = bpfTimestamp + offset;
+
+	return std::chrono::system_clock::time_point{std::chrono::nanoseconds{wall_ns}};
+}

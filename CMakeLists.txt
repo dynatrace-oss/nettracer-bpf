@@ -168,13 +168,18 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
-file(READ "version.properties" ver)
+set(versionFile "version.properties")
+if(EXISTS ${versionFile})
+	file(READ ${versionFile} ver)
+else()
+	set(ver "version=0.0.0")
+	message(STATUS "Using development version ${ver}")
+endif()
+
 string(REGEX MATCH "version=([0-9]+)\.([0-9]+)\.([0-9]+)" _ ${ver})
 if(NOT CMAKE_MATCH_COUNT EQUAL 3)
 	message(FATAL_ERROR "Version parsing failed\n    Got: ${ver}")
 endif()
-
-
 
 set(NETTRACER_VERSION_MAJOR ${CMAKE_MATCH_1})
 set(NETTRACER_VERSION_MINOR ${CMAKE_MATCH_2})

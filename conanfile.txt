@@ -11,5 +11,8 @@ CMakeToolchain
 [layout]
 cmake_layout
 
+[options]
+boost:without_test = True
+
 [imports]
 ., license* -> ./licenses @ folder=True, ignore_case=True

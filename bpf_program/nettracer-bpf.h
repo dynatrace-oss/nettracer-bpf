@@ -23,7 +23,8 @@
 enum tcp_event_type {
 	TCP_EVENT_TYPE_CONNECT,
 	TCP_EVENT_TYPE_ACCEPT,
-	TCP_EVENT_TYPE_CLOSE
+	TCP_EVENT_TYPE_CLOSE,
+	TCP_EVENT_TYPE_SYN_ATTEMPT
 };
 
 struct tcp_ipv4_event_t {
@@ -36,7 +37,7 @@ struct tcp_ipv4_event_t {
 	uint16_t sport;
 	uint16_t dport;
 	uint32_t netns;
-	uint8_t padding[4];
+	uint32_t synqueuelen;
  };
 
 struct tcp_ipv6_event_t {
@@ -44,7 +45,7 @@ struct tcp_ipv6_event_t {
 	uint32_t cpu;
 	enum tcp_event_type type;
 	uint32_t pid;
-	uint8_t padding[4];
+	uint32_t synqueuelen;
 	uint64_t saddr_h;
 	uint64_t saddr_l;
 	uint64_t daddr_h;
@@ -173,6 +174,8 @@ struct bpf_debug_counters_t {
 	uint64_t tcp_stats_updating_failures;
 	uint64_t perf_output_ipv4_on_connect_failures;
 	uint64_t perf_output_ipv6_on_connect_failures;
+	uint64_t perf_output_ipv4_on_connect_attempt_failures;
+	uint64_t perf_output_ipv6_on_connect_attempt_failures;
 	uint64_t perf_output_ipv4_on_accept_failures;
 	uint64_t perf_output_ipv6_on_accept_failures;
 	uint64_t perf_output_ipv4_on_close_failures;
@@ -180,6 +183,12 @@ struct bpf_debug_counters_t {
 	uint64_t connectsock_ipv4_update_failures;
 	uint64_t connectsock_ipv6_update_failures;
 	uint64_t map_sends_update_failures;
+};
+
+struct nettracer_params_t {
+	uint32_t syn_queue_size;
+	uint32_t syn6_queue_size;
+	uint32_t netns;
 };
 
 // Helper to safely increment a field of bpf_debug_counters_t from BPF code.

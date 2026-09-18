@@ -3,7 +3,7 @@
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -16,6 +16,7 @@
 #pragma once
 
 #include "system_calls.h"
+#include <chrono>
 #include <optional>
 #include <string>
 
@@ -33,3 +34,4 @@ std::string kernelVersionToString(int kernelVersion);
 // parsed.
 std::optional<unsigned> getNumPossibleCpus(const ISystemCalls& sysCalls);
 
+std::chrono::system_clock::time_point bpfTimeToSystemTime(uint64_t bpfTimestamp);

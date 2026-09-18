@@ -15,11 +15,13 @@
 */
 #pragma once
 
+#include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_program/nettracer-bpf.h"
-#include "connections_printing.h"
+#include "configuration.h"
+#include "tuple_utils.h"
 #include <chrono>
-#include <ostream>
 #include <mutex>
+#include <ostream>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -68,7 +70,7 @@ protected:
 	bool kbhit;
 	bool config_changed{false};
 	int max_map_size{1024};
-	ExitCtrl& exitCtrl;
+	config::ExitCtrl& exitCtrl;
 	bool incremental;
 	bool add_header_mode_ = false;
 	bpf::BPFMapsWrapper* mapsWrapper;
@@ -107,7 +109,7 @@ protected:
 	virtual steady_clock::time_point getCurrentTimeFromSteadyClock() const;
 
 public:
-	explicit NetStat(ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
+	explicit NetStat(config::ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
 	virtual ~NetStat();
 	void set_kbhit();
 	void set_max_map_size(uint32_t size);

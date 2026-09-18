@@ -129,3 +129,10 @@ struct {
 	__uint(max_entries, 1);
 } bpf_debug_counters SEC(".maps");
 
+// Map with only one element at 0-key, representing bpf params
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, __u32);
+	__type(value, struct nettracer_params_t);
+	__uint(max_entries, 1);
+} nettracer_params SEC(".maps");

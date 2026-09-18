@@ -20,18 +20,16 @@
 
 #include "bpf_debug_counters.h"
 #include "bpf_events.h"
+#include "configuration.h"
 #include "config_watcher.h"
-#include "connections_printing.h"
+#include "event_mode.h"
 #include "netstat.h"
 #include "offsetguess.h"
 #include "proc_tcp.h"
 #include "system_utils.h"
 #include "tuple_utils.h"
-#include "unified_log.h"
 
-#include <boost/program_options.hpp>
 #include <fmt/core.h>
-
 #include <chrono>
 #include <condition_variable>
 #include <ctime>
@@ -48,9 +46,9 @@
 #include <utility>
 #include <vector>
 
-namespace po = boost::program_options;
 
- ExitCtrl exitCtrl;
+
+ config::ExitCtrl exitCtrl;
 
 void atexit_handler(int a) {
 	exitCtrl.running = false;
@@ -68,83 +66,6 @@ void setUpExitBehavior() {
 	sigaction(SIGPIPE, &action, nullptr);
 }
 
-po::options_description getOptionsDescription() {
-	po::options_description desc{"Options"};
-	// clang-format off
-	desc.add_options()
-			("clear_probes,c", "Clear all probes on start")
-			("debug,d", po::value<std::string>()->default_value("info"), "Enable debug logs")
-			("events,e", po::value<unsigned>()->default_value(1), "Enable events")
-			("no_stdout_log,n", "Disable logging to stdout, print metrics data in tabular format")
-			("log,l", po::value<std::string>()->default_value(""), "Logger path")
-			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
-			("counters_interval", po::value<unsigned>()->default_value(300), "Interval (seconds) for logging BPF debug counters; 0 disables")
-			("incremental,i", "Enable incremental data")
-			("noninteractive,r", "Hex output")
-			("with_loopback,f", "With loopback")
-			("bpf,b", po::value<std::string>()->default_value("auto"), "BTF or classic")
-			("program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")
-			("header,s", "Add average header size to traffic")
-			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
-			("args_file", po::value<std::filesystem::path>(), "Arguments file")
-			("test", "Check if NetTracer can start properly, then exit")
-			("version,v", "Print version")
-			("help,h", "Print this help screen");
-	return desc;
-}
-
-po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath) {
-	if (argsFilePath.empty()) {
-		LOG_INFO("args_file provided but empty");
-		return {};
-	}
-	if (::access(argsFilePath.c_str(), R_OK) != 0) {
-		std::error_code errCode(errno, std::generic_category());
-		throw std::filesystem::filesystem_error("File access permissions validation failed", argsFilePath, errCode);
-	}
-	po::variables_map vm;
-	po::options_description desc{getOptionsDescription()};
-	po::store(po::parse_config_file<char>(argsFilePath.c_str(), desc), vm);
-	po::notify(vm);
-	return vm;
-}
-
-std::pair<po::variables_map, std::filesystem::path> parseOptions(int argc, char* argv[]) {
-	po::options_description desc{getOptionsDescription()};
-	// clang-format on
-	po::variables_map vm;
-	try {
-		po::store(po::parse_command_line(argc, argv, desc), vm);
-		po::notify(vm);
-
-		if (vm.count("help")) {
-			std::cout << desc << '\n';
-			exit(0);
-		}
-
-		if (vm.count("args_file")) {
-			auto fname = vm["args_file"].as<std::filesystem::path>();
-			return {parseArgsFile(fname), std::move(fname)};
-		}
-
-		return {vm, ""};
-	} catch (const po::invalid_syntax& ex){
-		if (ex.kind() == po::invalid_syntax::unrecognized_line) {
-			LOG_WARN("the options configuration file contains an invalid line");
-		} else {
-			LOG_WARN("{} running without args_file", ex.what());
-		}
-		LOG_WARN("{}", (std::stringstream{} << desc).str());
-		exit(1);
-	} catch (const po::error& ex) {
-		std::cout << ex.what() << '\n';
-		std::cout << desc << '\n';
-		exit(1);
-	} catch (const std::exception& ex) {
-		std::cout << ex.what() << '\n';
-		exit(1);
-	}
-}
 
 bool increaseMemoryLimit() {
 	// increase limit of lockable RAM to allow creation of userspace-mapped BPF maps
@@ -205,22 +126,21 @@ std::thread startDebugCountersThread(bpf::Ibpf* ebpf, const bpf::BPFMapsWrapper&
 	return std::thread{runDebugCountersLoop, mapFd, numPossibleCpus, intervalSeconds, std::cref(mapsWrapper)};
 }
 
-ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables_map& vm) {
+ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 	const std::string nettracerVersionStr{
 			fmt::format("{}.{}.{}", NETTRACER_VERSION_MAJOR, NETTRACER_VERSION_MINOR, NETTRACER_VERSION_PATCH)};
-	if (vm.count("version")) {
+	if (config.printVersion()) {
 		std::cout << "version: " << nettracerVersionStr << std::endl;
 		return ReturnCodes::Success;
 	}
 
-	bool noStdoutLog{setUpLogging(vm)};
+	bool eventsOnly = config.logEventsOnly();
 	LOG_INFO("Starting NetTracer v{}", nettracerVersionStr);
-
 	if (!increaseMemoryLimit()) {
 		return ReturnCodes::InsufficientCapabilities;
 	}
 
-	unsigned time_interval = vm["time_interval"].as<unsigned>();
+	unsigned time_interval = config.mainLoopTimeInterval();
 	LOG_INFO("time_interval: {}", time_interval);
 	exitCtrl.wait_time = time_interval;
 
@@ -231,7 +151,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	}
 	LOG_DEBUG("Detected kernel {}", kernelVersionToString(*kernelVersion));
 
-	auto ebpf = createBPFinterface(*kernelVersion, vm["bpf"].as<std::string>(), SystemCalls::getInstance());
+	auto ebpf = createBPFinterface(*kernelVersion, config.bpfType(), SystemCalls::getInstance());
 	if (!ebpf) {
 		LOG_ERROR("Unsuported option for bpf");
 		return ReturnCodes::GenericError;
@@ -239,23 +159,13 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	bpf::BPFMapsWrapper mapsWrapper;
 
 	netstat::NetStat netst(
-			exitCtrl, vm.count("incremental"), vm.count("header"), vm.count("noninteractive"), vm.count("with_loopback") == 0);
-
-	if (vm.count("clear_probes")) {
-		ebpf->clear_all_probes();
-		LOG_INFO("clear_probes");
-	}
+			exitCtrl, config.deltaMetricsEnabled(), config.addHeadersToMetrics(), config.noninteractiveEnabled(), config.filterLoopback());
 
 	try {
-		uint32_t nn_entries = vm["map_size"].as<uint32_t>();
+		uint32_t nn_entries = config.getMapsSize();
 		LOG_INFO("map_size: {}", nn_entries);
-		const int MAX_MAP_SIZE = 1024 * 1024;
-		if (nn_entries > MAX_MAP_SIZE) {
-			LOG_INFO("map_size too large: {}, using maximum value allowed: {}", nn_entries, MAX_MAP_SIZE);
-			nn_entries = MAX_MAP_SIZE;
-		}
 		netst.set_max_map_size(nn_entries);
-		if (!ebpf->load_bpf(vm["program"].as<std::string>(), nn_entries, *kernelVersion)) {
+		if (!ebpf->load_bpf(config.bpfProgram(), nn_entries, *kernelVersion, config.connectivityEnabled())) {
 			return ReturnCodes::GenericError;
 		}
 	} catch (const InsufficientCapabilitiesError& e) {
@@ -279,7 +189,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		return ReturnCodes::GenericError;
 	}
 
-	if (vm.count("test")) {
+	if (config.testRun()) {
 		LOG_INFO("All checks passed, stopping NetTracer");
 		return ReturnCodes::Success;
 	}
@@ -308,7 +218,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
 	std::function<void(std::promise<bool>&&)> map_reading;
 
-	if (noStdoutLog) {
+	if (eventsOnly) {
 		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst.event<ipv4_tuple_t>(evt); };
 		if (monitorIPv6) {
 			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
@@ -319,11 +229,10 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 			promise.set_value(ret);
 		};
 	} else {
-		static ConnectionsState<ipv4_tuple_t> ipv4Connections;
-		static ConnectionsState<ipv6_tuple_t> ipv6Connections;
-		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { updateConnectionsAfterEvent(evt, ipv4Connections); };
+		LOG_INFO("Only TCP events are output");
+		ipv4_event_update = [](const tcp_ipv4_event_t& evt) { processEvent(evt); };
 		if (monitorIPv6) {
-			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { updateConnectionsAfterEvent(evt, ipv6Connections); };
+			ipv6_event_update = [](const tcp_ipv6_event_t& evt) { processEvent(evt); };
 		}
 		map_reading = [&](std::promise<bool>&& promise) {
 			while (exitCtrl.running) {
@@ -332,9 +241,9 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 					break;
 				}
 
-				updateConnectionsFromMaps(ipv4Connections, ipv4_fds, mapsWrapper);
+				ignoreConnectionsFromMaps<ipv4_tuple_t>(ipv4_fds, mapsWrapper);
 				if (monitorIPv6) {
-					updateConnectionsFromMaps(ipv6Connections, ipv6_fds, mapsWrapper);
+					ignoreConnectionsFromMaps<ipv6_tuple_t>(ipv6_fds, mapsWrapper);
 				}
 
 				std::unique_lock<std::mutex> lk{exitCtrl.m};
@@ -345,7 +254,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 		};
 	}
 
-	const bool eventsEnabled = vm["events"].as<unsigned>() == 1;
+	const bool eventsEnabled = config.eventsEnabled();
 	auto ipv4_pmap = ebpf->get_perf_map("tcp_event_ipv4");
 	if (eventsEnabled) {
 		LOG_INFO("Starting TCP IPv4 events");
@@ -357,7 +266,7 @@ ReturnCodes startNetTracer(config_watcher& cw, boost::program_options::variables
 			bevents.add_observer<tcp_ipv6_event_t>(ipv6_pmap, ipv6_event_update);
 		}
 	}
-	const unsigned debugCountersInterval{vm["counters_interval"].as<unsigned>()};
+	const unsigned debugCountersInterval{config.countersInterval()};
 	std::thread debugCountersThread{startDebugCountersThread(ebpf.get(), mapsWrapper, debugCountersInterval)};
 
 	bevents.start();
@@ -381,13 +290,14 @@ int main(int argc, char* argv[]) {
 	setUpExitBehavior();
 	ReturnCodes rc;
 	config_watcher cw{};
+	config::Configuration config;
 	do {
-		auto [vm, argsFilePath]{parseOptions(argc, argv)};
+		auto argsFilePath{config.parseOptions(argc, argv)};
 		if (!cw) {
 			cw.init(argsFilePath);
 		}
 		cw.reset();
-		rc = startNetTracer(cw, vm);
+		rc = startNetTracer(cw, config);
 		LOG_INFO("NetTracer stop reason {}", std::underlying_type_t<ReturnCodes>(rc));
 	} while (rc == ReturnCodes::Reconfigure);
 	return rc;

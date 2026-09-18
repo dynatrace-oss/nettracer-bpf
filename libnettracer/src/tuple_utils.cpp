@@ -3,7 +3,7 @@
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -25,7 +25,7 @@
 namespace {
 
 constexpr std::array<const char*, 3> directionSigns = {"--", "<-", "->"};
-
+constexpr std::array<const char*, 4> eventTypeToName = {"connect", "accept", "close", "syn"};
 }
 
 std::string ipv6_to_string(uint64_t h, uint64_t l) {
@@ -63,14 +63,17 @@ std::string to_string(const ipv6_tuple_t& tuple, ConnectionDirection direction) 
 
 std::string to_string(const tcp_ipv4_event_t& tuple) {
 	ConnectionDirection direction{ConnectionDirection::Unknown};
-	if (tuple.type == TCP_EVENT_TYPE_ACCEPT) {
+	if (tuple.type == TCP_EVENT_TYPE_ACCEPT || tuple.type == TCP_EVENT_TYPE_SYN_ATTEMPT) {
 		direction = ConnectionDirection::Incoming;
 	} else if (tuple.type == TCP_EVENT_TYPE_CONNECT) {
 		direction = ConnectionDirection::Outgoing;
 	}
 
-	return fmt::format(
-			"{}:{:d} {} {}:{:d} NS:{:d} PID:{:d}",
+	std::string etype = eventTypeToName[tuple.type];
+
+	auto desc = fmt::format(
+			"type: {} {}:{:d} {} {}:{:d} NS:{:d} PID:{:d}",
+			etype,
 			ipv4_to_string(tuple.saddr),
 			tuple.sport,
 			directionSigns[static_cast<size_t>(direction)],
@@ -78,17 +81,23 @@ std::string to_string(const tcp_ipv4_event_t& tuple) {
 			tuple.dport,
 			tuple.netns,
 			tuple.pid);
+
+	return (tuple.type == TCP_EVENT_TYPE_SYN_ATTEMPT) ? desc + fmt::format(" synqueuelen: {}", tuple.synqueuelen) : desc;
 }
 
 std::string to_string(const tcp_ipv6_event_t& tuple) {
 	ConnectionDirection direction{ConnectionDirection::Unknown};
-	if (tuple.type == TCP_EVENT_TYPE_ACCEPT) {
+	if (tuple.type == TCP_EVENT_TYPE_ACCEPT || tuple.type == TCP_EVENT_TYPE_SYN_ATTEMPT) {
 		direction = ConnectionDirection::Incoming;
 	} else if (tuple.type == TCP_EVENT_TYPE_CONNECT) {
 		direction = ConnectionDirection::Outgoing;
 	}
-	return fmt::format(
-			"{}:{:d} {} {}:{:d} NS:{:d} PID:{:d}",
+
+	std::string etype = eventTypeToName[tuple.type];
+
+	auto desc = fmt::format(
+			"type: {} {}:{:d} {} {}:{:d} NS:{:d} PID:{:d}",
+			etype,
 			ipv6_to_string(tuple.saddr_h, tuple.saddr_l),
 			tuple.sport,
 			directionSigns[static_cast<size_t>(direction)],
@@ -96,6 +105,8 @@ std::string to_string(const tcp_ipv6_event_t& tuple) {
 			tuple.dport,
 			tuple.netns,
 			tuple.pid);
+
+	return (tuple.type == TCP_EVENT_TYPE_SYN_ATTEMPT) ? desc + fmt::format(" synqueuelen: {}", tuple.synqueuelen) : desc;
 }
 
 ipv4_tuple_t eventToTuple(const tcp_ipv4_event_t& evt) {

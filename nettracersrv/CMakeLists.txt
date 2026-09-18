@@ -1,11 +1,9 @@
 set(SOURCES
 	nettracer.cpp
-	unified_log.cpp
 )
 PREPEND(SOURCES_FULL "${CMAKE_CURRENT_LIST_DIR}" ${SOURCES})
 
 set(HEADERS
-	unified_log.h
 )
 PREPEND(HEADERS_FULL "${CMAKE_CURRENT_LIST_DIR}" ${HEADERS})
 
@@ -23,7 +21,6 @@ target_include_directories(nettracersrv
 )
 
 target_link_libraries(nettracersrv libnettracer)
-target_link_libraries(nettracersrv CONAN_PKG::boost)
 
 install(TARGETS nettracersrv
 	RUNTIME DESTINATION "bin"
