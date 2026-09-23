@@ -43,4 +43,4 @@ target_include_directories(libnettracer
 add_dependencies(libnettracer bpf_program)
 target_link_libraries(libnettracer bpf_generic)
 target_link_libraries(libnettracer /usr/lib/${ARCHITECTURE}-linux-gnu/libtinfo.a)
-target_link_libraries(libnettracer CONAN_PKG::boost)
+target_link_libraries(libnettracer Boost::boost Boost::program_options)

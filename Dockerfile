@@ -20,5 +20,5 @@ RUN apt-get update -y && \
 	update-alternatives --install /usr/bin/cc cc "/usr/lib/llvm-${LLVM_VERSION}/bin/clang" 800 && \
 	update-alternatives --install /usr/bin/c++ c++ "/usr/lib/llvm-${LLVM_VERSION}/bin/clang++" 800 && \
 	python3 -m pip install --upgrade pip setuptools wheel && \
-	pip3 install conan==1.66.0 cmake==3.28.4 && \
+	pip3 install --ignore-installed conan==2.0.17 cmake==3.28.4 && \
 	rm -rf /var/lib/apt/lists/*

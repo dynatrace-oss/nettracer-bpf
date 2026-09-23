@@ -32,7 +32,7 @@ target_link_libraries(libnettracer_test libnettracer)
 target_link_libraries(libnettracer_test z)
 target_link_libraries(libnettracer_test -lpthread)
 target_link_libraries(libnettracer_test -ldl)
-target_link_libraries(libnettracer_test CONAN_PKG::gtest)
+target_link_libraries(libnettracer_test GTest::gtest GTest::gtest_main GTest::gmock)
 
 include(GoogleTest)
 gtest_discover_tests(libnettracer_test)
