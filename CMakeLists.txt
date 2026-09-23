@@ -19,6 +19,34 @@ if(NOT UNIX)
 	message(FATAL_ERROR "OS not supported!")
 endif(NOT UNIX)
 
+if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
+	if(NOT EXISTS "$ENV{HOME}/.conan2/profiles/default")
+		message(STATUS "Creating Conan profile...")
+		execute_process(
+			COMMAND python3 ${CMAKE_SOURCE_DIR}/setup_conan_profile.py
+				--llvm-version $ENV{LLVM_VERSION}
+			RESULT_VARIABLE PROFILE_RESULT)
+		if(NOT PROFILE_RESULT EQUAL 0)
+			message(FATAL_ERROR "Conan profile setup failed!")
+		endif()
+	endif()
+	message(STATUS "Running conan install...")
+	execute_process(
+		COMMAND conan install ${CMAKE_SOURCE_DIR}
+			--output-folder=${CMAKE_BINARY_DIR}
+			--build=missing
+			--build=boost
+			-s build_type=${CMAKE_BUILD_TYPE}
+		RESULT_VARIABLE CONAN_RESULT
+		WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+	)
+	if(NOT CONAN_RESULT EQUAL 0)
+		message(FATAL_ERROR "Conan install failed!")
+	endif()
+endif()
+
+include("${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
+
 project(nettracer LANGUAGES C CXX DESCRIPTION "")
 
 option(SKIP_OFFSETGUESSING "Skip building legacy ofsetguessed BPF programs" OFF)
@@ -29,16 +57,10 @@ set(CMAKE_VERBOSE_MAKEFILE TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if (CONAN_EXPORTED)
-	include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-	conan_basic_setup(TARGETS)
-else ()
-	include(conan.cmake)
-	conan_cmake_run(CONANFILE conanfile.txt
-			BASIC_SETUP CMAKE_TARGETS UPDATE NO_OUTPUT_DIRS
-			BUILD missing
-	)
-endif ()
+find_package(fmt REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(Boost REQUIRED)
+find_package(GTest REQUIRED)
 
 if(NOT SKIP_OFFSETGUESSING)
 	if(NOT DEFINED KERNEL_VERSION)

@@ -20,7 +20,7 @@ target_include_directories(nettracersrv
 		"${PROJECT_SOURCE_DIR}/libnettracer/src"
 )
 
-target_link_libraries(nettracersrv libnettracer)
+target_link_libraries(nettracersrv libnettracer ZLIB::ZLIB)
 
 install(TARGETS nettracersrv
 	RUNTIME DESTINATION "bin"

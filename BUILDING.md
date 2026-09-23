@@ -2,9 +2,9 @@
 Building process is verfied on Ubuntu 18.04 and Debian 12 bookworm
 
 **Prerequisites**
-* conan >= 1.66.0  but <= 2.*
+* conan >= 2.0.17
 * cmake >= 3.28.4
-* clang >= 16
+* clang >= 18
 * libelf-dev
 * linux-headers-4.15.*
 
