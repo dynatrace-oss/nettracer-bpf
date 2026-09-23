@@ -39,9 +39,9 @@ jobs:
 
       - name: "Create a new tag"
         run: |
-          currentTag=$(git describe --abbrev=0 --tags)
+          currentTag=$(git tag | sort -V | tail -1)
           newTag=$( echo $currentTag | sed -E  's/([0-9]+\.[0-9]+\.)([0-9]+)/echo "\1$((\2+1))"/e')
-          git tag -a $newTag -m "Main push tagging with $newTag"
           echo "Current tag value: $currentTag New tag value: $newTag"
+          git tag -a $newTag -m "Main push tagging with $newTag"
           git push origin $newTag
 
