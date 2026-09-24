@@ -97,7 +97,7 @@ void NetStat::update(const bpf::bpf_fds& fds) {
 					   (el.rtt != val.rtt) || (el.rtt_var != val.rtt_var);
 
 		if ((el.pkts_sent > 0 && val.segs_out < el.pkts_sent) ||
-			(el.pkts_sent_prev > 0 && (val.segs_out - el.pkts_sent_prev) > (el.bytes_sent - el.bytes_sent_prev + 1))) {
+			(el.pkts_sent_prev > 0 && (val.segs_out - el.pkts_sent_prev) > (el.bytes_sent - el.bytes_sent_prev + 4))) {
 			LOG_DEBUG(
 					"Suspected segs_out:{} segs_out_prev:{} bytes_out:{} bytes_out_prev:{}",
 					val.segs_out,
@@ -107,7 +107,7 @@ void NetStat::update(const bpf::bpf_fds& fds) {
 		}
 
 		if ((el.pkts_received > 0 && val.segs_in < el.pkts_received) ||
-			(el.pkts_received_prev > 0 && (val.segs_in - el.pkts_received_prev) > (el.bytes_received - el.bytes_received_prev + 1))) {
+			(el.pkts_received_prev > 0 && (val.segs_in - el.pkts_received_prev) > (el.bytes_received - el.bytes_received_prev + 4))) {
 			LOG_DEBUG(
 					"Suspected segs_in:{} segs_in_prev:{} bytes_in:{} bytes_in_prev:{}",
 					val.segs_in,
@@ -179,6 +179,8 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 		clean_bpf<ipv6_tuple_t>(fdsIPv6);
 
 		if (kbhit || outputCtr.time_elapsed()) {
+			resolveOldConnections<ipv4_tuple_t>();
+			resolveOldConnections<ipv6_tuple_t>();
 			const auto [passive, active, established] = countTcpSessions();
 			const auto tcpSessionsStr =
 					fmt::format("Number of passive tcp sessions: {}, active: {}, established: {}", passive, active, established);
@@ -197,6 +199,7 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 			flush();
 			clean<ipv4_tuple_t>();
 			clean<ipv6_tuple_t>();
+			readListenPorts();
 		}
 
 		outputCtr.bump();
@@ -245,6 +248,10 @@ void NetStat::event(const EventIPTYPE& evt) {
 	auto& el = connections<IPTYPE>()[key];
 	if( key.sport == 0 ){
 		LOG_DEBUG("Event src port = 0 for {} ", to_string(evt));
+		return;
+	}
+	if (el.state.Closed == 1) {
+		LOG_DEBUG("Event on closed connection {}", to_string(evt));
 		return;
 	}
 	el.pid = evt.pid;
@@ -377,30 +384,61 @@ void NetStat::print_human_readable() {
 	}
 }
 
-template<typename IPTYPE>
-void NetStat::initConnection(const tcpTable<IPTYPE> &tbl){
-	auto& aggr{connections<IPTYPE>()};
-	for(auto &el: tbl){
-		auto &conn = aggr[el.second.ep];
-		conn.pid = el.second.pid;
-		conn.state.Direction = (el.second.direction == ConnectionDirection::Incoming) ? 1 : 0;
-		conn.state.Established = 1;
-		conn.update_time = getCurrentTimeFromSteadyClock();
+template <typename IPTYPE>
+void NetStat::readListenPorts(const tcpTable<IPTYPE>& tblisten) {
+	auto& lports = listenPorts<IPTYPE>();
+	lports.clear();
+	for (auto& [inode, tuple] : tblisten) {
+		lports.insert({tuple.ep, tuple.pid});
 	}
 }
 
-void NetStat::initConnections() {
-	initConnection<ipv4_tuple_t>(readTcpTable("/proc", filter_loopback));
-	initConnection<ipv6_tuple_t>(readTcpTable6("/proc", filter_loopback));
+void NetStat::readListenPorts() {
+	readListenPorts<ipv4_tuple_t>(readTcpTable("/proc", filter_loopback));
+	readListenPorts<ipv6_tuple_t>(readTcpTable6("/proc", filter_loopback));
+}
+
+template <typename IPTYPE>
+void NetStat::resolveOldConnections() {
+	auto& listenports{listenPorts<IPTYPE>()};
+	auto& aggr{connections<IPTYPE>()};
+
+	for (auto& [sock, data] : aggr) {
+
+		if (data.state.Established == 1) {
+			continue;
+		}
+		IPTYPE listenSock{};
+		listenSock.sport = sock.sport;
+		listenSock.netns = sock.netns;
+
+		auto it = listenports.find(listenSock);
+		if (it != listenports.end()) {
+			data.state.Direction = 1;
+			data.state.Established = 1;
+			continue;
+		}
+		if constexpr (std::is_same_v<IPTYPE, ipv4_tuple_t>) {
+			listenSock.saddr = sock.saddr;
+		} else {
+			listenSock.saddr_l = sock.saddr_l;
+			listenSock.saddr_h = sock.saddr_h;
+		}
+
+		it = listenports.find(listenSock);
+		if (it != listenports.end()) {
+			data.state.Direction = 1;
+		}
+		data.state.Established = 1;
+	}
 }
 
 void NetStat::init() {
-	initConnections();
-
 	// wrapper just wraps syscalls so using it is thread-safe
 	static bpf::BPFMapsWrapper wrapper;
 	mapsWrapper = &wrapper;
 
+	readListenPorts();
 }
 
 system_clock::time_point NetStat::getCurrentTimeFromSystemClock() const {
@@ -444,4 +482,10 @@ void NetStat::on_config_change() {
 	exitCtrl.cv.notify_all();
 }
 
+template void NetStat::update<ipv4_tuple_t>(const bpf::bpf_fds&);
+template void NetStat::update<ipv6_tuple_t>(const bpf::bpf_fds&);
+template void NetStat::resolveOldConnections<ipv4_tuple_t>();
+template void NetStat::resolveOldConnections<ipv6_tuple_t>();
+template void NetStat::readListenPorts<ipv4_tuple_t>(const tcpTable<ipv4_tuple_t>&);
+template void NetStat::readListenPorts<ipv6_tuple_t>(const tcpTable<ipv6_tuple_t>&);
 } // namespace netstat

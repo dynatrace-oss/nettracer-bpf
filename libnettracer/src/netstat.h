@@ -61,11 +61,15 @@ struct Connection {
 
 using ConnectionsIPv4 = std::unordered_map<ipv4_tuple_t, Connection>;
 using ConnectionsIPv6 = std::unordered_map<ipv6_tuple_t, Connection>;
+using IPv4ListenSock2Pid = std::unordered_multimap<ipv4_tuple_t, uint32_t>;
+using IPv6ListenSock2Pid = std::unordered_multimap<ipv6_tuple_t, uint32_t>;
 
 class NetStat {
 protected:
 	ConnectionsIPv4 aggr_;
 	ConnectionsIPv6 aggr6_;
+	IPv4ListenSock2Pid listen_;
+	IPv6ListenSock2Pid listen6_;
 	std::mutex mx;
 	bool kbhit;
 	bool config_changed{false};
@@ -81,10 +85,12 @@ protected:
 
 	template <typename IPTYPE>
 	inline auto& connections(); // no default instantiation
+	template <typename IPTYPE>
+	inline auto& listenPorts();
 
 	template<typename IPTYPE>
-	void initConnection(const tcpTable<IPTYPE>&);
-	void initConnections();
+	void readListenPorts(const tcpTable<IPTYPE>&);
+	void readListenPorts();
 
 	std::tuple<unsigned, unsigned, unsigned> countTcpSessions();
 	template<typename IPTYPE>
@@ -108,6 +114,9 @@ protected:
 	virtual system_clock::time_point getCurrentTimeFromSystemClock() const;
 	virtual steady_clock::time_point getCurrentTimeFromSteadyClock() const;
 
+	template <typename IPTYPE>
+	void resolveOldConnections();
+
 public:
 	explicit NetStat(config::ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
 	virtual ~NetStat();
@@ -129,6 +138,15 @@ inline auto& NetStat::connections<ipv4_tuple_t>() {
 template<>
 inline auto& NetStat::connections<ipv6_tuple_t>() {
 	return aggr6_;
+}
+
+template<>
+inline auto& NetStat::listenPorts<ipv4_tuple_t>() {
+	return listen_;
+}
+template<>
+inline auto& NetStat::listenPorts<ipv6_tuple_t>() {
+	return listen6_;
 }
 
 } // namespace netstat

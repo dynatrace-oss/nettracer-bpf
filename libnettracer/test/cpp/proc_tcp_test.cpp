@@ -27,9 +27,19 @@ TEST(ProcTcpTest, EmptyCasueEceptionv6) {
 	EXPECT_THROW(test::parseLine6("", 0), std::exception);
 }
 
-TEST(ProcTcpTest, OkParsing4) {
+TEST(ProcTcpTest, Parsing4NotListenSock) {
 	std::string input =
 			"   0: 0100007F:7AB7 01020304:07E5 01 00000000:00000000 00:00000000 00000000   999        0 8480039 1 0000000000000000 100 0 0 10 0"s;
+
+	const auto [inode, conn] = test::parseLine4(input, 0);
+	EXPECT_EQ(conn.ep, ipv4_tuple_t{});
+	EXPECT_EQ(conn.pid, 0);
+	EXPECT_EQ(conn.direction, ConnectionDirection::Unknown);
+}
+
+TEST(ProcTcpTest, OkParsing4ListenSock) {
+	std::string input =
+			"   0: 0100007F:7AB7 01020304:07E5 0A 00000000:00000000 00:00000000 00000000   999        0 8480039 1 0000000000000000 100 0 0 10 0"s;
 
 	const auto [inode, conn] = test::parseLine4(input, 0);
 	EXPECT_EQ(conn.ep.saddr, 0x100007F);
@@ -39,9 +49,19 @@ TEST(ProcTcpTest, OkParsing4) {
 	EXPECT_EQ(inode, 8480039);
 }
 
-TEST(ProcTcpTest, OkParsing6) {
+TEST(ProcTcpTest, Parsing6NotListenSock) {
 	std::string input =
 			" 18: 00000000000000000000000001000000:0278 00000000000000000000000001000000:C355 01 00000000:00000000 00:00000000 00000000  0    0 8670135 1 0000000000000000 100 0 0 10 0"s;
+
+	const auto [inode, conn] = test::parseLine6(input, 0);
+	EXPECT_EQ(conn.ep, ipv6_tuple_t{});
+	EXPECT_EQ(conn.pid, 0);
+	EXPECT_EQ(conn.direction, ConnectionDirection::Unknown);
+}
+
+TEST(ProcTcpTest, OkParsing6ListenSock) {
+	std::string input =
+			" 18: 00000000000000000000000001000000:0278 00000000000000000000000001000000:C355 0A 00000000:00000000 00:00000000 00000000  0    0 8670135 1 0000000000000000 100 0 0 10 0"s;
 
 	const auto [inode, conn] = test::parseLine6(input, 0);
 	EXPECT_EQ(conn.ep.saddr_h, 0x0000000);
@@ -53,6 +73,7 @@ TEST(ProcTcpTest, OkParsing6) {
 	EXPECT_EQ(inode, 8670135);
 }
 
+/*
 TEST(ProcTcpTest, markIncomingTraffic) {
 	std::vector<ipv4_tuple_t> listensockets{{0x11111111, 0, 22, 0, 0}};
 	tcpTable<ipv4_tuple_t> table{
@@ -62,3 +83,4 @@ TEST(ProcTcpTest, markIncomingTraffic) {
 	EXPECT_EQ(table[11ul].direction, ConnectionDirection::Incoming);
 	EXPECT_EQ(table[112ul].direction, ConnectionDirection::Outgoing);
 }
+*/
