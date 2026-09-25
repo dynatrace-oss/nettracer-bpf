@@ -251,8 +251,7 @@ void NetStat::event(const EventIPTYPE& evt) {
 		return;
 	}
 	if (el.state.Closed == 1) {
-		LOG_DEBUG("Event on closed connection {}", to_string(evt));
-		return;
+		LOG_INFO("Event on closed connection {}", to_string(evt));
 	}
 	el.pid = evt.pid;
 	el.update_time = getCurrentTimeFromSteadyClock();
@@ -268,9 +267,6 @@ void NetStat::event(const EventIPTYPE& evt) {
 		el.end = time;
 	}
 }
-
-template void NetStat::event<ipv4_tuple_t>(const tcp_ipv4_event_t& evt);
-template void NetStat::event<ipv6_tuple_t>(const tcp_ipv6_event_t& evt);
 
 #define PRINT_BIT(field) ((s.field) ? "1" : "0")
 
@@ -488,4 +484,6 @@ template void NetStat::resolveOldConnections<ipv4_tuple_t>();
 template void NetStat::resolveOldConnections<ipv6_tuple_t>();
 template void NetStat::readListenPorts<ipv4_tuple_t>(const tcpTable<ipv4_tuple_t>&);
 template void NetStat::readListenPorts<ipv6_tuple_t>(const tcpTable<ipv6_tuple_t>&);
+template void NetStat::event<ipv4_tuple_t>(const tcp_ipv4_event_t& evt);
+template void NetStat::event<ipv6_tuple_t>(const tcp_ipv6_event_t& evt);
 } // namespace netstat
