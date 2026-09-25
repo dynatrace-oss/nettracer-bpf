@@ -15,7 +15,6 @@
 */
 #pragma once
 
-#include "connections_printing.h"
 #include "mock_bpf_maps.h"
 #include <limits>
 #include <memory>
