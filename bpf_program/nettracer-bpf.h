@@ -24,7 +24,9 @@ enum tcp_event_type {
 	TCP_EVENT_TYPE_CONNECT,
 	TCP_EVENT_TYPE_ACCEPT,
 	TCP_EVENT_TYPE_CLOSE,
-	TCP_EVENT_TYPE_SYN_ATTEMPT
+	TCP_EVENT_TYPE_SYN_ATTEMPT,
+	TCP_EVENT_TYPE_RST,
+	TCP_EVENT_TYPE_DROP
 };
 
 struct tcp_ipv4_event_t {
@@ -185,10 +187,8 @@ struct bpf_debug_counters_t {
 	uint64_t map_sends_update_failures;
 };
 
-struct nettracer_params_t {
+struct tcp_params_t {
 	uint32_t syn_queue_size;
-	uint32_t syn6_queue_size;
-	uint32_t netns;
 };
 
 // Helper to safely increment a field of bpf_debug_counters_t from BPF code.
