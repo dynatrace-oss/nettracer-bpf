@@ -1,9 +1,9 @@
 /*
-* Copyright 2025 Dynatrace LLC
+* Copyright 2026 Dynatrace LLC
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -115,21 +115,17 @@ protected:
 
 TEST_F(NetStatTest, testUpdateEmptyIPv4) {
 	setUpNetStat();
-
 	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
 	EXPECT_TRUE(netstat->connections<ipv4_tuple_t>().empty());
 }
 
 TEST_F(NetStatTest, testUpdateEmptyIPv6) {
 	setUpNetStat();
-
 	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
 	EXPECT_TRUE(netstat->connections<ipv6_tuple_t>().empty());
 }
 
-TEST_F(NetStatTest, testUpdateConnsNotYetCollectedIPv4) {
+TEST_F(NetStatTest, updateConnsfromStats) {
 	setUpNetStat();
 	addIPv4Stats();
 	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(2);
@@ -145,7 +141,7 @@ TEST_F(NetStatTest, testUpdateConnsNotYetCollectedIPv4) {
 	std::all_of(netstatConns.cbegin(), netstatConns.cend(), [](const auto& pair){ return pair.second.state.Established; });
 }
 
-TEST_F(NetStatTest, testUpdateConnsNotYetCollectedIPv6) {
+TEST_F(NetStatTest, updateConnsfromStatsPv6) {
 	setUpNetStat();
 	addIPv6Stats();
 	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(2);
@@ -161,653 +157,56 @@ TEST_F(NetStatTest, testUpdateConnsNotYetCollectedIPv6) {
 	std::all_of(netstatConns.cbegin(), netstatConns.cend(), [](const auto& pair){ return pair.second.state.Established; });
 }
 
-/*
-TEST_F(NetStatTest, testUpdateConnsUpdatedPIDIPv4) {
+
+TEST_F(NetStatTest, testCleanNotClosedPv4) {
 	setUpNetStat();
 	addIPv4Stats();
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(2);
 
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(3);
 	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	auto tuples{getIPv4Tuples()};
-	
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	const auto& netstatConns{netstat->connections<ipv4_tuple_t>()};
-	EXPECT_EQ(netstatConns.size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatContainsConnection(tuple);
-	}
-	EXPECT_TRUE(std::none_of(netstatConns.cbegin(), netstatConns.cend(), [](const auto& pair){ return pair.second.pid == 0; }));
+	netstat->clean_bpf<ipv4_tuple_t>(ipv4FDs);
+	EXPECT_FALSE(ipv4StatsMap->empty());
 }
 
-TEST_F(NetStatTest, testUpdateConnsUpdatedPIDIPv6) {
+TEST_F(NetStatTest, testCleanNotClosedIPv6) {
 	setUpNetStat();
 	addIPv6Stats();
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(4);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	auto tuples{getIPv6Tuples()};
-	const auto& tupleWithPID0{tuples[1]};
-	ASSERT_EQ(ipv6PIDsMap->at(tupleWithPID0).pid, 0);
-	ipv6PIDsMap->at(tupleWithPID0).pid = 0x1234500000000;
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	const auto& netstatConns{netstat->connections<ipv6_tuple_t>()};
-	EXPECT_EQ(netstatConns.size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatContainsConnection(tuple);
-	}
-	EXPECT_TRUE(std::none_of(netstatConns.cbegin(), netstatConns.cend(), [](const auto& pair){ return pair.second.pid == 0; }));
-}
-
-TEST_F(NetStatTest, testUpdateConnsUpdatedNotPIDIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	markIPv4ConnsAsClosed();
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-	
-	const auto tuples{getIPv4Tuples()};
-	const auto& netstatConns{netstat->connections<ipv4_tuple_t>()};
-	EXPECT_EQ(netstatConns.size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatContainsConnection(tuple);
-	}
-	EXPECT_TRUE(std::all_of(netstatConns.cbegin(), netstatConns.cend(), [](const auto& pair){ return pair.second.state.Closed; }));
-}
-
-TEST_F(NetStatTest, testUpdateConnsUpdatedNotPIDIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	markIPv6ConnsAsClosed();
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-	
-	const auto tuples{getIPv6Tuples()};
-	const auto& netstatConns{netstat->connections<ipv6_tuple_t>()};
-	EXPECT_EQ(netstatConns.size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatContainsConnection(tuple);
-	}
-	EXPECT_TRUE(std::all_of(netstatConns.cbegin(), netstatConns.cend(), [](const auto& pair){ return pair.second.state.Closed; }));
-}
-
-TEST_F(NetStatTest, testUpdateConnsRemovedButStillKeptInNetstatIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	ipv4PIDsMap->clear();
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-	
-	const auto tuples{getIPv4Tuples()};
-	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatContainsConnection(tuple);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateConnsRemovedButStillKeptInNetstatIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	ipv6PIDsMap->clear();
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-	
-	const auto tuples{getIPv6Tuples()};
-	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatContainsConnection(tuple);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateGenericStatsNotYetCollectedIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	const auto tuples{getIPv4Tuples()};
-	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatStatsAreCorrect(tuple, *ipv4StatsMap);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateGenericStatsNotYetCollectedIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	const auto tuples{getIPv6Tuples()};
-	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatStatsAreCorrect(tuple, *ipv6StatsMap);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateGenericStatsUpdatedIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-	
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	const auto tuples{getIPv4Tuples()};
-	ipv4StatsMap->at(tuples[0]).sent_bytes = 77777;
-	ipv4StatsMap->at(tuples[1]).received_bytes = 77777;
-	ipv4StatsMap->at(tuples[2]).sent_bytes = 77777;
-	ipv4StatsMap->at(tuples[2]).received_bytes = 77777;
-	const size_t changedStats{3};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(changedStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatStatsAreCorrect(tuple, *ipv4StatsMap);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateGenericStatsUpdatedIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-	
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	const auto tuples{getIPv6Tuples()};
-	ipv6StatsMap->at(tuples[0]).sent_bytes = 77777;
-	ipv6StatsMap->at(tuples[1]).received_bytes = 77777;
-	ipv6StatsMap->at(tuples[2]).sent_bytes = 77777;
-	ipv6StatsMap->at(tuples[2]).received_bytes = 77777;
-	const size_t changedStats{3};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(changedStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatStatsAreCorrect(tuple, *ipv6StatsMap);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateGenericStatsRemovedButStillKeptInNetstatIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-	
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	std::unordered_map<ipv4_tuple_t, stats_t> oldCopy;
-	std::swap(*ipv4StatsMap, oldCopy);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-	
-	const auto tuples{getIPv4Tuples()};
-	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatStatsAreCorrect(tuple, oldCopy);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateGenericStatsRemovedButStillKeptInNetstatIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-	
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	std::unordered_map<ipv6_tuple_t, stats_t> oldCopy;
-	std::swap(*ipv6StatsMap, oldCopy);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-	
-	const auto tuples{getIPv6Tuples()};
-	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatStatsAreCorrect(tuple, oldCopy);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateTCPStatsNotYetCollectedIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	const auto tuples{getIPv4Tuples()};
-	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatTCPStatsAreCorrect(tuple, *ipv4TCPStatsMap);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateTCPStatsNotYetCollectedIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	const auto tuples{getIPv6Tuples()};
-	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatTCPStatsAreCorrect(tuple, *ipv6TCPStatsMap);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateTCPStatsUpdatedIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-	
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	const auto tuples{getIPv4Tuples()};
-	ipv4TCPStatsMap->at(tuples[0]).segs_in = 77777;
-	ipv4TCPStatsMap->at(tuples[1]).retransmissions = 77777;
-	ipv4TCPStatsMap->at(tuples[2]).rtt_var = 77777;
-	const size_t changedStats{3};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(changedStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatTCPStatsAreCorrect(tuple, *ipv4TCPStatsMap);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateTCPStatsUpdatedIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-	
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	const auto tuples{getIPv6Tuples()};
-	ipv6TCPStatsMap->at(tuples[0]).segs_in = 77777;
-	ipv6TCPStatsMap->at(tuples[1]).retransmissions = 77777;
-	ipv6TCPStatsMap->at(tuples[2]).rtt_var = 77777;
-	const size_t changedStats{3};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(changedStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatTCPStatsAreCorrect(tuple, *ipv6TCPStatsMap);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateTCPStatsRemovedButStillKeptInNetstatIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-	
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	std::unordered_map<ipv4_tuple_t, tcp_stats_t> oldCopy;
-	std::swap(*ipv4TCPStatsMap, oldCopy);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-	
-	const auto tuples{getIPv4Tuples()};
-	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatTCPStatsAreCorrect(tuple, oldCopy);
-	}
-}
-
-TEST_F(NetStatTest, testUpdateTCPStatsRemovedButStillKeptInNetstatIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-	
-	const size_t nonzeroStats{2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	std::unordered_map<ipv6_tuple_t, tcp_stats_t> oldCopy;
-	std::swap(*ipv6TCPStatsMap, oldCopy);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-	
-	const auto tuples{getIPv6Tuples()};
-	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), tuples.size());
-	for (const auto& tuple : tuples) {
-		checkIfNetstatTCPStatsAreCorrect(tuple, oldCopy);
-	}
-}
-
-TEST_F(NetStatTest, testCleanBPFEmptyIPv4) {
-	setUpNetStat();
-
 	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean_bpf<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_TRUE(ipv4PIDsMap->empty());
-	EXPECT_TRUE(ipv4StatsMap->empty());
-	EXPECT_TRUE(ipv4TCPStatsMap->empty());
-}
-
-TEST_F(NetStatTest, testCleanBPFEmptyIPv6) {
-	setUpNetStat();
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
 	netstat->clean_bpf<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_TRUE(ipv6PIDsMap->empty());
-	EXPECT_TRUE(ipv6StatsMap->empty());
-	EXPECT_TRUE(ipv6TCPStatsMap->empty());
-}
-
-TEST_F(NetStatTest, testCleanBPFUpToDateIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean_bpf<ipv4_tuple_t>(ipv4FDs);
-
-	const auto tuples{getIPv4Tuples()};
-	EXPECT_EQ(ipv4PIDsMap->size(), tuples.size());
-	EXPECT_EQ(ipv4StatsMap->size(), tuples.size());
-	EXPECT_EQ(ipv4TCPStatsMap->size(), tuples.size());
-}
-
-TEST_F(NetStatTest, testCleanBPFUpToDateIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean_bpf<ipv6_tuple_t>(ipv6FDs);
-
-	const auto tuples{getIPv6Tuples()};
-	EXPECT_EQ(ipv6PIDsMap->size(), tuples.size());
-	EXPECT_EQ(ipv6StatsMap->size(), tuples.size());
-	EXPECT_EQ(ipv6TCPStatsMap->size(), tuples.size());
-}
-
-TEST_F(NetStatTest, testCleanBPFStaleIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.WillOnce(Return(steady_clock::time_point{std::chrono::hours(999)}));
-
-	netstat->clean_bpf<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_TRUE(ipv4PIDsMap->empty());
-	EXPECT_TRUE(ipv4StatsMap->empty());
-	EXPECT_TRUE(ipv4TCPStatsMap->empty());
-}
-
-TEST_F(NetStatTest, testCleanBPFStaleIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.WillOnce(Return(steady_clock::time_point{std::chrono::hours(999)}));
-
-	netstat->clean_bpf<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_TRUE(ipv6PIDsMap->empty());
-	EXPECT_TRUE(ipv6StatsMap->empty());
-	EXPECT_TRUE(ipv6TCPStatsMap->empty());
-}
-
-TEST_F(NetStatTest, testCleanBPFClosedIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-	markIPv4ConnsAsClosed();
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean_bpf<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_TRUE(ipv4PIDsMap->empty());
-	EXPECT_TRUE(ipv4StatsMap->empty());
-	EXPECT_TRUE(ipv4TCPStatsMap->empty());
-}
-
-TEST_F(NetStatTest, testCleanBPFClosedIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-	markIPv6ConnsAsClosed();
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean_bpf<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_TRUE(ipv6PIDsMap->empty());
-	EXPECT_TRUE(ipv6StatsMap->empty());
-	EXPECT_TRUE(ipv6TCPStatsMap->empty());
-}
-
-TEST_F(NetStatTest, testCleanEmptyIPv4) {
-	setUpNetStat();
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean<ipv4_tuple_t>();
-
-	EXPECT_TRUE(netstat->connections<ipv4_tuple_t>().empty());
-}
-
-TEST_F(NetStatTest, testCleanEmptyIPv6) {
-	setUpNetStat();
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean<ipv6_tuple_t>();
-
-	EXPECT_TRUE(netstat->connections<ipv6_tuple_t>().empty());
-}
-
-TEST_F(NetStatTest, testCleanUpToDateIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean<ipv4_tuple_t>();
-
-	const auto tuples{getIPv4Tuples()};
-	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), tuples.size());
-}
-
-TEST_F(NetStatTest, testCleanUpToDateIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
-	netstat->clean<ipv6_tuple_t>();
-
-	const auto tuples{getIPv6Tuples()};
-	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), tuples.size());
-}
-
-TEST_F(NetStatTest, testCleanStaleIPv4) {
-	setUpNetStat();
-	addIPv4Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv4_tuple_t>(ipv4FDs);
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.WillOnce(Return(steady_clock::time_point{std::chrono::hours(999)}));
-
-	netstat->clean<ipv4_tuple_t>();
-
-	EXPECT_TRUE(netstat->connections<ipv4_tuple_t>().empty());
-}
-
-TEST_F(NetStatTest, testCleanStaleIPv6) {
-	setUpNetStat();
-	addIPv6Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
-	netstat->update<ipv6_tuple_t>(ipv6FDs);
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.WillOnce(Return(steady_clock::time_point{std::chrono::hours(999)}));
-
-	netstat->clean<ipv6_tuple_t>();
-
-	EXPECT_TRUE(netstat->connections<ipv6_tuple_t>().empty());
+	EXPECT_FALSE(ipv6StatsMap->empty());
 }
 
 TEST_F(NetStatTest, testCleanClosedIPv4) {
 	setUpNetStat();
-	addIPv4Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
+	addIPv4Stats();
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(4);
 	netstat->update<ipv4_tuple_t>(ipv4FDs);
 	markIPv4ConnsAsClosed();
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
+	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), 4u);
+	netstat->clean_bpf<ipv4_tuple_t>(ipv4FDs);
+	EXPECT_TRUE(ipv4PIDsMap->empty());
+	EXPECT_TRUE(ipv4StatsMap->empty());
+	EXPECT_TRUE(ipv4TCPStatsMap->empty());
+	EXPECT_FALSE(netstat->connections<ipv4_tuple_t>().empty());
 	netstat->clean<ipv4_tuple_t>();
-
 	EXPECT_TRUE(netstat->connections<ipv4_tuple_t>().empty());
 }
 
 TEST_F(NetStatTest, testCleanClosedIPv6) {
 	setUpNetStat();
-	addIPv6Conns();
-
-	const size_t nonzeroStats{2+2};
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock)
-		.Times(nonzeroStats);
-
+	addIPv6Stats();
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(4);
 	netstat->update<ipv6_tuple_t>(ipv6FDs);
 	markIPv6ConnsAsClosed();
-
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock);
-
+	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), 4u);
+	netstat->clean_bpf<ipv6_tuple_t>(ipv6FDs);
+	EXPECT_TRUE(ipv6PIDsMap->empty());
+	EXPECT_TRUE(ipv6StatsMap->empty());
+	EXPECT_TRUE(ipv6TCPStatsMap->empty());
+	EXPECT_FALSE(netstat->connections<ipv6_tuple_t>().empty());
 	netstat->clean<ipv6_tuple_t>();
-
 	EXPECT_TRUE(netstat->connections<ipv6_tuple_t>().empty());
-}*/
+}
 
 TEST_F(NetStatTest, resolveDirectionForServer) {
 	setUpNetStat();
