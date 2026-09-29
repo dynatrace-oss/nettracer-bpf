@@ -63,6 +63,11 @@ std::pair<iNode, Connection<ipv4_tuple_t>> parseLine(const std::string& line, ui
 	iss >> hex >> remoteAddress;
 	iss.ignore(1);
 	iss >> hex >> remotePort >> state;
+	if (state != TCP_LISTEN) {
+		return {};
+	}
+	LOG_TRACE("tcp table found listen socket {} {}", localPort, remotePort);
+
 	Connection<ipv4_tuple_t> conn;
 	conn.ep = ipv4_tuple_t{localAddress, remoteAddress, localPort, remotePort, ns};
 
@@ -75,9 +80,6 @@ std::pair<iNode, Connection<ipv4_tuple_t>> parseLine(const std::string& line, ui
 	iss >> hex >> skipInt;
 	iss >> hex >> skipInt >> std::dec >> skipInt >> std::dec >> skipInt >> std::dec >> in;
 
-	if (state == TCP_LISTEN) {
-		LOG_DEBUG("tcp table found listen socket {}", to_string(conn.ep));
-	}
 	return {in, conn};
 }
 
@@ -105,6 +107,12 @@ std::pair<iNode, Connection<ipv6_tuple_t>> parseLine(const std::string& line, ui
 
 	const auto [localAddressl, localAddressh] = convertIPv6(&localAddressTemp[0]);
 	const auto [remoteAddressl, remoteAddressh] = convertIPv6(&remoteAddressTemp[0]);
+
+	if (state != TCP_LISTEN) {
+		return {};
+	}
+	LOG_TRACE("tcp6 table found listen socket {} {}", localPort, remotePort);
+
 	Connection<ipv6_tuple_t> conn;
 	conn.ep = ipv6_tuple_t{
 			localAddressl,
@@ -123,47 +131,7 @@ std::pair<iNode, Connection<ipv6_tuple_t>> parseLine(const std::string& line, ui
 	iss >> hex >> skipInt;
 
 	iss >> hex >> skipInt >> std::dec >> skipInt >> std::dec >> skipInt >> std::dec >> in;
-	if (state == TCP_LISTEN) {
-		LOG_DEBUG("tcp6 table found listen socket {}", to_string(conn.ep));
-	}
 	return {in, conn};
-}
-
-void markIncomingTraffic(const std::vector<ipv4_tuple_t>& listensockets, tcpTable<ipv4_tuple_t>& table) {
-
-	for (const auto& sock : listensockets) {
-		for (auto& connection : table) {
-			if (connection.second.ep.sport == sock.sport && (connection.second.ep.saddr == sock.saddr || sock.saddr == 0)) {
-				connection.second.direction = ConnectionDirection::Incoming;
-			}
-		}
-	}
-
-	for (auto& connection : table) {
-		if (connection.second.direction == ConnectionDirection::Unknown) {
-			connection.second.direction = ConnectionDirection::Outgoing;
-		}
-	}
-}
-
-void markIncomingTraffic(const std::vector<ipv6_tuple_t>& listensockets, tcpTable<ipv6_tuple_t>& table) {
-
-	for (const auto& sock : listensockets) {
-		for (auto& connection : table) {
-
-			if (connection.second.ep.sport == sock.sport &&
-				((sock.saddr_h == 0 && sock.saddr_l == 0) ||
-				 (connection.second.ep.saddr_h == sock.saddr_h && connection.second.ep.saddr_l == sock.saddr_l))) {
-				connection.second.direction = ConnectionDirection::Incoming;
-			}
-		}
-	}
-
-	for (auto& connection : table) {
-		if (connection.second.direction == ConnectionDirection::Unknown) {
-			connection.second.direction = ConnectionDirection::Outgoing;
-		}
-	}
 }
 
 template <typename IPTYPE>
@@ -180,17 +148,15 @@ bool readTcpFile(tcpTable<IPTYPE>& table, const fs::path& fileName, uint32_t ns,
 	std::getline(input, line); // skip header
 	while (std::getline(input, line)) {
 		auto conn = parseLine<IPTYPE>(line, ns);
+		if (!conn.first) {
+			continue;
+		}
 		if (filter && shouldFilter(conn.second.ep)) {
 			continue;
 		}
-		if (conn.second.ep.dport && conn.first) {
-			newTable.insert(conn);
-		} else {
-			listenSockets.push_back(conn.second.ep);
-		}
+		newTable.insert(conn);
 	}
 
-	markIncomingTraffic(listenSockets, newTable);
 	table.merge(newTable);
 	return true;
 }
@@ -255,7 +221,7 @@ tcpTable<IPTYPE> readTcpTableImpl(const fs::path& root, const fs::path& file, bo
 			if (!readTcpFile<IPTYPE>(table, p.path() / "net" / file, currnet_ns, filter))
 				continue;
 
-			LOG_DEBUG("tcptable for nondeafult ns: {} read", currnet_ns);
+			LOG_TRACE("tcptable for nondeafult ns: {} read", currnet_ns);
 			visited.push_back(currnet_ns);
 		}
 		auto fdDir = p.path() / "fd";
@@ -317,8 +283,5 @@ std::pair<iNode, Connection<ipv6_tuple_t>> parseLine6(const std::string& line, u
 }
 std::pair<iNode, Connection<ipv4_tuple_t>> parseLine4(const std::string& line, uint32_t ns) {
 	return ::parseLine<ipv4_tuple_t>(line, ns);
-}
-void markIncomingTraffic(const std::vector<ipv4_tuple_t>& listensockets, tcpTable<ipv4_tuple_t>& table) {
-	return ::markIncomingTraffic(listensockets, table);
 }
 } // namespace test
