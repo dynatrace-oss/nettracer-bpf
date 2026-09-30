@@ -16,7 +16,7 @@ from typing import Tuple
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Setup Conan profile for clang")
     parser.add_argument("--llvm-version", type=int, default=18, help="LLVM version to use (default: 18)")
-    parser.add_argument("--cppstd", type=int, default=23, help="C++ standard to use (default: 23)")
+    parser.add_argument("--cppstd", type=int, default=20, help="C++ standard to use (default: 20)")
     parser.add_argument("--build-type", default="Release", choices=["Release", "Debug", "RelWithDebInfo", "MinSizeRel"], help="Build type (default: Release)")
     return parser.parse_args()
 
