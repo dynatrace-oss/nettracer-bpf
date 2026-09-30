@@ -30,12 +30,24 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
 			message(FATAL_ERROR "Conan profile setup failed!")
 		endif()
 	endif()
+	message(STATUS "Running conan list boost/*  ...")
+	execute_process(COMMAND conan list "boost/*"
+    OUTPUT_VARIABLE CONAN_BOOST_VERSIONS
+    ERROR_VARIABLE CONAN_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+	if(CONAN_BOOST_VERSIONS)
+		message(STATUS "--------------------------------------------------")
+		message(STATUS "Available Boost versions from Conan:\n${CONAN_BOOST_VERSIONS}")
+		message(STATUS "--------------------------------------------------")
+	else()
+		message(WARNING "Failed to fetch Boost versions from Conan: ${CONAN_ERROR}")
+	endif()
+
 	message(STATUS "Running conan install...")
 	execute_process(
 		COMMAND conan install ${CMAKE_SOURCE_DIR}
 			--output-folder=${CMAKE_BINARY_DIR}
-			--build=missing
-			--build=boost
 			-s build_type=${CMAKE_BUILD_TYPE}
 		RESULT_VARIABLE CONAN_RESULT
 		WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
