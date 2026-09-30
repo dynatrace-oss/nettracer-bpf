@@ -3,6 +3,9 @@ from conan.tools.files import copy
 import os
 
 class NetTracerConan(ConanFile):
+    name = "nettracer-bpf"
+    license = "Apache-2.0"
+    url = "https://github.com/dynatrace-oss/nettracer-bpf.git"
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeDeps", "CMakeToolchain"
 
@@ -18,3 +21,15 @@ class NetTracerConan(ConanFile):
                  src=dep.package_folder,
                  dst=os.path.join(self.build_folder, "licenses", dep.ref.name),
                  ignore_case=True)
+
+    def set_version(self):
+        if not self.version:
+            self.version = "0.0.0"
+
+    @property
+    def sbom_type(self):
+        return "application"
+
+    @property
+    def sbom_purl(self):
+        return f"pkg:github/dynatrace-oss/nettracer-bpf@{self.version}"
