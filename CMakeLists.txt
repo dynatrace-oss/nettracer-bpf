@@ -30,19 +30,32 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
 			message(FATAL_ERROR "Conan profile setup failed!")
 		endif()
 	endif()
-	message(STATUS "Running conan list boost/*  ...")
-	execute_process(COMMAND conan list "fmt/*" "spdlog/*" "boost/*" "gtest/*" -r=conancenter
-    OUTPUT_VARIABLE CONAN_BOOST_VERSIONS
-    ERROR_VARIABLE CONAN_ERROR
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-	if(CONAN_BOOST_VERSIONS)
-		message(STATUS "--------------------------------------------------")
-		message(STATUS "Available Boost versions from Conan:\n${CONAN_BOOST_VERSIONS}")
-		message(STATUS "--------------------------------------------------")
-	else()
-		message(WARNING "Failed to fetch Boost versions from Conan: ${CONAN_ERROR}")
-	endif()
+
+	set(PACKAGES_TO_CHECK "fmt/*" "spdlog/*" "boost/*" "gtest/*")
+	set(CONAN_OUTPUT_TOTAL "")
+
+	message(STATUS "Fetching versions from ConanCenter...")
+
+	foreach(PKG ${PACKAGES_TO_CHECK})
+		execute_process(
+			COMMAND conan list "${PKG}" -r=conancenter
+			OUTPUT_VARIABLE PKG_OUTPUT
+			ERROR_VARIABLE PKG_ERROR
+			RESULT_VARIABLE PKG_RESULT
+			OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+    
+		if(PKG_RESULT EQUAL 0)
+			string(APPEND CONAN_OUTPUT_TOTAL "${PKG_OUTPUT}\n")
+		else()
+			string(APPEND CONAN_OUTPUT_TOTAL "Error fetching ${PKG}: ${PKG_ERROR}\n")
+		endif()
+	endforeach()
+
+	message(STATUS "--------------------------------------------------")
+	message(STATUS "Available versions from Conan:\n${CONAN_OUTPUT_TOTAL}")
+	message(STATUS "--------------------------------------------------")
 
 	message(STATUS "Running conan install...")
 	execute_process(
