@@ -31,7 +31,7 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
 		endif()
 	endif()
 	message(STATUS "Running conan list boost/*  ...")
-	execute_process(COMMAND conan list "boost/*"
+	execute_process(COMMAND conan list "boost/*" -r=conancenter
     OUTPUT_VARIABLE CONAN_BOOST_VERSIONS
     ERROR_VARIABLE CONAN_ERROR
     OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -48,7 +48,6 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
 	execute_process(
 		COMMAND conan install ${CMAKE_SOURCE_DIR}
 			--output-folder=${CMAKE_BINARY_DIR}
-			--build=missing
 			-s build_type=${CMAKE_BUILD_TYPE}
 		RESULT_VARIABLE CONAN_RESULT
 		WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
