@@ -30,12 +30,37 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
 			message(FATAL_ERROR "Conan profile setup failed!")
 		endif()
 	endif()
+
+
+	set(PACKAGES_TO_CHECK "fmt/*" "spdlog/*" "boost/*" "gtest/*")
+	set(CONAN_OUTPUT_TOTAL "")
+
+	message(STATUS "Fetching versions from ConanCenter...")
+
+	foreach(PKG ${PACKAGES_TO_CHECK})
+		execute_process(
+			COMMAND conan list "${PKG}" -r=conancenter
+			OUTPUT_VARIABLE PKG_OUTPUT
+			ERROR_VARIABLE PKG_ERROR
+			RESULT_VARIABLE PKG_RESULT
+			OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+    
+		if(PKG_RESULT EQUAL 0)
+			string(APPEND CONAN_OUTPUT_TOTAL "${PKG_OUTPUT}\n")
+		else()
+			string(APPEND CONAN_OUTPUT_TOTAL "Error fetching ${PKG}: ${PKG_ERROR}\n")
+		endif()
+	endforeach()
+
+	message(STATUS "--------------------------------------------------")
+	message(STATUS "Available versions from Conan:\n${CONAN_OUTPUT_TOTAL}")
+	message(STATUS "--------------------------------------------------")
+
 	message(STATUS "Running conan install...")
 	execute_process(
 		COMMAND conan install ${CMAKE_SOURCE_DIR}
 			--output-folder=${CMAKE_BINARY_DIR}
-			--build=missing
-			--build=boost
 			-s build_type=${CMAKE_BUILD_TYPE}
 		RESULT_VARIABLE CONAN_RESULT
 		WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -51,7 +76,7 @@ project(nettracer LANGUAGES C CXX DESCRIPTION "")
 
 option(SKIP_OFFSETGUESSING "Skip building legacy ofsetguessed BPF programs" OFF)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_VERBOSE_MAKEFILE TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
