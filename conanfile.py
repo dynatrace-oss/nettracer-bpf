@@ -15,11 +15,12 @@ class NetTracerConan(ConanFile):
         self.requires("gtest/1.14.0")
 
     def generate(self):
-        for dep in self.dependencies.values():
-            copy(self, "license*",
-                 src=dep.package_folder,
-                 dst=os.path.join(self.build_folder, "licenses", dep.ref.name),
-                 ignore_case=True)
+        for require, dep in self.dependencies.items():
+            if not require.build:
+                copy(self, "license*",
+                    src=dep.package_folder,
+                    dst=os.path.join(self.build_folder, "licenses", dep.ref.name),
+                    ignore_case=True)
 
     def set_name(self):
         if not self.name:
