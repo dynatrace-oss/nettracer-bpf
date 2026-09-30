@@ -31,7 +31,7 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
 		endif()
 	endif()
 	message(STATUS "Running conan list boost/*  ...")
-	execute_process(COMMAND conan list "boost/*" -r=conancenter
+	execute_process(COMMAND conan list "fmt/*" "spdlog/*" "boost/*" "gtest/*" -r=conancenter
     OUTPUT_VARIABLE CONAN_BOOST_VERSIONS
     ERROR_VARIABLE CONAN_ERROR
     OUTPUT_STRIP_TRAILING_WHITESPACE)
