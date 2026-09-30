@@ -48,6 +48,7 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_toolchain.cmake")
 	execute_process(
 		COMMAND conan install ${CMAKE_SOURCE_DIR}
 			--output-folder=${CMAKE_BINARY_DIR}
+			--build=missing
 			-s build_type=${CMAKE_BUILD_TYPE}
 		RESULT_VARIABLE CONAN_RESULT
 		WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
