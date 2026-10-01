@@ -30,7 +30,7 @@ def setup_conan_remote() -> None:
     if "conancenter" not in result.stdout:
         print("Adding conancenter remote...")
         subprocess.run(
-            ["conan", "remote", "add", "conancenter", "https://center.conan.io"],
+            ["conan", "remote", "add", "conancenter", "https://conan.io", "--force"],
             check=True
         )
     else:
