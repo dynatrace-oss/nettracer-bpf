@@ -16,7 +16,7 @@ class NetTracerConan(ConanFile):
 
     def generate(self):
         for require, dep in self.dependencies.items():
-            if not require.build:
+            if not require.build and dep.package_folder:
                 copy(self, "license*",
                     src=dep.package_folder,
                     dst=os.path.join(self.build_folder, "licenses", dep.ref.name),
