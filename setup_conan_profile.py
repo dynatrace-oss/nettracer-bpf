@@ -20,23 +20,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--build-type", default="Release", choices=["Release", "Debug", "RelWithDebInfo", "MinSizeRel"], help="Build type (default: Release)")
     return parser.parse_args()
 
-
-def setup_conan_remote() -> None:
-    """Add conancenter remote if not already configured."""
-    result = subprocess.run(
-        ["conan", "remote", "list"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True
-    )
-    if "conancenter" not in result.stdout:
-        print("Adding conancenter remote...")
-        subprocess.run(
-            ["conan", "remote", "add", "conancenter", "https://conan.io", "--force"],
-            check=True
-        )
-    else:
-        print("conancenter remote already configured.")
-
-
 def find_compiler(llvm_version: int) -> Tuple[str, str]:
     if not isinstance(llvm_version, int) or llvm_version < 1 or llvm_version > 99:
         raise RuntimeError(f"Invalid LLVM version: {llvm_version}")
@@ -131,7 +114,6 @@ def main() -> None:
 
         conan_home = detect_conan_home()
         create_profile(conan_home, clang, clangpp, compiler_version, args.cppstd, args.build_type, arch)
-        # setup_conan_remote() moved to .github/actions/configure/action.yaml
 
         show_profile()
         print("Done.")
