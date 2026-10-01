@@ -18,7 +18,7 @@ description: "Configure build environment"
 runs:
   using: "composite"
   steps:
-   - name: "Setup Conan Remote"
+    - name: "Setup Conan Remote"
       shell: bash
       run: >-
         docker run -i --rm
@@ -29,12 +29,13 @@ runs:
         nettracer-build:latest
         bash -c "
         if ! conan remote list | grep -q 'conancenter'; then
-          echo 'Adding conancenter remote ...'
+          echo 'Adding conancenter remote...'
           conan remote add conancenter https://conan.io --force
         else
-          echo 'Conancenter remote already configured.'
+          echo 'conancenter remote already configured.'
         fi
         "
+
     - name: "Configure"
       shell: bash
       run: >-
