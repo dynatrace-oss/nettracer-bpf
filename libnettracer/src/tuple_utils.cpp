@@ -25,7 +25,7 @@
 namespace {
 
 constexpr std::array<const char*, 3> directionSigns = {"--", "<-", "->"};
-constexpr std::array<const char*, 4> eventTypeToName = {"connect", "accept", "close", "syn"};
+constexpr std::array<const char*, 6> eventTypeToName = {"connect", "accept", "close", "syn", "rst", "drop"};
 }
 
 std::string ipv6_to_string(uint64_t h, uint64_t l) {

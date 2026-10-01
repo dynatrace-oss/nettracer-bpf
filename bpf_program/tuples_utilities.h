@@ -126,11 +126,11 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct guess_status_t *st
 	struct in6_addr saddr, daddr;
 	bpf_core_read(&np, sizeof(np), &inet->pinet6);
 	bpf_core_read(&saddr, sizeof(saddr), &np->saddr);
-	saddr_h = *(__u64 *)&saddr.in6_u.u6_addr8[0];
-	saddr_l = *(__u64 *)&saddr.in6_u.u6_addr8[8];
+	__builtin_memcpy(&saddr_h, &saddr.in6_u.u6_addr8[0], sizeof(__u64));
+	__builtin_memcpy(&saddr_l, &saddr.in6_u.u6_addr8[8], sizeof(__u64));
 	bpf_core_read(&daddr, sizeof(daddr), &sk->__sk_common.skc_v6_daddr);  //this field can be in different place depending on kernel version
-	daddr_h = *(__u64 *)&daddr.in6_u.u6_addr8[0];
-	daddr_l = *(__u64 *)&daddr.in6_u.u6_addr8[8];
+	__builtin_memcpy(&daddr_h, &daddr.in6_u.u6_addr8[0], sizeof(__u64));
+	__builtin_memcpy(&daddr_l, &daddr.in6_u.u6_addr8[8], sizeof(__u64));
 	bpf_core_read(&sport, sizeof(sport), &sk->__sk_common.skc_num);
 	bpf_core_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
 #endif
