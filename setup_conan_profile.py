@@ -131,7 +131,7 @@ def main() -> None:
 
         conan_home = detect_conan_home()
         create_profile(conan_home, clang, clangpp, compiler_version, args.cppstd, args.build_type, arch)
-        setup_conan_remote()
+        # setup_conan_remote()
 
         show_profile()
         print("Done.")
