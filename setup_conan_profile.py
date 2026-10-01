@@ -30,7 +30,7 @@ def setup_conan_remote() -> None:
     if "conancenter" not in result.stdout:
         print("Adding conancenter remote...")
         subprocess.run(
-            ["conan", "remote", "add", "conancenter", "https://center.conan.io"],
+            ["conan", "remote", "add", "conancenter", "https://conan.io", "--force"],
             check=True
         )
     else:
@@ -131,7 +131,7 @@ def main() -> None:
 
         conan_home = detect_conan_home()
         create_profile(conan_home, clang, clangpp, compiler_version, args.cppstd, args.build_type, arch)
-        setup_conan_remote()
+        # setup_conan_remote() moved to .github/actions/configure/action.yaml
 
         show_profile()
         print("Done.")
