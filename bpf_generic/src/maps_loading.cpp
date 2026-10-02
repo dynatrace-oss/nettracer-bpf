@@ -43,6 +43,8 @@ std::string to_string(bpf_map_type type) {
 
 SectionLoader::SectionLoader(const std::string& path) : elfFile(path) {
 }
+SectionLoader::SectionLoader(unsigned char* buf, size_t size) : elfFile(buf, size) {
+}
 
 bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper, const elfSection* rodataSec) {
 	bool all_ok = true;
