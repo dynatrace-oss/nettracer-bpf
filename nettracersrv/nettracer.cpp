@@ -281,7 +281,7 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		debugCountersThread.join();
 	}
     bevents.stop();
-	LOG_INFO("Events stopped");
+	LOG_INFO("Events stopped {}", exitCtrl.running);
 
 	return map_reader_future.get() ? ReturnCodes::Reconfigure : ReturnCodes::Success;
 }

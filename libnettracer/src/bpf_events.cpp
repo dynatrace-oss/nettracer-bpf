@@ -15,10 +15,11 @@
 */
 #include "bpf_events.h"
 #include "bpf_generic/src/perf_event.h"
-#include "configuration.h"
 #include "config_watcher.h"
+#include "configuration.h"
 #include <algorithm>
 #include <exception>
+#include <fcntl.h>
 #include <iostream>
 #include <poll.h>
 #include <stdint.h>
@@ -87,7 +88,11 @@ void bpf_events::stop() {
 
 std::vector<pollfd> bpf_events::create_pfds() {
 	std::vector<pollfd> fds;
-	fds.push_back(pollfd{STDIN_FILENO, POLLIN, 0});
+	if (fcntl(0, F_GETFD) != -1) {
+		fds.push_back(pollfd{STDIN_FILENO, POLLIN, 0});
+	} else {
+		LOG_WARN("Stdin closed");
+	}
 
 	if (!legacy_perf_events) {
 		for (auto& it : observers) {

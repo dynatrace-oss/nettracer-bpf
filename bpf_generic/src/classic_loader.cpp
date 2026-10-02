@@ -39,6 +39,9 @@
 #include <unistd.h>
 #include <vector>
 #include "log.h"
+#ifndef SKIP_OFFSETGUESSING
+#include "nettracer-bpf.o.h"
+#endif
 
 #define DEBUGFS "/sys/kernel/debug/tracing/"
 
@@ -240,18 +243,17 @@ void ClassicLoader::set_maps_max_entries(uint32_t map_max_entries) {
 
 bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion, bool enableConnectivity) {
 
-	std::error_code ec;
-	bool exists = std::filesystem::exists(path, ec);
-	if (ec || !exists) {
-		LOG_ERROR("Cannot access file: {}", path);
-		return false;
-	}
-
 	LOG_INFO("Loading Classic BPF");
 	if (enableConnectivity) {
 		LOG_WARN("Connectivity not supported");
 	}
+
+#ifdef SKIP_OFFSETGUESSING
 	SectionLoader sectionloader(path);
+#else
+	SectionLoader sectionloader(&nettracer_bpf_o[0], nettracer_bpf_o_len);
+#endif
+
 	if (!sectionloader.loadSections()) {
 		LOG_ERROR("Error loading sections from elf");
 		return false;
