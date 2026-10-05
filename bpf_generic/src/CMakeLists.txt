@@ -24,7 +24,10 @@ add_library(bpf_generic STATIC ${SOURCES} ${HEADERS})
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 include_directories("${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../libbpf")
-add_definitions(${LLVM_DEFINITIONS})
+
+if(SKIP_OFFSETGUESSING)
+	target_compile_definitions(bpf_generic PRIVATE SKIP_OFFSETGUESSING)
+endif()
 
 target_link_libraries(bpf_generic spdlog::spdlog)
 target_link_libraries(bpf_generic fmt::fmt)

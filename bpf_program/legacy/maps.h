@@ -32,16 +32,6 @@ struct bpf_map_def SEC("maps") nettracer_status = {
 	.max_entries = 1
 };
 
-/* This is a key/value store with the keys being the cpu number
- * and the values being a perf file descriptor.
- */
-struct bpf_map_def SEC("maps") bpf_logs = {
-	.type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(uint32_t),
-	.max_entries = 2024
-};
-
 /* This is a key/value store with the keys being a pid
  * and the values being a struct sock *.
  */

@@ -37,7 +37,7 @@ bool loadMaps(maps_config& maps, BPFMapsWrapper& mapsWrapper, const elfSection* 
 using MapsSymbols = std::unordered_map<uintptr_t, std::string>;
 
 struct ElfFile {
-	int fd{};
+	int fd{-1};
 	Elf* elf{nullptr};
 	GElf_Ehdr ehdr;
 
@@ -56,18 +56,34 @@ struct ElfFile {
 		if (gelf_getehdr(elf, &ehdr) != &ehdr)
 			throw std::runtime_error{"Cannot read elf header"};
 	}
+
+	explicit ElfFile(unsigned char* buf, size_t size) {
+		if (elf_version(EV_CURRENT) == EV_NONE)
+			throw std::runtime_error{"Cannot read elf version"};
+
+		elf = elf_memory(reinterpret_cast<char*>(buf), size);
+		if (!elf)
+			throw std::runtime_error{"Cannot read elf from memory buffer"};
+
+		if (gelf_getehdr(elf, &ehdr) != &ehdr)
+			throw std::runtime_error{"Cannot read elf header"};
+	}
+
 	ElfFile(const ElfFile&) = delete;
     ElfFile& operator=(const ElfFile&) = delete;
 
 	~ElfFile() {
 		elf_end(elf);
-		close(fd);
+		if (fd != -1) {
+			close(fd);
+		}
 	}
 };
 
 class SectionLoader {
 public:
 	explicit SectionLoader(const std::string& path);
+	explicit SectionLoader(unsigned char* buf, size_t size);
 	bool loadSections();
 	bool relocateData(maps_config& maps);
 
