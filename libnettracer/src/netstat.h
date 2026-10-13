@@ -99,10 +99,8 @@ protected:
 	template<typename IPTYPE, typename T, typename F>
 	void process_bpf_map(int fd, F func);
 
-	void printHeader();
 	template<typename IPTYPE>
 	void print();
-	template<typename IPTYPE>
 	void print_human_readable();
 	void flush();
 	template <typename IPTYPE>

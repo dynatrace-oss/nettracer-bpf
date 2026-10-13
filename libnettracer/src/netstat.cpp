@@ -169,7 +169,6 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 	using namespace std::literals::chrono_literals;
 
 	TimeGuard outputCtr(exitCtrl.wait_time), logCtr(seconds(5min).count());
-	printHeader();
 
 	while (exitCtrl.running && !config_changed) {
 		update<ipv4_tuple_t>(fdsIPv4);
@@ -185,8 +184,7 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 			const auto tcpSessionsStr =
 					fmt::format("Number of passive tcp sessions: {}, active: {}, established: {}", passive, active, established);
 			if (interactive) {
-				print_human_readable<ipv4_tuple_t>();
-				print_human_readable<ipv6_tuple_t>();
+				print_human_readable();
 				std::cout << tcpSessionsStr;
 			} else {
 				print<ipv4_tuple_t>();
@@ -275,20 +273,6 @@ static std::ostream& operator<<(std::ostream& os, const netstat::State& s) {
 	return os;
 }
 
-static void printAddr(std::ostream& os, const ipv4_tuple_t& tup, int field_width, bool direction) {
-	std::string_view arrow = direction ? "<-" : "->";
-	os << std::setw(field_width) << fmt::format("{}:{}", ipv4_to_string(tup.saddr), tup.sport)
-	   << arrow
-	   << std::setw(field_width) << fmt::format(" {}:{}", ipv4_to_string(tup.daddr), tup.dport);
-}
-
-static void printAddr(std::ostream& os, const ipv6_tuple_t& tup, int field_width, bool direction) {
-	std::string_view arrow = direction ? "<-" : "->";
-	os << std::setw(field_width) << fmt::format("{}:{}", ipv6_to_string(tup.saddr_h, tup.saddr_l), tup.sport)
-	   << arrow
-	   << std::setw(field_width) << fmt::format(" {}:{}", ipv6_to_string(tup.daddr_h, tup.daddr_l), tup.dport);
-}
-
 template <typename IPTYPE>
 static uint64_t subtract(uint64_t a, uint64_t b, std::string_view position, const IPTYPE& key) {
 	uint64_t result = 0;
@@ -354,30 +338,33 @@ void NetStat::print() {
 	}
 }
 
-void NetStat::printHeader() {
-	if (!interactive)
-		return;
-
-	*os << std::left << std::setw(field_width) << "local address" << std::setw(field_width) << "remote address"
-		<< std::setw(field_width) << "pid" << std::setw(field_width) << "bytes sent" << std::setw(field_width)
-		<< "bytes received " << std::setw(field_width) << "rtt" << "\n";
+static void printHeader(int field_width, std::ostream& os) {
+	os << std::left << std::setw(2 * field_width) << "local address <-> remote address" << std::setw(field_width) << "pid"
+	   << std::setw(field_width) << "bytes sent" << std::setw(field_width) << "bytes received " << std::setw(field_width) << "rtt" << "\n";
 }
 
 template <typename IPTYPE>
-void NetStat::print_human_readable() {
-	std::unique_lock<std::mutex> l(mx);
-	auto& aggr{connections<IPTYPE>()};
-	for (auto& it : aggr) {
+void print_human_readable(const std::unordered_map<IPTYPE, Connection>& aggr, int direction, int field_width, std::ostream& os) {
+	ConnectionDirection dirconn = (direction == 1) ? ConnectionDirection::Incoming : ConnectionDirection::Outgoing;
 
-		if (filter_loopback && shouldFilter(it.first)) {
+	for (auto& [tup, stats] : aggr) {
+		if (stats.state.Direction != direction) {
 			continue;
 		}
 
-		printAddr(*os, it.first, field_width, it.second.state.Direction);
-		*os << std::setw(field_width) << it.second.pid <<  std::setw(field_width) << it.second.bytes_sent
-			<< std::setw(field_width) << it.second.bytes_received << std::setw(field_width) << it.second.rtt << "\n";
-		set_prev_metrics(it.second);
+		os << std::setw(field_width) << to_string(tup, dirconn);
+		os << std::setw(field_width) << stats.pid << std::setw(field_width) << stats.bytes_sent << std::setw(field_width)
+		   << stats.bytes_received << std::setw(field_width) << stats.rtt << "\n";
 	}
+}
+
+void NetStat::print_human_readable() {
+	printHeader(field_width, *os);
+	std::unique_lock<std::mutex> l(mx);
+	print_human_readable<ipv4_tuple_t>(aggr_, 1, field_width, *os);
+	print_human_readable<ipv6_tuple_t>(aggr6_, 1, field_width, *os);
+	print_human_readable<ipv4_tuple_t>(aggr_, 0, field_width, *os);
+	print_human_readable<ipv6_tuple_t>(aggr6_, 0, field_width, *os);
 }
 
 template <typename IPTYPE>

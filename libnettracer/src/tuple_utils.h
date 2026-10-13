@@ -68,10 +68,6 @@ struct hash<ipv6_tuple_t> {
 
 } // namespace std
 
-enum class LineId { Connection = 1, Event, Metrics };
-enum class EventType { Accept = 1, Connect, Close };
-
-
 // format ipv6 address - h and l are 64 bit and in network byte order
 std::string ipv6_to_string(uint64_t h, uint64_t l);
 std::string ipv4_to_string(uint32_t addr);
