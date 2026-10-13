@@ -41,7 +41,7 @@ std::string ipv4_to_string(uint32_t ip) {
 
 std::string to_string(const ipv4_tuple_t& tuple, ConnectionDirection direction) {
 	return fmt::format(
-			"{}:{:d} {} {}:{:d} NS:{:d}",
+			"{:>15}:{:<5} {:^2} {:>15}:{:<5} [{:>8x}]",
 			ipv4_to_string(tuple.saddr),
 			tuple.sport,
 			directionSigns[static_cast<size_t>(direction)],
@@ -52,7 +52,7 @@ std::string to_string(const ipv4_tuple_t& tuple, ConnectionDirection direction) 
 
 std::string to_string(const ipv6_tuple_t& tuple, ConnectionDirection direction) {
 	return fmt::format(
-			"{}:{:d} {} {}:{:d} NS:{:d}",
+			"{:>20}:{:<5} {:^2} {:>20}:{:<5} [{:>8x}]",
 			ipv6_to_string(tuple.saddr_h, tuple.saddr_l),
 			tuple.sport,
 			directionSigns[static_cast<size_t>(direction)],

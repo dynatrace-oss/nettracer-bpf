@@ -27,6 +27,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <utility>
+#include "connectivity_stats.h"
 
 namespace netstat {
 
@@ -45,18 +46,8 @@ struct Connection {
 	steady_clock::time_point update_time;
 	system_clock::time_point start;
 	system_clock::time_point end;
-	uint64_t bytes_sent = 0;
-	uint64_t bytes_sent_prev = 0;
-	uint64_t bytes_received = 0;
-	uint64_t bytes_received_prev = 0;
-	uint64_t pkts_sent = 0;
-	uint64_t pkts_sent_prev = 0;
-	uint64_t pkts_received = 0;
-	uint64_t pkts_received_prev = 0;
-	uint64_t pkts_retrans =0;
-	uint64_t pkts_retrans_prev = 0;
-	uint32_t rtt = 0;
-	uint32_t rtt_var = 0;
+	Stats curr;
+	Stats prev;
 };
 
 using ConnectionsIPv4 = std::unordered_map<ipv4_tuple_t, Connection>;

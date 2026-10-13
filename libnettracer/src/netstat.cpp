@@ -86,41 +86,41 @@ void NetStat::update(const bpf::bpf_fds& fds) {
 	});
 
 	process_bpf_map<IPTYPE, stats_t>(fds.stats_fd, [&](auto& el, const auto& val) {
-		bool changed = (el.bytes_sent != val.sent_bytes) || (el.bytes_received != val.received_bytes);
-		el.bytes_sent = val.sent_bytes;
-		el.bytes_received = val.received_bytes;
+		bool changed = (el.curr.bytes_sent != val.sent_bytes) || (el.curr.bytes_received != val.received_bytes);
+		el.curr.bytes_sent = val.sent_bytes;
+		el.curr.bytes_received = val.received_bytes;
 		return changed;
 	});
 
 	process_bpf_map<IPTYPE, tcp_stats_t>(fds.tcp_stats_fd, [&](auto& el, const auto& val) {
-		bool changed = (el.pkts_retrans != val.retransmissions) || (el.pkts_sent != val.segs_out) || (el.pkts_received != val.segs_in) ||
-					   (el.rtt != val.rtt) || (el.rtt_var != val.rtt_var);
+		bool changed = (el.curr.pkts_retrans != val.retransmissions) || (el.curr.pkts_sent != val.segs_out) || (el.curr.pkts_received != val.segs_in) ||
+					   (el.curr.rtt != val.rtt) || (el.curr.rtt_var != val.rtt_var);
 
-		if ((el.pkts_sent > 0 && val.segs_out < el.pkts_sent) ||
-			(el.pkts_sent_prev > 0 && (val.segs_out - el.pkts_sent_prev) > (el.bytes_sent - el.bytes_sent_prev + 4))) {
+		if ((el.curr.pkts_sent > 0 && val.segs_out < el.curr.pkts_sent) ||
+			(el.prev.pkts_sent > 0 && (val.segs_out - el.prev.pkts_sent) > (el.curr.bytes_sent - el.prev.bytes_sent + 4))) {
 			LOG_DEBUG(
 					"Suspected segs_out:{} segs_out_prev:{} bytes_out:{} bytes_out_prev:{}",
 					val.segs_out,
-					el.pkts_sent_prev,
-					el.bytes_sent,
-					el.bytes_sent_prev);
+					el.prev.pkts_sent,
+					el.curr.bytes_sent,
+					el.prev.bytes_sent);
 		}
 
-		if ((el.pkts_received > 0 && val.segs_in < el.pkts_received) ||
-			(el.pkts_received_prev > 0 && (val.segs_in - el.pkts_received_prev) > (el.bytes_received - el.bytes_received_prev + 4))) {
+		if ((el.curr.pkts_received > 0 && val.segs_in < el.curr.pkts_received) ||
+			(el.prev.pkts_received > 0 && (val.segs_in - el.prev.pkts_received) > (el.curr.bytes_received - el.prev.bytes_received + 4))) {
 			LOG_DEBUG(
 					"Suspected segs_in:{} segs_in_prev:{} bytes_in:{} bytes_in_prev:{}",
 					val.segs_in,
-					el.pkts_received_prev,
-					el.bytes_received,
-					el.bytes_received_prev);
+					el.prev.pkts_received,
+					el.curr.bytes_received,
+					el.prev.bytes_received);
 		}
 
-		el.pkts_sent = val.segs_out;
-		el.pkts_received = val.segs_in;
-		el.pkts_retrans = val.retransmissions;
-		el.rtt = val.rtt;
-		el.rtt_var = val.rtt_var;
+		el.curr.pkts_sent = val.segs_out;
+		el.curr.pkts_received = val.segs_in;
+		el.curr.pkts_retrans = val.retransmissions;
+		el.curr.rtt = val.rtt;
+		el.curr.rtt_var = val.rtt_var;
 		return changed;
 	});
 }
@@ -290,11 +290,11 @@ void NetStat::flush() {
 }
 
 static void set_prev_metrics(Connection& el) {
-	el.bytes_received_prev = el.bytes_received;
-	el.bytes_sent_prev = el.bytes_sent;
-	el.pkts_retrans_prev = el.pkts_retrans;
-	el.pkts_sent_prev = el.pkts_sent;
-	el.pkts_received_prev = el.pkts_received;
+	el.prev.bytes_received = el.curr.bytes_received;
+	el.prev.bytes_sent = el.curr.bytes_sent;
+	el.prev.pkts_retrans = el.curr.pkts_retrans;
+	el.prev.pkts_sent = el.curr.pkts_sent;
+	el.prev.pkts_received = el.curr.pkts_received;
 }
 
 template<typename IPTYPE>
@@ -307,21 +307,21 @@ void NetStat::print() {
 
 		buf.str("");
 		auto wall_now = getCurrentTimeFromSystemClock();
-		uint64_t pkts_sent = subtract(it->second.pkts_sent, (incremental ? it->second.pkts_sent_prev : 0), "pkts_sent", it->first);
-		uint64_t pkts_received = subtract(it->second.pkts_received, (incremental ? it->second.pkts_received_prev : 0), "pkts_received", it->first);
+		uint64_t pkts_sent = subtract(it->second.curr.pkts_sent, (incremental ? it->second.prev.pkts_sent : 0), "pkts_sent", it->first);
+		uint64_t pkts_received = subtract(it->second.curr.pkts_received, (incremental ? it->second.prev.pkts_received : 0), "pkts_received", it->first);
 
 		buf << std::right
 			  << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
 			  << it->first
 			  << std::setw(12) << it->second.pid
 			  << std::setw(12) << it->first.netns << it->second.state
-			  << std::setw(22) << subtract( it->second.bytes_sent, (incremental ? it->second.bytes_sent_prev : 0), "bytes_sent", it->first) + addAvgHeaderSize<IPTYPE>( pkts_sent, add_header_mode_)
-			  << std::setw(22) << subtract( it->second.bytes_received, (incremental? it->second.bytes_received_prev: 0), "bytes_received", it->first) + addAvgHeaderSize<IPTYPE>( pkts_received, add_header_mode_ )
+			  << std::setw(22) << subtract( it->second.curr.bytes_sent, (incremental ? it->second.prev.bytes_sent : 0), "bytes_sent", it->first) + addAvgHeaderSize<IPTYPE>( pkts_sent, add_header_mode_)
+			  << std::setw(22) << subtract( it->second.curr.bytes_received, (incremental? it->second.prev.bytes_received: 0), "bytes_received", it->first) + addAvgHeaderSize<IPTYPE>( pkts_received, add_header_mode_ )
 		  	  << std::setw(22) << pkts_sent
 			  << std::setw(22) << pkts_received
-			  << std::setw(22) << subtract( it->second.pkts_retrans, (incremental ? it->second.pkts_retrans_prev : 0), "retranmissions", it->first)
-			  << std::setw(12) << it->second.rtt
-			  << std::setw(12) << it->second.rtt_var;
+			  << std::setw(22) << subtract( it->second.curr.pkts_retrans, (incremental ? it->second.prev.pkts_retrans : 0), "retranmissions", it->first)
+			  << std::setw(12) << it->second.curr.rtt
+			  << std::setw(12) << it->second.curr.rtt_var;
 
 		if (it->second.state.Established) {
 			auto end = (it->second.end != system_clock::time_point{}) ? it->second.end : getCurrentTimeFromSystemClock();
@@ -353,8 +353,8 @@ void print_human_readable(const std::unordered_map<IPTYPE, Connection>& aggr, in
 		}
 
 		os << std::setw(field_width) << to_string(tup, dirconn);
-		os << std::setw(field_width) << stats.pid << std::setw(field_width) << stats.bytes_sent << std::setw(field_width)
-		   << stats.bytes_received << std::setw(field_width) << stats.rtt << "\n";
+		os << std::setw(field_width) << stats.pid << std::setw(field_width) << stats.curr.bytes_sent << std::setw(field_width)
+		   << stats.curr.bytes_received << std::setw(field_width) << stats.curr.rtt << "\n";
 	}
 }
 

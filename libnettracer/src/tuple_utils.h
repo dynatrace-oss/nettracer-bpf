@@ -40,33 +40,37 @@ inline bool operator!=(const ipv6_tuple_t& lhs, const ipv6_tuple_t& rhs) {
 	return !(lhs == rhs);
 }
 
-namespace std {
+namespace {
+inline void hash_combine(std::size_t& seed, std::size_t v) {
+	seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+}
+} // namespace
 
 template <>
-struct hash<ipv4_tuple_t> {
+struct std::hash<ipv4_tuple_t> {
 	std::size_t operator()(const ipv4_tuple_t& t) const noexcept {
-		std::size_t h1 = std::hash<decltype(t.saddr)>{}(t.saddr);
-		std::size_t h2 = std::hash<decltype(t.daddr)>{}(t.daddr);
-		std::size_t h3 = std::hash<decltype(t.sport)>{}(t.sport);
-		std::size_t h4 = std::hash<decltype(t.dport)>{}(t.dport);
-		return h1 ^ (h2 << 1) ^ (h3 << 1) ^ h4; // or use boost::hash_combine
+		std::size_t h = 0;
+		hash_combine(h, hash<decltype(t.saddr)>{}(t.saddr));
+		hash_combine(h, std::hash<decltype(t.daddr)>{}(t.daddr));
+		hash_combine(h, std::hash<decltype(t.sport)>{}(t.sport));
+		hash_combine(h, std::hash<decltype(t.dport)>{}(t.dport));
+		return h;
 	}
 };
 
 template <>
-struct hash<ipv6_tuple_t> {
+struct std::hash<ipv6_tuple_t> {
 	std::size_t operator()(const ipv6_tuple_t& t) const noexcept {
-		std::size_t h1 = std::hash<decltype(t.saddr_h)>{}(t.saddr_h);
-		std::size_t h2 = std::hash<decltype(t.saddr_l)>{}(t.saddr_l);
-		std::size_t h3 = std::hash<decltype(t.daddr_h)>{}(t.daddr_h);
-		std::size_t h4 = std::hash<decltype(t.daddr_l)>{}(t.daddr_l);
-		std::size_t h5 = std::hash<decltype(t.sport)>{}(t.sport);
-		std::size_t h6 = std::hash<decltype(t.dport)>{}(t.dport);
-		return h1 ^ (h2 << 1) ^ (h3 << 1) ^ (h4 << 1) ^ h5 ^ (h5 << 1) ^ h6; // or use boost::hash_combine
+		std::size_t h = 0;
+		hash_combine(h, std::hash<decltype(t.saddr_h)>{}(t.saddr_h));
+		hash_combine(h, std::hash<decltype(t.saddr_l)>{}(t.saddr_l));
+		hash_combine(h, std::hash<decltype(t.daddr_h)>{}(t.daddr_h));
+		hash_combine(h, std::hash<decltype(t.daddr_l)>{}(t.daddr_l));
+		hash_combine(h, std::hash<decltype(t.sport)>{}(t.sport));
+		hash_combine(h, std::hash<decltype(t.dport)>{}(t.dport));
+		return h;
 	}
 };
-
-} // namespace std
 
 // format ipv6 address - h and l are 64 bit and in network byte order
 std::string ipv6_to_string(uint64_t h, uint64_t l);
