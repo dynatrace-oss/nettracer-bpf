@@ -20,8 +20,9 @@
 
 #include "bpf_debug_counters.h"
 #include "bpf_events.h"
-#include "configuration.h"
 #include "config_watcher.h"
+#include "configuration.h"
+#include "connectivity_stats.h"
 #include "event_mode.h"
 #include "netstat.h"
 #include "offsetguess.h"
@@ -157,14 +158,27 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		return ReturnCodes::GenericError;
 	}
 	bpf::BPFMapsWrapper mapsWrapper;
-
-	netstat::NetStat netst(
-			exitCtrl, config.deltaMetricsEnabled(), config.addHeadersToMetrics(), config.noninteractiveEnabled(), config.filterLoopback());
+	std::unique_ptr<netstat::IStatsCollector> netst;
+	if (config.connectivityEnabled()) {
+		netst = std::make_unique<netstat::ConnectivityStats>(
+				exitCtrl,
+				config.deltaMetricsEnabled(),
+				config.addHeadersToMetrics(),
+				config.noninteractiveEnabled(),
+				config.filterLoopback());
+	} else {
+		netst = std::make_unique<netstat::NetStat>(
+				exitCtrl,
+				config.deltaMetricsEnabled(),
+				config.addHeadersToMetrics(),
+				config.noninteractiveEnabled(),
+				config.filterLoopback());
+	}
 
 	try {
 		uint32_t nn_entries = config.getMapsSize();
 		LOG_INFO("map_size: {}", nn_entries);
-		netst.set_max_map_size(nn_entries);
+		netst->set_max_map_size(nn_entries);
 		if (!ebpf->load_bpf(config.bpfProgram(), nn_entries, *kernelVersion, config.connectivityEnabled())) {
 			return ReturnCodes::GenericError;
 		}
@@ -210,22 +224,22 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		LOG_INFO(fmt::format("Offset guessing finished: ipv6:{}", monitorIPv6));
 	}
 
-	netst.init();
+	netst->init();
 	bpf_events bevents(cw, ebpf->needs_offset_guessing());
-	bevents.set_kbhit_observer(std::bind(&netstat::NetStat::set_kbhit, &netst));
+	bevents.set_kbhit_observer(std::bind(&netstat::IStatsCollector::set_kbhit, netst.get()));
 
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
 	std::function<void(std::promise<bool>&&)> map_reading;
 
 	if (eventsOnly) {
-		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst.event<ipv4_tuple_t>(evt); };
+		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst->eventIpv4(evt); };
 		if (monitorIPv6) {
-			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
+			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst->eventIpv6(evt); };
 		}
-		bevents.set_config_change_observer(std::bind(&netstat::NetStat::on_config_change, &netst));
+		bevents.set_config_change_observer(std::bind(&netstat::IStatsCollector::on_config_change, netst.get()));
 		map_reading = [&](std::promise<bool>&& promise) {
-			auto ret = netst.map_loop(ipv4_fds, ipv6_fds);
+			auto ret = netst->map_loop(ipv4_fds, ipv6_fds);
 			promise.set_value(ret);
 		};
 	} else {

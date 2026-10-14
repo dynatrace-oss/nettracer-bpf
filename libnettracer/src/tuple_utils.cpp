@@ -40,24 +40,26 @@ std::string ipv4_to_string(uint32_t ip) {
 }
 
 std::string to_string(const ipv4_tuple_t& tuple, ConnectionDirection direction) {
+	std::string dportstr = (tuple.dport) ? std::to_string(tuple.dport) : "*";
 	return fmt::format(
 			"{:>15}:{:<5} {:^2} {:>15}:{:<5} [{:>8x}]",
 			ipv4_to_string(tuple.saddr),
 			tuple.sport,
 			directionSigns[static_cast<size_t>(direction)],
 			ipv4_to_string(tuple.daddr),
-			tuple.dport,
+			dportstr,
 			tuple.netns);
 }
 
 std::string to_string(const ipv6_tuple_t& tuple, ConnectionDirection direction) {
+	std::string dportstr = (tuple.dport) ? std::to_string(tuple.dport) : "*";
 	return fmt::format(
 			"{:>20}:{:<5} {:^2} {:>20}:{:<5} [{:>8x}]",
 			ipv6_to_string(tuple.saddr_h, tuple.saddr_l),
 			tuple.sport,
 			directionSigns[static_cast<size_t>(direction)],
 			ipv6_to_string(tuple.daddr_h, tuple.daddr_l),
-			tuple.dport,
+			dportstr,
 			tuple.netns);
 }
 
@@ -213,3 +215,12 @@ std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup) {
 	return os;
 }
 
+std::string short_num(uint32_t v) {
+	if (v < 1000)
+		return fmt::format("{}", v);
+	if (v < 1'000'000)
+		return fmt::format("{:.1f}K", v / 1e3);
+	if (v < 1'000'000'000)
+		return fmt::format("{:.1f}M", v / 1e6);
+	return fmt::format("{:.1f}G", v / 1e9);
+}

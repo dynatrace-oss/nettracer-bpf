@@ -3,7 +3,7 @@
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -82,6 +82,7 @@ std::ostream& operator<<(std::ostream& os, const ipv4_tuple_t& tup);
 std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup);
 
 uint64_t swap_uint32_t(uint64_t addrpart);
+std::string short_num(uint32_t num);
 
 inline std::string to_string(const ipv4_tuple_t& tuple) {
 	return to_string(tuple, ConnectionDirection::Unknown);

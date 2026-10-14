@@ -14,44 +14,21 @@
  * limitations under the License.
  */
 #pragma once
-#include <functional>
 #include "netstat.h"
+#include <chrono>
+#include <functional>
 
 namespace netstat {
-
-struct Stats {
-	uint64_t bytes_sent = 0;
-	uint64_t bytes_received = 0;
-	uint64_t pkts_sent = 0;
-	uint64_t pkts_received = 0;
-	uint64_t pkts_retrans = 0;
-	uint32_t rtt = 0;
-	uint32_t rtt_var = 0;
-};
-
-struct ServerStats : public Stats {
-	uint32_t session_counter = 0;
-	uint32_t connection_attempts = 0;
-	uint32_t connection_resets = 0;
-	uint32_t connection_timeout = 0;
-
-	void addStats(const Stats& conn) {
-		bytes_sent += conn.bytes_sent;
-		bytes_received += conn.bytes_received;
-		pkts_sent += conn.pkts_sent;
-		pkts_received += conn.pkts_received;
-		pkts_retrans += conn.pkts_retrans;
-		rtt = std::max(rtt, conn.rtt);
-		rtt_var = std::max(rtt_var, conn.rtt_var);
-	}
-};
-
 struct server_ipv4_tuple_t {
 	uint32_t saddr;
 	uint32_t daddr;
 	uint16_t sport;
+	uint32_t netns;
 	uint32_t pid;
 	bool operator==(const server_ipv4_tuple_t&) const = default;
+	ipv4_tuple_t get_tuple() const {
+		return ipv4_tuple_t{saddr, daddr, sport, 0, netns};
+	}
 };
 
 struct server_ipv6_tuple_t {
@@ -60,13 +37,14 @@ struct server_ipv6_tuple_t {
 	uint64_t daddr_h;
 	uint64_t daddr_l;
 	uint16_t sport;
+	uint32_t netns;
 	uint32_t pid;
 	bool operator==(const server_ipv6_tuple_t&) const = default;
+	ipv6_tuple_t get_tuple() const {
+		return ipv6_tuple_t{saddr_h, saddr_l, daddr_h, daddr_l, sport, 0, netns};
+	}
 };
-
-using ServersIPv4 = std::unordered_map<server_ipv4_tuple_t, ServerStats>;
-using ServersIPv6 = std::unordered_map<server_ipv6_tuple_t, ServerStats>;
-}
+} // namespace netstat
 
 template <>
 struct std::hash<netstat::server_ipv4_tuple_t> {
@@ -94,3 +72,76 @@ struct std::hash<netstat::server_ipv6_tuple_t> {
 	}
 };
 
+namespace netstat {
+struct ServerStats : public Stats {
+	std::chrono::steady_clock::time_point update_time;
+	uint32_t connection_attempts = 0;
+	uint32_t connection_resets = 0;
+	uint32_t connection_timeouts = 0;
+
+	void addStats(const Stats& conn) {
+		bytes_sent += conn.bytes_sent;
+		bytes_received += conn.bytes_received;
+		pkts_sent += conn.pkts_sent;
+		pkts_received += conn.pkts_received;
+		pkts_retrans += conn.pkts_retrans;
+		rtt = std::max(rtt, conn.rtt);
+		rtt_var = std::max(rtt_var, conn.rtt_var);
+	}
+};
+
+using ServersIPv4 = std::unordered_map<server_ipv4_tuple_t, ServerStats>;
+using ServersIPv6 = std::unordered_map<server_ipv6_tuple_t, ServerStats>;
+inline server_ipv4_tuple_t createServerKey(const ipv4_tuple_t& key, uint32_t pid) {
+	return server_ipv4_tuple_t{key.saddr, key.daddr, key.sport, key.netns, pid};
+}
+inline server_ipv6_tuple_t createServerKey(const ipv6_tuple_t& key, uint32_t pid) {
+	return server_ipv6_tuple_t{key.saddr_h, key.saddr_l, key.daddr_h, key.daddr_l, key.sport, key.netns, pid};
+}
+
+template <typename T>
+struct ServerTupleOf;
+template <>
+struct ServerTupleOf<ipv4_tuple_t> {
+	using type = server_ipv4_tuple_t;
+};
+template <>
+struct ServerTupleOf<ipv6_tuple_t> {
+	using type = server_ipv6_tuple_t;
+};
+
+template <typename T>
+using ServerTuple_t = typename ServerTupleOf<T>::type;
+
+class ConnectivityStats : public NetStat {
+	ServersIPv4 servers_;
+	ServersIPv6 servers6_;
+	std::mutex mx_servers;
+	template <typename IPTYPE>
+	inline auto& servers();
+	template <typename IPTYPE, typename EventIPTYPE>
+	void event(const EventIPTYPE& evt);
+	template <typename IPTYPE>
+	void aggregateServers();
+
+public:
+	using NetStat::NetStat;
+	void eventIpv4(const tcp_ipv4_event_t& evt) override;
+	void eventIpv6(const tcp_ipv6_event_t& evt) override;
+	virtual ~ConnectivityStats() = default;
+
+protected:
+	void print_human_readable() override;
+	void print_to_pipe() override;
+	void aggregateServers() override;
+};
+
+template <>
+inline auto& ConnectivityStats::servers<ipv4_tuple_t>() {
+	return servers_;
+}
+template <>
+inline auto& ConnectivityStats::servers<ipv6_tuple_t>() {
+	return servers6_;
+}
+} // namespace netstat
