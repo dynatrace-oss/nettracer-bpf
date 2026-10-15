@@ -57,9 +57,6 @@ struct tcp_ipv6_event_t {
 	uint32_t netns;
 };
 
-// tcp_set_state doesn't run in the context of the process that initiated the
-// connection so we need to store a map TUPLE -> PID to send the right PID on
-// the event
 struct ipv4_tuple_t {
 	uint32_t saddr;
 	uint32_t daddr;
@@ -187,6 +184,7 @@ struct bpf_debug_counters_t {
 	uint64_t map_sends_update_failures;
 };
 
+#define MAX_NAMESPACES 128
 struct tcp_params_t {
 	uint32_t syn_queue_size;
 };

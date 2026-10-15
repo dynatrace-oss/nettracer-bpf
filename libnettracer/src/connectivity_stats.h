@@ -117,15 +117,23 @@ class ConnectivityStats : public NetStat {
 	ServersIPv4 servers_;
 	ServersIPv6 servers6_;
 	std::mutex mx_servers;
+	int tcp_params_fd{-1};
+	int tcp6_params_fd{-1};
+	std::unordered_map<uint32_t, uint32_t> syn_backlog_conf;
+	std::unordered_map<uint32_t, uint32_t> syn_backlog_conf6;
+
 	template <typename IPTYPE>
 	inline auto& servers();
 	template <typename IPTYPE, typename EventIPTYPE>
 	void event(const EventIPTYPE& evt);
 	template <typename IPTYPE>
-	void aggregateServers();
+	void aggregate();
+	template <typename IPTYPE>
+	std::unordered_map<uint32_t, uint32_t>& getTcpConf(int& fd);
 
 public:
 	using NetStat::NetStat;
+	void init(bpf::Ibpf& ebpf) override;
 	void eventIpv4(const tcp_ipv4_event_t& evt) override;
 	void eventIpv6(const tcp_ipv6_event_t& evt) override;
 	virtual ~ConnectivityStats() = default;
@@ -133,7 +141,7 @@ public:
 protected:
 	void print_human_readable() override;
 	void print_to_pipe() override;
-	void aggregateServers() override;
+	void aggregate() override;
 };
 
 template <>

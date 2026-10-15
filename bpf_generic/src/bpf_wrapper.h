@@ -57,12 +57,12 @@ public:
 };
 
 struct bpf_fds {
-    int pid_fd;
-    int stats_fd;
-    int tcp_stats_fd;
-    bool isInvalid() const{
-        return (pid_fd < 0 || stats_fd < 0 || tcp_stats_fd < 0);
-    }
+	int pid_fd{-1};
+	int stats_fd{-1};
+	int tcp_stats_fd{-1};
+	bool isInvalid() const {
+		return (pid_fd < 0 || stats_fd < 0 || tcp_stats_fd < 0);
+	}
 };
 
 class Ibpf;

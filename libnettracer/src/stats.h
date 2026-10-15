@@ -42,7 +42,7 @@ Stats calc_delta(Stats curr, Stats prev, const IPTYPE& key) {
 		LOG_INFO("nonmonotonic counter bytes_received : {} < {} key: {}", curr.bytes_received, prev.bytes_received, to_string(key));
 	}
 	if (curr.pkts_sent >= prev.pkts_sent) {
-		result.pkts_sent = curr.pkts_sent - curr.pkts_sent;
+		result.pkts_sent = curr.pkts_sent - prev.pkts_sent;
 	} else {
 		LOG_INFO("nonmonotonic counter pkts_sent : {} < {} key: {}", curr.pkts_sent, curr.pkts_received, to_string(key));
 	}

@@ -18,6 +18,10 @@
 #include "bpf_program/nettracer-bpf.h"
 #include "configuration.h"
 
+namespace bpf {
+class Ibpf;
+}
+
 namespace netstat {
 
 constexpr int ADDRESS_FIELD_WIDTH = 56;
@@ -29,8 +33,8 @@ public:
 	virtual void set_kbhit() = 0;
 	virtual void set_max_map_size(uint32_t size) = 0;
 	virtual void on_config_change() = 0;
-	virtual void init() = 0;
-	virtual bool map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6) = 0;
+	virtual void init(bpf::Ibpf& ebpf) = 0;
+	virtual bool map_loop() = 0;
 	virtual void eventIpv4(const tcp_ipv4_event_t& evt) = 0;
 	virtual void eventIpv6(const tcp_ipv6_event_t& evt) = 0;
 };

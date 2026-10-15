@@ -60,7 +60,7 @@ void NetStat::process_bpf_map(int fd, F func) {
 		T val{};
 		if (mapsWrapper->lookupElement(fd, &currentKey, &val)) {
 			if (currentKey.sport > 0) {
-				std::unique_lock<std::mutex> l(mx_aggr);
+				std::unique_lock l(mx_aggr);
 				auto& el = connections<IPTYPE>()[currentKey];
 				if (func(el, val)) {
 					el.update_time = getCurrentTimeFromSteadyClock();
@@ -164,7 +164,7 @@ std::tuple<unsigned, unsigned, unsigned> NetStat::countTcpSessions() {
 	return {incoming, container4.size() + container6.size() - incoming, established};
 }
 
-bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6) {
+bool NetStat::map_loop() {
 	using namespace std::literals::chrono_literals;
 
 	TimeGuard outputCtr(exitCtrl.wait_time), logCtr(seconds(5min).count());
@@ -179,7 +179,7 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 		if (kbhit || outputCtr.time_elapsed()) {
 			resolveOldConnections<ipv4_tuple_t>();
 			resolveOldConnections<ipv6_tuple_t>();
-			aggregateServers();
+			aggregate();
 			const auto [passive, active, established] = countTcpSessions();
 			const auto tcpSessionsStr =
 					fmt::format("Number of passive tcp sessions: {}, active: {}, established: {}", passive, active, established);
@@ -201,7 +201,7 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 
 		outputCtr.bump();
 		logCtr.bump();
-		std::unique_lock<std::mutex> lk(exitCtrl.m);
+		std::unique_lock lk(exitCtrl.m);
 		kbhit = false;
 		exitCtrl.cv.wait_for(lk, milliseconds(1000 / INTERVAL_DIVIDER), [this] { return !exitCtrl.running || kbhit || config_changed; });
 	}
@@ -211,7 +211,7 @@ bool NetStat::map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6)
 template<typename IPTYPE>
 void NetStat::clean_bpf(const bpf::bpf_fds& fds) {
 	auto now = getCurrentTimeFromSteadyClock();
-	std::unique_lock<std::mutex> l(mx_aggr);
+	std::unique_lock lock(mx_aggr);
 	auto& aggr{connections<IPTYPE>()};
 	for (auto it = aggr.begin(); it != aggr.end(); ++it) {
 		if (it->second.state.Closed || now - it->second.update_time >= INACTIVE_TIMEOUT) {
@@ -225,7 +225,7 @@ void NetStat::clean_bpf(const bpf::bpf_fds& fds) {
 template<typename IPTYPE>
 void NetStat::clean() {
 	auto now = getCurrentTimeFromSteadyClock();
-	std::unique_lock<std::mutex> l(mx_aggr);
+	std::unique_lock lock(mx_aggr);
 	auto& aggr{connections<IPTYPE>()};
 	for (auto it = aggr.begin(); it != aggr.end();) {
 		if (it->second.state.Closed || now - it->second.update_time >= INACTIVE_TIMEOUT) {
@@ -246,7 +246,7 @@ void NetStat::event(const EventIPTYPE& evt) {
 		return;
 	}
 
-	std::unique_lock<std::mutex> l(mx_aggr);
+	std::unique_lock lock(mx_aggr);
 	auto& el = connections<IPTYPE>()[key];
 
 	if (el.state.Closed == 1) {
@@ -292,7 +292,7 @@ void NetStat::flush() {
 
 template <typename IPTYPE>
 void NetStat::set_prev_metrics() {
-	std::unique_lock<std::mutex> l(mx_aggr);
+	std::unique_lock lock(mx_aggr);
 	auto& aggr = connections<IPTYPE>();
 
 	for (auto& [tup, stats] : aggr) {
@@ -308,7 +308,7 @@ void NetStat::set_prev_metrics() {
 
 template<typename IPTYPE>
 void NetStat::print() const {
-	std::unique_lock<std::mutex> lock(mx_aggr);
+	std::unique_lock lock(mx_aggr);
 	const std::unordered_map<IPTYPE, Connection> aggr = connections<IPTYPE>();
 	lock.unlock();
 	std::stringstream buf;
@@ -375,7 +375,7 @@ void print_human_readable(const std::unordered_map<IPTYPE, Connection>& aggr, in
 }
 
 void NetStat::print_human_readable_clients() {
-	std::unique_lock<std::mutex> l(mx_aggr);
+	std::unique_lock lock(mx_aggr);
 	print_human_readable<ipv4_tuple_t>(aggr_, 0, field_width, *os);
 	print_human_readable<ipv6_tuple_t>(aggr6_, 0, field_width, *os);
 }
@@ -384,7 +384,7 @@ void NetStat::print_human_readable() {
 	printHeader(field_width, *os);
 	print_human_readable_clients();
 
-	std::unique_lock<std::mutex> l(mx_aggr);
+	std::unique_lock lock(mx_aggr);
 	print_human_readable<ipv4_tuple_t>(aggr_, 1, field_width, *os);
 	print_human_readable<ipv6_tuple_t>(aggr6_, 1, field_width, *os);
 }
@@ -438,10 +438,20 @@ void NetStat::resolveOldConnections() {
 	}
 }
 
-void NetStat::init() {
+void NetStat::init(bpf::Ibpf& ebpf) {
 	// wrapper just wraps syscalls so using it is thread-safe
 	static bpf::BPFMapsWrapper wrapper;
 	mapsWrapper = &wrapper;
+
+	fdsIPv4 = getIPv4Fds(ebpf);
+	if (fdsIPv4.isInvalid()) {
+		throw std::invalid_argument("invalid fds for ipv4 maps");
+	}
+
+	fdsIPv6 = getIPv6Fds(ebpf);
+	if (fdsIPv6.isInvalid()) {
+		throw std::invalid_argument("invalid fds for ipv6 maps");
+	}
 
 	readListenPorts();
 }
@@ -474,26 +484,27 @@ void netstat::NetStat::set_max_map_size(uint32_t size) {
 }
 
 void NetStat::set_kbhit() {
-	std::unique_lock<std::mutex> ul(exitCtrl.m);
+	std::unique_lock ul(exitCtrl.m);
 	kbhit = true;
 	ul.unlock();
 	exitCtrl.cv.notify_all();
 }
 
 void NetStat::on_config_change() {
-	std::unique_lock<std::mutex> ul(exitCtrl.m);
+	std::unique_lock lock(exitCtrl.m);
 	config_changed = true;
-	ul.unlock();
+	lock.unlock();
 	exitCtrl.cv.notify_all();
 }
 
-void NetStat::aggregateServers() {
+void NetStat::aggregate() {
+	//no aggregation, to defined in derived class
 }
 
 template <typename IPTYPE>
 std::unordered_map<IPTYPE, Connection> NetStat::filterServerAggrs() {
 	std::unordered_map<IPTYPE, Connection> result;
-	std::unique_lock<std::mutex> ul(mx_aggr);
+	std::unique_lock lock(mx_aggr);
 	auto aggr = connections<IPTYPE>();
 	for (auto& [tup, stats] : aggr) {
 		if (stats.state.Direction != 1) {
@@ -509,6 +520,8 @@ template void NetStat::update<ipv4_tuple_t>(const bpf::bpf_fds&);
 template void NetStat::update<ipv6_tuple_t>(const bpf::bpf_fds&);
 template void NetStat::resolveOldConnections<ipv4_tuple_t>();
 template void NetStat::resolveOldConnections<ipv6_tuple_t>();
+template void NetStat::set_prev_metrics<ipv4_tuple_t>();
+template void NetStat::set_prev_metrics<ipv6_tuple_t>();
 template std::unordered_map<ipv4_tuple_t, Connection> NetStat::filterServerAggrs<ipv4_tuple_t>();
 template std::unordered_map<ipv6_tuple_t, Connection> NetStat::filterServerAggrs<ipv6_tuple_t>();
 } // namespace netstat

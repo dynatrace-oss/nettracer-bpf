@@ -140,5 +140,5 @@ struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__type(key, __u32);
 	__type(value, struct tcp_params_t);
-	__uint(max_entries, 128);
+	__uint(max_entries, MAX_NAMESPACES);
 } tcp6_params SEC(".maps");
