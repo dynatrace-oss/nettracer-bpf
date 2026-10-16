@@ -17,7 +17,7 @@
 
 #include "bpf_program/nettracer-bpf.h"
 #include "proc_tcp.h"
-
+#include <boost/container_hash/hash.hpp>
 #include <array>
 #include <string>
 #include <tuple>
@@ -40,20 +40,14 @@ inline bool operator!=(const ipv6_tuple_t& lhs, const ipv6_tuple_t& rhs) {
 	return !(lhs == rhs);
 }
 
-namespace {
-inline void hash_combine(std::size_t& seed, std::size_t v) {
-	seed ^= v + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
-}
-} // namespace
-
 template <>
 struct std::hash<ipv4_tuple_t> {
 	std::size_t operator()(const ipv4_tuple_t& t) const noexcept {
 		std::size_t h = 0;
-		hash_combine(h, hash<decltype(t.saddr)>{}(t.saddr));
-		hash_combine(h, std::hash<decltype(t.daddr)>{}(t.daddr));
-		hash_combine(h, std::hash<decltype(t.sport)>{}(t.sport));
-		hash_combine(h, std::hash<decltype(t.dport)>{}(t.dport));
+		boost::hash_combine(h, t.saddr);
+		boost::hash_combine(h, t.daddr);
+		boost::hash_combine(h, t.sport);
+		boost::hash_combine(h, t.dport);
 		return h;
 	}
 };
@@ -62,12 +56,12 @@ template <>
 struct std::hash<ipv6_tuple_t> {
 	std::size_t operator()(const ipv6_tuple_t& t) const noexcept {
 		std::size_t h = 0;
-		hash_combine(h, std::hash<decltype(t.saddr_h)>{}(t.saddr_h));
-		hash_combine(h, std::hash<decltype(t.saddr_l)>{}(t.saddr_l));
-		hash_combine(h, std::hash<decltype(t.daddr_h)>{}(t.daddr_h));
-		hash_combine(h, std::hash<decltype(t.daddr_l)>{}(t.daddr_l));
-		hash_combine(h, std::hash<decltype(t.sport)>{}(t.sport));
-		hash_combine(h, std::hash<decltype(t.dport)>{}(t.dport));
+		boost::hash_combine(h, t.saddr_h);
+		boost::hash_combine(h, t.saddr_l);
+		boost::hash_combine(h, t.daddr_h);
+		boost::hash_combine(h, t.daddr_l);
+		boost::hash_combine(h, t.sport);
+		boost::hash_combine(h, t.dport);
 		return h;
 	}
 };
@@ -82,7 +76,7 @@ std::ostream& operator<<(std::ostream& os, const ipv4_tuple_t& tup);
 std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup);
 
 uint64_t swap_uint32_t(uint64_t addrpart);
-std::string short_num(uint32_t num);
+std::string short_num(uint64_t num);
 
 inline std::string to_string(const ipv4_tuple_t& tuple) {
 	return to_string(tuple, ConnectionDirection::Unknown);
@@ -102,3 +96,8 @@ bool shouldFilter(const ipv4_tuple_t key);
 bool shouldFilter(const ipv6_tuple_t key);
 bool isIpv4MappedIpv6(uint64_t addr_l, uint64_t addr_h);
 ipv4_tuple_t convertMappedIpv6Tuple(const ipv6_tuple_t ipv6);
+
+namespace netstat {
+struct State;
+}
+std::ostream& operator<<(std::ostream& os, const netstat::State& s);

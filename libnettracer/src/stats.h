@@ -14,9 +14,18 @@
  * limitations under the License.
  */
 #pragma once
+#include "bpf_generic/src/log.h"
+#include "tuple_utils.h"
 #include <cstdint>
 
 namespace netstat {
+
+struct State {
+	unsigned char Established : 1;
+	unsigned char Direction : 1;
+	unsigned char Closed : 1;
+	unsigned char Aggregated : 1;
+};
 
 struct Stats {
 	uint64_t bytes_sent = 0;
@@ -44,7 +53,7 @@ Stats calc_delta(Stats curr, Stats prev, const IPTYPE& key) {
 	if (curr.pkts_sent >= prev.pkts_sent) {
 		result.pkts_sent = curr.pkts_sent - prev.pkts_sent;
 	} else {
-		LOG_INFO("nonmonotonic counter pkts_sent : {} < {} key: {}", curr.pkts_sent, curr.pkts_received, to_string(key));
+		LOG_INFO("nonmonotonic counter pkts_sent : {} < {} key: {}", curr.pkts_sent, prev.pkts_sent, to_string(key));
 	}
 	if (curr.pkts_received >= prev.pkts_received) {
 		result.pkts_received = curr.pkts_received - prev.pkts_received;
@@ -54,7 +63,7 @@ Stats calc_delta(Stats curr, Stats prev, const IPTYPE& key) {
 	if (curr.pkts_retrans >= prev.pkts_retrans) {
 		result.pkts_retrans = curr.pkts_retrans - prev.pkts_retrans;
 	} else {
-		LOG_INFO("nonmonotonic counter pkts_received : {} < {} key: {}", curr.pkts_retrans, prev.pkts_retrans, to_string(key));
+		LOG_INFO("nonmonotonic counter pkts_retrans : {} < {} key: {}", curr.pkts_retrans, prev.pkts_retrans, to_string(key));
 	}
 	result.rtt = curr.rtt;
 	result.rtt_var = curr.rtt_var;

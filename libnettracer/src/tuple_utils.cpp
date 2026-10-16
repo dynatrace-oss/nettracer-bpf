@@ -15,6 +15,7 @@
 */
 #include "tuple_utils.h"
 #include "proc_tcp.h"
+#include "stats.h"
 #include <arpa/inet.h>
 #include <fmt/core.h>
 #include <functional>
@@ -215,7 +216,7 @@ std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup) {
 	return os;
 }
 
-std::string short_num(uint32_t v) {
+std::string short_num(uint64_t v) {
 	if (v < 1000)
 		return fmt::format("{}", v);
 	if (v < 1'000'000)
@@ -223,4 +224,11 @@ std::string short_num(uint32_t v) {
 	if (v < 1'000'000'000)
 		return fmt::format("{:.1f}M", v / 1e6);
 	return fmt::format("{:.1f}G", v / 1e9);
+}
+
+#define PRINT_BIT(field) ((s.field) ? "1" : "0")
+
+std::ostream& operator<<(std::ostream& os, const netstat::State& s) {
+	os << " " << PRINT_BIT(Established) << PRINT_BIT(Direction) << PRINT_BIT(Closed) << PRINT_BIT(Aggregated) << " ";
+	return os;
 }

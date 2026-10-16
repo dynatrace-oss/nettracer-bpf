@@ -30,12 +30,6 @@
 
 namespace netstat {
 
-struct State {
-	unsigned char Established : 1;
-	unsigned char Direction : 1;
-	unsigned char Closed : 1;
-};
-
 using namespace std::chrono;
 
 struct Connection {
@@ -98,13 +92,12 @@ protected:
 
 	virtual void print_to_pipe();
 	template <typename IPTYPE>
-	void print() const ;
+	void print(bool clientsOnly) const ;
 	virtual void print_human_readable();
 	void print_human_readable_clients();
 	void flush();
 	template <typename IPTYPE>
 	void clean();
-
 	template <typename IPTYPE>
 	void clean_bpf(const bpf::bpf_fds& fds);
 
@@ -117,7 +110,7 @@ protected:
 	void set_prev_metrics();
 	virtual void aggregate();
 	template <typename IPTYPE, typename EventIPTYPE>
-	void event(const EventIPTYPE& evt);
+	bool event(const EventIPTYPE& evt);
 
 public:
 	explicit NetStat(config::ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
@@ -156,4 +149,17 @@ inline auto& NetStat::listenPorts<ipv6_tuple_t>() {
 	return listen6_;
 }
 
+template <class IPTYPE>
+constexpr uint64_t addAvgHeaderSize(uint64_t pkts, bool count) {
+	return 0;
+}
+template <>
+constexpr uint64_t addAvgHeaderSize<ipv4_tuple_t>(uint64_t pkts, bool count) {
+	return count ? 66 * pkts : 0;
+}
+
+template <>
+constexpr uint64_t addAvgHeaderSize<ipv6_tuple_t>(uint64_t pkts, bool count) {
+	return count ? 77 * pkts : 0;
+}
 } // namespace netstat

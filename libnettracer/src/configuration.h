@@ -76,6 +76,9 @@ public:
 	bool connectivityEnabled() const {
 		return connectivity;
 	}
+	void disableConnectivity() {
+		connectivity = false;
+	}
 	std::string bpfProgram() const {
 		return variablesMap["program"].as<std::string>();
 	}
