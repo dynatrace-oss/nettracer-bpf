@@ -222,49 +222,50 @@ void NetStat::clean() {
 	}
 }
 
-template<typename IPTYPE, typename EventIPTYPE>
+template <typename IPTYPE, typename EventIPTYPE>
 bool NetStat::event(const EventIPTYPE& evt) {
 	auto key{eventToTuple(evt)};
-	auto time = bpfTimeToSystemTime(evt.timestamp);
 
 	if (key.sport == 0) {
 		LOG_DEBUG("Event src port = 0 for {} ", to_string(evt));
 		return true;
 	}
 
+	if (evt.type != TCP_EVENT_TYPE_CONNECT && evt.type != TCP_EVENT_TYPE_ACCEPT && evt.type != TCP_EVENT_TYPE_CLOSE) {
+		return false;
+	}
 
-	if (evt.type == TCP_EVENT_TYPE_CONNECT) {
-		std::unique_lock lock(mx_aggr);
-		auto& el = connections<IPTYPE>()[key];
-		el.pid = evt.pid;
-		el.update_time = getCurrentTimeFromSteadyClock();
+	const auto time = bpfTimeToSystemTime(evt.timestamp);
+
+	std::unique_lock lock(mx_aggr);
+	auto& el = connections<IPTYPE>()[key];
+
+	if (el.state.Closed == 1) {
+		LOG_INFO("Event on closed connection {}", to_string(evt));
+	}
+	el.pid = evt.pid;
+	el.update_time = getCurrentTimeFromSteadyClock();
+
+	switch (evt.type) {
+	case TCP_EVENT_TYPE_CONNECT:
 		el.start = time;
 		el.state.Established = 1;
 		el.state.Direction = 0;
-		return true;
-	}
-
-	if (evt.type == TCP_EVENT_TYPE_ACCEPT) {
-		std::unique_lock lock(mx_aggr);
-		auto& el = connections<IPTYPE>()[key];
-		el.pid = evt.pid;
-		el.update_time = getCurrentTimeFromSteadyClock();
-		el.state.Direction = 1;
-		el.state.Established = 1;
+		break;
+	case TCP_EVENT_TYPE_ACCEPT:
 		el.start = time;
-		return true;
-	}
-	if (evt.type == TCP_EVENT_TYPE_CLOSE) {
-		std::unique_lock lock(mx_aggr);
-		auto& el = connections<IPTYPE>()[key];
-		el.pid = evt.pid;
-		el.update_time = getCurrentTimeFromSteadyClock();
-		el.state.Closed = 1;
+		el.state.Established = 1;
+		el.state.Direction = 1;
+		break;
+	case TCP_EVENT_TYPE_CLOSE:
 		el.end = time;
-		return true;
+		el.state.Closed = 1;
+		break;
+	default:
+		return false;
 	}
 
-	return false;
+	return true;
 }
 
 void NetStat::eventIpv4(const tcp_ipv4_event_t& evt) {

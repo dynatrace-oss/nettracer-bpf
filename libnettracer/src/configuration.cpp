@@ -29,7 +29,7 @@ po::options_description Configuration::getOptionsDescription() {
 			("log,l", po::value<std::string>()->default_value(""), "Logger path")
 			("time_interval,t", po::value<unsigned>()->default_value(30), "Time interval of printing metrics data")
 			("counters_interval", po::value<unsigned>()->default_value(300), "Interval (seconds) for logging BPF debug counters; 0 disables")
-			("incremental,i", "Enable incremental data")
+			("incremental,i",  po::bool_switch(&deltaMode), "Enable incremental data")
 			("noninteractive,r", "Hex output")
 			("with_loopback,f", "With loopback")
 			("bpf,b", po::value<std::string>()->default_value("auto"), "BTF or classic")
@@ -47,6 +47,7 @@ std::filesystem::path Configuration::parseOptions(int argc, char* argv[]) {
 	po::options_description desc{getOptionsDescription()};
 	// clang-format on
 	try {
+		std::filesystem::path args_file_name;
 		po::store(po::parse_command_line(argc, argv, desc), variablesMap);
 		po::notify(variablesMap);
 
@@ -56,12 +57,14 @@ std::filesystem::path Configuration::parseOptions(int argc, char* argv[]) {
 		}
 		noStdoutLog = setUpLogging();
 		if (variablesMap.count("args_file")) {
-			auto fname = variablesMap["args_file"].as<std::filesystem::path>();
-			variablesMap = parseArgsFile(fname);
-			return fname;
+			args_file_name = variablesMap["args_file"].as<std::filesystem::path>();
+			variablesMap = parseArgsFile(args_file_name);
 		}
-
-		return {};
+		if (connectivity && !deltaMode) {
+			LOG_WARN("Delta mode must be enabled with connectivity mode");
+			deltaMode = true;
+		}
+		return args_file_name;
 	} catch (const po::invalid_syntax& ex) {
 		if (ex.kind() == po::invalid_syntax::unrecognized_line) {
 			LOG_WARN("the options configuration file contains an invalid line");

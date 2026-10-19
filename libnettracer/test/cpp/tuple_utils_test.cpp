@@ -219,3 +219,22 @@ TEST(TupleConversionTests, testIPv6EventToTuple) {
 	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CLOSE, pid, 2, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 	EXPECT_EQ((ipv6_tuple_t{addrAh, addrAl, addrBh, addrBl, portA, portB, netns}), eventToTuple(tcp_ipv6_event_t{timestamp, cpu, tcp_event_type::TCP_EVENT_TYPE_CONNECT, pid, 3, addrAh, addrAl, addrBh, addrBl, portA, portB, netns}));
 }
+
+TEST(HumanReadableTests, printUint64) {
+	uint64_t var = 123;
+	std::string result = short_num(var);
+	EXPECT_EQ(result, "123");
+	var = 123456;
+	result = short_num(var);
+	EXPECT_EQ(result, "123.5K");
+	var = 123456789;
+	result = short_num(var);
+	EXPECT_EQ(result, "123.5M");
+	var = 123456789123;
+	result = short_num(var);
+	EXPECT_EQ(result, "123.5G");
+	var = 123456789123123;
+	result = short_num(var);
+	EXPECT_EQ(result, "123456.8G");
+}
+

@@ -15,6 +15,8 @@
  */
 #include "configuration.h"
 #include <gtest/gtest.h>
+#include <spdlog/sinks/ostream_sink.h>
+#include <sstream>
 
 using namespace config;
 
@@ -38,4 +40,31 @@ TEST(ConfigurationTest, disabledEventAndConnectivityCannotCoexist) {
 	cfg.parseOptions(3, const_cast<char**>(argv));
 	EXPECT_TRUE(cfg.connectivityEnabled());
 	EXPECT_THROW(cfg.eventsEnabled(), po::invalid_option_value);
+}
+
+TEST(ConfigurationTest, connectivityWorksOnlyWithIncrementalMode) {
+	Configuration cfg;
+	const char* argv[] = {"nettracer", "--connectivity"};
+	cfg.parseOptions(2, const_cast<char**>(argv));
+	EXPECT_TRUE(cfg.connectivityEnabled());
+	EXPECT_TRUE(cfg.deltaMetricsEnabled());
+}
+
+TEST(ConfigurationTest, noWarningWhenDeltaAlreadyEnabled) {
+	std::ostringstream oss;
+	auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(oss);
+	auto logger = std::make_shared<spdlog::logger>("test", sink);
+	logger->set_level(spdlog::level::warn);
+	auto previous = spdlog::default_logger();
+	spdlog::set_default_logger(logger);
+
+	Configuration cfg;
+	const char* argv[] = {"nettracer", "--connectivity", "-i"};
+	cfg.parseOptions(3, const_cast<char**>(argv));
+
+	logger->flush();
+	spdlog::set_default_logger(previous);
+
+	EXPECT_TRUE(cfg.deltaMetricsEnabled());
+    EXPECT_EQ(oss.str().size(), 0u);
 }

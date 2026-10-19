@@ -142,7 +142,7 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 	}
 
 	unsigned time_interval = config.mainLoopTimeInterval();
-LOG_INFO("time_interval: {}", time_interval);
+	LOG_INFO("time_interval: {}", time_interval);
 	exitCtrl.wait_time = time_interval;
 
 	auto kernelVersion{getKernelVersion(SystemCalls::getInstance())};
@@ -160,7 +160,7 @@ LOG_INFO("time_interval: {}", time_interval);
 	bpf::BPFMapsWrapper mapsWrapper;
 	std::unique_ptr<netstat::IStatsCollector> netst;
 	if (ebpf->needs_offset_guessing() && config.connectivityEnabled()) {
-		LOG_ERROR("Connectivity works only when BTF is enabled and supported by kernel. Disabling");
+		LOG_WARN("Connectivity works only when BTF is enabled and supported by kernel. Disabling");
 		config.disableConnectivity();
 	}
 	if (config.connectivityEnabled()) {
