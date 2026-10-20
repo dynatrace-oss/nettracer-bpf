@@ -123,14 +123,10 @@ class ConnectivityStats : public NetStat {
 	std::unordered_map<uint32_t, uint32_t> syn_backlog_conf;
 	std::unordered_map<uint32_t, uint32_t> syn_backlog_conf6;
 
-	template <typename IPTYPE>
-	inline auto& servers();
-	template <typename IPTYPE>
-	inline auto& servers() const;
 	template <typename IPTYPE, typename EventIPTYPE>
 	void event(const EventIPTYPE& evt);
 	template <typename IPTYPE>
-	void aggregate();
+	void aggregateImpl();
 	template <typename IPTYPE>
 	std::unordered_map<uint32_t, uint32_t>& getTcpConf(int& fd);
 	template <typename IPTYPE>
@@ -147,6 +143,10 @@ protected:
 	void print_human_readable() override;
 	void print_to_pipe() override;
 	void aggregate() override;
+	template <typename IPTYPE>
+	inline auto& servers();
+	template <typename IPTYPE>
+	inline auto& servers() const;
 };
 
 template <>

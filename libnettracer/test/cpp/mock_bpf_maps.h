@@ -109,7 +109,10 @@ public:
 		return mapWrappers.at(fd)->createElement(key, value);
 	}
 	bool lookupElement(int fd, const void* key, void* value) const override {
-		return mapWrappers.at(fd)->lookupElement(key, value);
+		if (fd != -1) {
+			return mapWrappers.at(fd)->lookupElement(key, value);
+		}
+		return false;
 	}
 	bool updateElement(int fd, const void* key, const void* value, bool createIfDoesntExist = true) override {
 		return mapWrappers.at(fd)->updateElement(key, value, createIfDoesntExist);

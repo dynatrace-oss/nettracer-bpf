@@ -40,7 +40,7 @@ static void printHeader(int field_width, std::ostream& os) {
 
 void ConnectivityStats::print_human_readable() {
 	printHeader(field_width, *os);
-	print_human_readable_clients();
+	NetStat::print_human_readable(ConnKind::Client);
 	ServersIPv4 s4;
 	ServersIPv6 s6;
 	{
@@ -71,7 +71,7 @@ void ConnectivityStats::print_to_pipe() {
 }
 
 template <typename IPTYPE>
-void ConnectivityStats::aggregate() {
+void ConnectivityStats::aggregateImpl() {
 	auto aggr = filterServerAggrs<IPTYPE>();
 	std::unique_lock lock(mx_servers);
 	for (auto& [tup, stats] : aggr) {
@@ -82,8 +82,8 @@ void ConnectivityStats::aggregate() {
 }
 
 void ConnectivityStats::aggregate() {
-	aggregate<ipv4_tuple_t>();
-	aggregate<ipv6_tuple_t>();
+	aggregateImpl<ipv4_tuple_t>();
+	aggregateImpl<ipv6_tuple_t>();
 }
 
 template <typename IPTYPE>
@@ -157,8 +157,7 @@ void ConnectivityStats::init(bpf::Ibpf& ebpf) {
 template <typename IPTYPE>
 void ConnectivityStats::print(const std::unordered_map<ServerTuple_t<IPTYPE>, ServerStats>& aggr)  const {
 	std::stringstream buf;
-	State  kind{};
-	kind.Aggregated = 1;
+	State  kind{ .Direction = 1, .Aggregated = 1};
 
 	for (const auto& [sock, stat] : aggr) {
 
@@ -166,12 +165,21 @@ void ConnectivityStats::print(const std::unordered_map<ServerTuple_t<IPTYPE>, Se
 		auto wall_now = getCurrentTimeFromSystemClock();
 		const ServerStats& delta = stat;
 
-		buf << std::right << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count() << sock.get_tuple()
-			<< std::setw(12) << sock.pid << std::setw(12) << sock.netns << kind << std::setw(22)
-			<< delta.bytes_sent + addAvgHeaderSize<IPTYPE>(delta.pkts_sent, add_header_mode_) << std::setw(22)
-			<< delta.bytes_received + addAvgHeaderSize<IPTYPE>(delta.pkts_received, add_header_mode_) << std::setw(22) << delta.pkts_sent
-			<< std::setw(22) << delta.pkts_received << std::setw(22) << delta.pkts_retrans << std::setw(12) << delta.rtt << std::setw(12)
-			<< delta.connection_attempts << std::setw(12) << delta.connection_timeouts << std::setw(12) << delta.connection_resets;
+		buf << std::right << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
+		    << sock.get_tuple()
+			<< std::setw(12) << sock.pid
+			<< std::setw(12) << sock.netns
+			<< kind
+			<< std::setw(22) << delta.bytes_sent + addAvgHeaderSize<IPTYPE>(delta.pkts_sent, add_header_mode_)
+			<< std::setw(22) << delta.bytes_received + addAvgHeaderSize<IPTYPE>(delta.pkts_received, add_header_mode_)
+			<< std::setw(22) << delta.pkts_sent
+			<< std::setw(22) << delta.pkts_received
+			<< std::setw(22) << delta.pkts_retrans
+			<< std::setw(12) << delta.rtt
+			<< std::setw(12) << delta.rtt_var
+			<< std::setw(12) << delta.connection_attempts
+			<< std::setw(12) << delta.connection_timeouts
+			<< std::setw(12) << delta.connection_resets;
 
 		*os << buf.str() << std::endl;
 		LOG_TRACE(buf.str());

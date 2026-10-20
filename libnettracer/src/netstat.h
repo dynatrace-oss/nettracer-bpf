@@ -55,14 +55,14 @@ class NetStat : public IStatsCollector {
 	mutable std::mutex mx_aggr;
 	bpf::bpf_fds fdsIPv4;
 	bpf::bpf_fds fdsIPv6;
-
-protected:
 	ConnectionsIPv4 aggr_;
 	ConnectionsIPv6 aggr6_;
 	IPv4ListenSock2Pid listen_;
 	IPv6ListenSock2Pid listen6_;
 	bool kbhit;
 	bool config_changed{false};
+
+protected:
 	int max_map_size{1024};
 	config::ExitCtrl& exitCtrl;
 	bool incremental;
@@ -97,7 +97,7 @@ protected:
 	template <typename IPTYPE>
 	void print(std::optional<ConnKind> kind);
 	virtual void print_human_readable();
-	void print_human_readable_clients();
+	void print_human_readable(ConnKind direction);
 	void flush();
 	template <typename IPTYPE>
 	void clean_inactive();

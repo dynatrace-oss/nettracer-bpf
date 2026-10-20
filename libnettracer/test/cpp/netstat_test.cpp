@@ -40,13 +40,13 @@ public:
 	// make those methods public to make them easier to test (testing the main netstat loop is troublesome...)
 	using NetStat::update;
 	using NetStat::print;
+	using NetStat::print_to_pipe;
 	using NetStat::clean_closed;
 	using NetStat::clean_inactive;
 	using NetStat::clean_bpf;
 	using NetStat::connections;
 	using NetStat::listenPorts;
 	using NetStat::resolveOldConnections;
-
 };
 
 class NetStatTest : public BPFMapsProcessingTest {
@@ -250,4 +250,49 @@ TEST_F(NetStatTest, resolveDirectionForClient) {
 	netstat->resolveOldConnections<ipv4_tuple_t>();
 	EXPECT_EQ(sockData->second.state.Direction, 0);
 	EXPECT_EQ(sockData->second.state.Established, 1);
+}
+
+TEST_F(NetStatTest, printClients) {
+	setUpNetStat();
+	ipv4_tuple_t sock{};
+	sock.sport = 22;
+	sock.netns = 11;
+	sock.dport = 22;
+	sock.saddr = 0x11;
+	sock.daddr = 0x66;
+	EXPECT_CALL(*netstat, getCurrentTimeFromSystemClock).Times(1);
+	std::unordered_map<ipv4_tuple_t, netstat::Connection>& aggr = netstat->connections<ipv4_tuple_t>();
+	aggr.emplace(sock, netstat::Connection{10, 12, State{1}});
+	netstat->print_to_pipe();
+	auto str = os->str();
+	size_t newlines = std::count(str.begin(), str.end(), '\n');
+	EXPECT_EQ(newlines, 1u);
+	std::istringstream iss(str);
+
+	size_t count = 0;
+	std::string word;
+	std::cout<<str;
+	while (iss >> word)
+		++count;
+
+	EXPECT_EQ(count, 19u);  //19 field should be printed
+}
+
+TEST_F(NetStatTest, printClientsandServers) {
+	setUpNetStat();
+	ipv4_tuple_t sock{};
+	sock.sport = 22;
+	sock.netns = 11;
+	sock.dport = 22;
+	sock.saddr = 0x11;
+	sock.daddr = 0x66;
+	EXPECT_CALL(*netstat, getCurrentTimeFromSystemClock).Times(2);
+	std::unordered_map<ipv4_tuple_t, netstat::Connection>& aggr = netstat->connections<ipv4_tuple_t>();
+	aggr.emplace(sock, netstat::Connection{10, 12, State{ .Established = 1}});
+	sock.dport = 33;
+	aggr.emplace(sock, netstat::Connection{10, 12, State{ .Established = 1, .Direction = 1}});
+	netstat->print_to_pipe();
+	auto str = os->str();
+	size_t newlines = std::count(str.begin(), str.end(), '\n');
+	EXPECT_EQ(newlines, 2u);
 }
