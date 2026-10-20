@@ -180,8 +180,8 @@ bool NetStat::map_loop() {
 			}
 			outputCtr.reset();
 			flush();
-			clean<ipv4_tuple_t>();
-			clean<ipv6_tuple_t>();
+			clean_inactive<ipv4_tuple_t>();
+			clean_inactive<ipv6_tuple_t>();
 			readListenPorts();
 		}
 
@@ -209,12 +209,26 @@ void NetStat::clean_bpf(const bpf::bpf_fds& fds) {
 }
 
 template<typename IPTYPE>
-void NetStat::clean() {
+void NetStat::clean_inactive() {
 	auto now = getCurrentTimeFromSteadyClock();
 	std::unique_lock lock(mx_aggr);
 	auto& aggr{connections<IPTYPE>()};
 	for (auto it = aggr.begin(); it != aggr.end();) {
-		if (it->second.state.Closed || now - it->second.update_time >= INACTIVE_TIMEOUT) {
+		if (now - it->second.update_time >= INACTIVE_TIMEOUT) {
+			it = aggr.erase(it);
+		} else {
+			++it;
+		}
+	}
+}
+
+template <typename IPTYPE>
+void NetStat::clean_closed(std::optional<ConnKind> kind) {
+	auto& aggr{connections<IPTYPE>()};
+	for (auto it = aggr.begin(); it != aggr.end();) {
+		const bool match = !kind || it->second.state.Direction == static_cast<int>(*kind);
+
+		if (it->second.state.Closed && match) {
 			it = aggr.erase(it);
 		} else {
 			++it;
@@ -297,15 +311,16 @@ void NetStat::set_prev_metrics() {
 }
 
 template <typename IPTYPE>
-void NetStat::print(bool clientsOnly) const {
+void NetStat::print(std::optional<ConnKind> kind) {
 	std::unique_lock lock(mx_aggr);
 	const std::unordered_map<IPTYPE, Connection> aggr = connections<IPTYPE>();
+	clean_closed<IPTYPE>(kind);
 	lock.unlock();
 	std::stringstream buf;
 
 	for (auto it = aggr.begin(); it != aggr.end(); ++it) {
-
-		if (clientsOnly && it->second.state.Direction) {
+		const bool match = !kind || it->second.state.Direction == static_cast<int>(*kind);
+		if (!match) {
 			continue;
 		}
 
@@ -341,8 +356,8 @@ void NetStat::print(bool clientsOnly) const {
 }
 
 void NetStat::print_to_pipe() {
-	print<ipv4_tuple_t>(false);
-	print<ipv6_tuple_t>(false);
+	print<ipv4_tuple_t>(std::nullopt);
+	print<ipv6_tuple_t>(std::nullopt);
 	set_prev_metrics<ipv4_tuple_t>();
 	set_prev_metrics<ipv6_tuple_t>();
 }
@@ -372,6 +387,8 @@ void NetStat::print_human_readable_clients() {
 	std::unique_lock lock(mx_aggr);
 	print_human_readable<ipv4_tuple_t>(aggr_, 0, field_width, *os);
 	print_human_readable<ipv6_tuple_t>(aggr6_, 0, field_width, *os);
+	clean_closed<ipv4_tuple_t>(ConnKind::Client);
+	clean_closed<ipv6_tuple_t>(ConnKind::Client);
 }
 
 void NetStat::print_human_readable() {
@@ -381,6 +398,8 @@ void NetStat::print_human_readable() {
 	std::unique_lock lock(mx_aggr);
 	print_human_readable<ipv4_tuple_t>(aggr_, 1, field_width, *os);
 	print_human_readable<ipv6_tuple_t>(aggr6_, 1, field_width, *os);
+	clean_closed<ipv4_tuple_t>(ConnKind::Server);
+	clean_closed<ipv6_tuple_t>(ConnKind::Server);
 	lock.unlock();
 	set_prev_metrics<ipv4_tuple_t>();
 	set_prev_metrics<ipv6_tuple_t>();
@@ -509,7 +528,7 @@ std::unordered_map<IPTYPE, Connection> NetStat::filterServerAggrs() {
 		}
 		result.emplace(tup, stats);
 	}
-
+	clean_closed<IPTYPE>(ConnKind::Server);
 	return result;
 }
 
@@ -519,6 +538,8 @@ template void NetStat::resolveOldConnections<ipv4_tuple_t>();
 template void NetStat::resolveOldConnections<ipv6_tuple_t>();
 template void NetStat::set_prev_metrics<ipv4_tuple_t>();
 template void NetStat::set_prev_metrics<ipv6_tuple_t>();
+template void NetStat::clean_closed<ipv4_tuple_t>(std::optional<ConnKind>);
+template void NetStat::clean_closed<ipv6_tuple_t>(std::optional<ConnKind>);
 template std::unordered_map<ipv4_tuple_t, Connection> NetStat::filterServerAggrs<ipv4_tuple_t>();
 template std::unordered_map<ipv6_tuple_t, Connection> NetStat::filterServerAggrs<ipv6_tuple_t>();
 } // namespace netstat

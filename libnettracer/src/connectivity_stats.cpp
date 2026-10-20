@@ -55,8 +55,8 @@ void ConnectivityStats::print_human_readable() {
 }
 
 void ConnectivityStats::print_to_pipe() {
-	NetStat::print<ipv4_tuple_t>(true);
-	NetStat::print<ipv6_tuple_t>(true);
+	NetStat::print<ipv4_tuple_t>(ConnKind::Client);
+	NetStat::print<ipv6_tuple_t>(ConnKind::Client);
 	ServersIPv4 s4;
 	ServersIPv6 s6;
 	{

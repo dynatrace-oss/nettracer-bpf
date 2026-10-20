@@ -40,7 +40,8 @@ public:
 	// make those methods public to make them easier to test (testing the main netstat loop is troublesome...)
 	using NetStat::update;
 	using NetStat::print;
-	using NetStat::clean;
+	using NetStat::clean_closed;
+	using NetStat::clean_inactive;
 	using NetStat::clean_bpf;
 	using NetStat::connections;
 	using NetStat::listenPorts;
@@ -179,7 +180,7 @@ TEST_F(NetStatTest, testCleanNotClosedIPv6) {
 TEST_F(NetStatTest, testCleanClosedIPv4) {
 	setUpNetStat();
 	addIPv4Stats();
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(4);
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(3);
 	netstat->update<ipv4_tuple_t>(ipv4FDs);
 	markIPv4ConnsAsClosed();
 	EXPECT_EQ(netstat->connections<ipv4_tuple_t>().size(), 4u);
@@ -188,14 +189,14 @@ TEST_F(NetStatTest, testCleanClosedIPv4) {
 	EXPECT_TRUE(ipv4StatsMap->empty());
 	EXPECT_TRUE(ipv4TCPStatsMap->empty());
 	EXPECT_FALSE(netstat->connections<ipv4_tuple_t>().empty());
-	netstat->clean<ipv4_tuple_t>();
+	netstat->clean_closed<ipv4_tuple_t>(std::nullopt);
 	EXPECT_TRUE(netstat->connections<ipv4_tuple_t>().empty());
 }
 
 TEST_F(NetStatTest, testCleanClosedIPv6) {
 	setUpNetStat();
 	addIPv6Stats();
-	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(4);
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(3);
 	netstat->update<ipv6_tuple_t>(ipv6FDs);
 	markIPv6ConnsAsClosed();
 	EXPECT_EQ(netstat->connections<ipv6_tuple_t>().size(), 4u);
@@ -204,7 +205,7 @@ TEST_F(NetStatTest, testCleanClosedIPv6) {
 	EXPECT_TRUE(ipv6StatsMap->empty());
 	EXPECT_TRUE(ipv6TCPStatsMap->empty());
 	EXPECT_FALSE(netstat->connections<ipv6_tuple_t>().empty());
-	netstat->clean<ipv6_tuple_t>();
+	netstat->clean_closed<ipv6_tuple_t>(std::nullopt);
 	EXPECT_TRUE(netstat->connections<ipv6_tuple_t>().empty());
 }
 

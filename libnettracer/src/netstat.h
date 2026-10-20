@@ -22,6 +22,7 @@
 #include <chrono>
 #include <mutex>
 #include <ostream>
+#include <optional>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -47,6 +48,8 @@ using ConnectionsIPv4 = std::unordered_map<ipv4_tuple_t, Connection>;
 using ConnectionsIPv6 = std::unordered_map<ipv6_tuple_t, Connection>;
 using IPv4ListenSock2Pid = std::unordered_multimap<ipv4_tuple_t, uint32_t>;
 using IPv6ListenSock2Pid = std::unordered_multimap<ipv6_tuple_t, uint32_t>;
+
+enum class ConnKind : int { Client = 0, Server = 1 };
 
 class NetStat : public IStatsCollector {
 	mutable std::mutex mx_aggr;
@@ -92,12 +95,14 @@ protected:
 
 	virtual void print_to_pipe();
 	template <typename IPTYPE>
-	void print(bool clientsOnly) const ;
+	void print(std::optional<ConnKind> kind);
 	virtual void print_human_readable();
 	void print_human_readable_clients();
 	void flush();
 	template <typename IPTYPE>
-	void clean();
+	void clean_inactive();
+	template <typename IPTYPE>
+	void clean_closed(std::optional<ConnKind> kind);
 	template <typename IPTYPE>
 	void clean_bpf(const bpf::bpf_fds& fds);
 
