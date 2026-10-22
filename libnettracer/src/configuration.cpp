@@ -55,15 +55,17 @@ std::filesystem::path Configuration::parseOptions(int argc, char* argv[]) {
 			std::cout << desc << '\n';
 			exit(0);
 		}
-		noStdoutLog = setUpLogging();
 		if (variablesMap.count("args_file")) {
 			args_file_name = variablesMap["args_file"].as<std::filesystem::path>();
 			variablesMap = parseArgsFile(args_file_name);
 		}
+
+		noStdoutLog = setUpLogging();
 		if (connectivity && !deltaMode) {
 			LOG_WARN("Delta mode must be enabled with connectivity mode");
 			deltaMode = true;
 		}
+
 		return args_file_name;
 	} catch (const po::invalid_syntax& ex) {
 		if (ex.kind() == po::invalid_syntax::unrecognized_line) {
@@ -85,7 +87,7 @@ std::filesystem::path Configuration::parseOptions(int argc, char* argv[]) {
 
 po::variables_map Configuration::parseArgsFile(const std::filesystem::path& argsFilePath) {
 	if (argsFilePath.empty()) {
-		LOG_INFO("args_file provided but empty");
+		std::cerr << "--args_file provided but empty";
 		return {};
 	}
 	if (::access(argsFilePath.c_str(), R_OK) != 0) {
@@ -150,7 +152,6 @@ bool Configuration::setUpLogging() const {
 	logging::setUpLogger(logger_path, !noStdOut);
 	auto level = loglevelFromConfig(variablesMap);
 	logging::getLogger()->set_level(level);
-
 	return noStdOut;
 }
 

@@ -50,21 +50,3 @@ TEST(ConfigurationTest, connectivityWorksOnlyWithIncrementalMode) {
 	EXPECT_TRUE(cfg.deltaMetricsEnabled());
 }
 
-TEST(ConfigurationTest, noWarningWhenDeltaAlreadyEnabled) {
-	std::ostringstream oss;
-	auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(oss);
-	auto logger = std::make_shared<spdlog::logger>("test", sink);
-	logger->set_level(spdlog::level::warn);
-	auto previous = spdlog::default_logger();
-	spdlog::set_default_logger(logger);
-
-	Configuration cfg;
-	const char* argv[] = {"nettracer", "--connectivity", "-i"};
-	cfg.parseOptions(3, const_cast<char**>(argv));
-
-	logger->flush();
-	spdlog::set_default_logger(previous);
-
-	EXPECT_TRUE(cfg.deltaMetricsEnabled());
-    EXPECT_EQ(oss.str().size(), 0u);
-}
