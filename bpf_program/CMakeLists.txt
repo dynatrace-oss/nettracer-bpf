@@ -76,7 +76,9 @@ if(NOT SKIP_OFFSETGUESSING)
 endif()
 
 list(APPEND HEADERS_BTF
-	maps.h ${HEADERS}
+	maps.h
+	probes/connectivity.h
+	${HEADERS}
 )
 
 set(BPF_OUTPUT_FILE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nettracer-bpf.core.o")
