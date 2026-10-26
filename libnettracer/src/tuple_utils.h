@@ -3,7 +3,7 @@
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
+* You may obtain a copy of the License at
 *
 * https://www.apache.org/licenses/LICENSE-2.0
 *
@@ -17,7 +17,7 @@
 
 #include "bpf_program/nettracer-bpf.h"
 #include "proc_tcp.h"
-
+#include <boost/container_hash/hash.hpp>
 #include <array>
 #include <string>
 #include <tuple>
@@ -40,37 +40,31 @@ inline bool operator!=(const ipv6_tuple_t& lhs, const ipv6_tuple_t& rhs) {
 	return !(lhs == rhs);
 }
 
-namespace std {
-
 template <>
-struct hash<ipv4_tuple_t> {
+struct std::hash<ipv4_tuple_t> {
 	std::size_t operator()(const ipv4_tuple_t& t) const noexcept {
-		std::size_t h1 = std::hash<decltype(t.saddr)>{}(t.saddr);
-		std::size_t h2 = std::hash<decltype(t.daddr)>{}(t.daddr);
-		std::size_t h3 = std::hash<decltype(t.sport)>{}(t.sport);
-		std::size_t h4 = std::hash<decltype(t.dport)>{}(t.dport);
-		return h1 ^ (h2 << 1) ^ (h3 << 1) ^ h4; // or use boost::hash_combine
+		std::size_t h = 0;
+		boost::hash_combine(h, t.saddr);
+		boost::hash_combine(h, t.daddr);
+		boost::hash_combine(h, t.sport);
+		boost::hash_combine(h, t.dport);
+		return h;
 	}
 };
 
 template <>
-struct hash<ipv6_tuple_t> {
+struct std::hash<ipv6_tuple_t> {
 	std::size_t operator()(const ipv6_tuple_t& t) const noexcept {
-		std::size_t h1 = std::hash<decltype(t.saddr_h)>{}(t.saddr_h);
-		std::size_t h2 = std::hash<decltype(t.saddr_l)>{}(t.saddr_l);
-		std::size_t h3 = std::hash<decltype(t.daddr_h)>{}(t.daddr_h);
-		std::size_t h4 = std::hash<decltype(t.daddr_l)>{}(t.daddr_l);
-		std::size_t h5 = std::hash<decltype(t.sport)>{}(t.sport);
-		std::size_t h6 = std::hash<decltype(t.dport)>{}(t.dport);
-		return h1 ^ (h2 << 1) ^ (h3 << 1) ^ (h4 << 1) ^ h5 ^ (h5 << 1) ^ h6; // or use boost::hash_combine
+		std::size_t h = 0;
+		boost::hash_combine(h, t.saddr_h);
+		boost::hash_combine(h, t.saddr_l);
+		boost::hash_combine(h, t.daddr_h);
+		boost::hash_combine(h, t.daddr_l);
+		boost::hash_combine(h, t.sport);
+		boost::hash_combine(h, t.dport);
+		return h;
 	}
 };
-
-} // namespace std
-
-enum class LineId { Connection = 1, Event, Metrics };
-enum class EventType { Accept = 1, Connect, Close };
-
 
 // format ipv6 address - h and l are 64 bit and in network byte order
 std::string ipv6_to_string(uint64_t h, uint64_t l);
@@ -82,6 +76,7 @@ std::ostream& operator<<(std::ostream& os, const ipv4_tuple_t& tup);
 std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup);
 
 uint64_t swap_uint32_t(uint64_t addrpart);
+std::string short_num(uint64_t num);
 
 inline std::string to_string(const ipv4_tuple_t& tuple) {
 	return to_string(tuple, ConnectionDirection::Unknown);
@@ -101,3 +96,8 @@ bool shouldFilter(const ipv4_tuple_t key);
 bool shouldFilter(const ipv6_tuple_t key);
 bool isIpv4MappedIpv6(uint64_t addr_l, uint64_t addr_h);
 ipv4_tuple_t convertMappedIpv6Tuple(const ipv6_tuple_t ipv6);
+
+namespace netstat {
+struct State;
+}
+std::ostream& operator<<(std::ostream& os, const netstat::State& s);

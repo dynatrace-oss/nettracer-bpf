@@ -37,6 +37,7 @@ class Configuration {
 	bool connectivity{false};
 	bool disableEvents{false};
 	bool testrun{false};
+	bool deltaMode{false};
 	po::options_description getOptionsDescription();
 	po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath);
 	bool setUpLogging() const;
@@ -61,7 +62,7 @@ public:
 		return testrun;
 	}
 	bool deltaMetricsEnabled() const {
-		return variablesMap.count("incremental") > 0;
+		return deltaMode;
 	}
 	bool addHeadersToMetrics() const {
 		return variablesMap.count("header") > 0;
@@ -75,6 +76,9 @@ public:
 	bool eventsEnabled() const;
 	bool connectivityEnabled() const {
 		return connectivity;
+	}
+	void disableConnectivity() {
+		connectivity = false;
 	}
 	std::string bpfProgram() const {
 		return variablesMap["program"].as<std::string>();

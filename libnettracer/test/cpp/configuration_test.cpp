@@ -15,6 +15,8 @@
  */
 #include "configuration.h"
 #include <gtest/gtest.h>
+#include <spdlog/sinks/ostream_sink.h>
+#include <sstream>
 
 using namespace config;
 
@@ -39,3 +41,12 @@ TEST(ConfigurationTest, disabledEventAndConnectivityCannotCoexist) {
 	EXPECT_TRUE(cfg.connectivityEnabled());
 	EXPECT_THROW(cfg.eventsEnabled(), po::invalid_option_value);
 }
+
+TEST(ConfigurationTest, connectivityWorksOnlyWithIncrementalMode) {
+	Configuration cfg;
+	const char* argv[] = {"nettracer", "--connectivity"};
+	cfg.parseOptions(2, const_cast<char**>(argv));
+	EXPECT_TRUE(cfg.connectivityEnabled());
+	EXPECT_TRUE(cfg.deltaMetricsEnabled());
+}
+

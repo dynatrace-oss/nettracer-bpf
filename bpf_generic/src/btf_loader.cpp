@@ -121,6 +121,12 @@ int BTFLoader::get_map_fd(const std::string& id) {
 	if (id == "bpf_debug_counters") {
 		return bpf_map__fd(skel->maps.bpf_debug_counters);
 	}
+	if (id == "tcp_params") {
+		return bpf_map__fd(skel->maps.tcp_params);
+	}
+	if (id == "tcp6_params") {
+		return bpf_map__fd(skel->maps.tcp6_params);
+	}
 
 	return -1;
 }

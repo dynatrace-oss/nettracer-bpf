@@ -15,6 +15,8 @@
 */
 #pragma once
 
+#include "bpf_program/nettracer-bpf.h"
+#include "tuple_utils.h"
 #include "mock_bpf_maps.h"
 #include <limits>
 #include <memory>

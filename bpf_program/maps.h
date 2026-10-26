@@ -130,15 +130,15 @@ struct {
 } bpf_debug_counters SEC(".maps");
 
 struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__type(key, __u32);
 	__type(value, struct tcp_params_t);
-	__uint(max_entries, 128);
+	__uint(max_entries, MAX_NAMESPACES);
 } tcp_params SEC(".maps");
 
 struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__type(key, __u32);
 	__type(value, struct tcp_params_t);
-	__uint(max_entries, 128);
+	__uint(max_entries, MAX_NAMESPACES);
 } tcp6_params SEC(".maps");

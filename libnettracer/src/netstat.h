@@ -1,27 +1,28 @@
 /*
-* Copyright 2025 Dynatrace LLC
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
-*
-* https://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2025 Dynatrace LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
-#include "bpf_generic/src/bpf_wrapper.h"
-#include "bpf_program/nettracer-bpf.h"
+#include "Istats_collector.h"
 #include "configuration.h"
+#include "stats.h"
 #include "tuple_utils.h"
 #include <chrono>
 #include <mutex>
 #include <ostream>
+#include <optional>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -29,12 +30,6 @@
 #include <utility>
 
 namespace netstat {
-
-struct State {
-	unsigned char Established : 1;
-	unsigned char Direction : 1;
-	unsigned char Closed : 1;
-};
 
 using namespace std::chrono;
 
@@ -45,18 +40,8 @@ struct Connection {
 	steady_clock::time_point update_time;
 	system_clock::time_point start;
 	system_clock::time_point end;
-	uint64_t bytes_sent = 0;
-	uint64_t bytes_sent_prev = 0;
-	uint64_t bytes_received = 0;
-	uint64_t bytes_received_prev = 0;
-	uint64_t pkts_sent = 0;
-	uint64_t pkts_sent_prev = 0;
-	uint64_t pkts_received = 0;
-	uint64_t pkts_received_prev = 0;
-	uint64_t pkts_retrans =0;
-	uint64_t pkts_retrans_prev = 0;
-	uint32_t rtt = 0;
-	uint32_t rtt_var = 0;
+	Stats curr;
+	Stats prev;
 };
 
 using ConnectionsIPv4 = std::unordered_map<ipv4_tuple_t, Connection>;
@@ -64,15 +49,20 @@ using ConnectionsIPv6 = std::unordered_map<ipv6_tuple_t, Connection>;
 using IPv4ListenSock2Pid = std::unordered_multimap<ipv4_tuple_t, uint32_t>;
 using IPv6ListenSock2Pid = std::unordered_multimap<ipv6_tuple_t, uint32_t>;
 
-class NetStat {
-protected:
+enum class ConnKind : int { Client = 0, Server = 1 };
+
+class NetStat : public IStatsCollector {
+	mutable std::mutex mx_aggr;
+	bpf::bpf_fds fdsIPv4;
+	bpf::bpf_fds fdsIPv6;
 	ConnectionsIPv4 aggr_;
 	ConnectionsIPv6 aggr6_;
 	IPv4ListenSock2Pid listen_;
 	IPv6ListenSock2Pid listen6_;
-	std::mutex mx;
 	bool kbhit;
 	bool config_changed{false};
+
+protected:
 	int max_map_size{1024};
 	config::ExitCtrl& exitCtrl;
 	bool incremental;
@@ -84,31 +74,36 @@ protected:
 	bool filter_loopback;
 
 	template <typename IPTYPE>
-	inline auto& connections(); // no default instantiation
+	inline auto& connections() const;
+	template <typename IPTYPE>
+	inline auto& connections();
 	template <typename IPTYPE>
 	inline auto& listenPorts();
+	template <typename IPTYPE>
+	std::unordered_map<IPTYPE, Connection> filterServerAggrs();
 
-	template<typename IPTYPE>
+	template <typename IPTYPE>
 	void readListenPorts(const tcpTable<IPTYPE>&);
 	void readListenPorts();
 
 	std::tuple<unsigned, unsigned, unsigned> countTcpSessions();
-	template<typename IPTYPE>
+	template <typename IPTYPE>
 	void update(const bpf::bpf_fds& fds);
 
-	template<typename IPTYPE, typename T, typename F>
+	template <typename IPTYPE, typename T, typename F>
 	void process_bpf_map(int fd, F func);
 
-	void printHeader();
-	template<typename IPTYPE>
-	void print();
-	template<typename IPTYPE>
-	void print_human_readable();
+	virtual void print_to_pipe();
+	template <typename IPTYPE>
+	void print(std::optional<ConnKind> kind);
+	virtual void print_human_readable();
+	void print_human_readable(ConnKind direction);
 	void flush();
 	template <typename IPTYPE>
-	void clean();
-
-	template<typename IPTYPE>
+	void clean_inactive();
+	template <typename IPTYPE>
+	void clean_closed(std::optional<ConnKind> kind);
+	template <typename IPTYPE>
 	void clean_bpf(const bpf::bpf_fds& fds);
 
 	virtual system_clock::time_point getCurrentTimeFromSystemClock() const;
@@ -116,37 +111,60 @@ protected:
 
 	template <typename IPTYPE>
 	void resolveOldConnections();
+	template <typename IPTYPE>
+	void set_prev_metrics();
+	virtual void aggregate();
+	template <typename IPTYPE, typename EventIPTYPE>
+	bool event(const EventIPTYPE& evt);
 
 public:
 	explicit NetStat(config::ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
 	virtual ~NetStat();
-	void set_kbhit();
-	void set_max_map_size(uint32_t size);
-	void on_config_change();
-	void init();
-
-	bool map_loop(const bpf::bpf_fds& fdsIPv4, const bpf::bpf_fds& fdsIPv6);
-
-	template<typename IPTYPE, typename EventIPTYPE>
-	void event(const EventIPTYPE& evt);
+	void set_kbhit() override;
+	void set_max_map_size(uint32_t size) override;
+	void on_config_change() override;
+	void init(bpf::Ibpf& ebpf) override;
+	bool map_loop() override;
+	void eventIpv4(const tcp_ipv4_event_t& evt) override;
+	void eventIpv6(const tcp_ipv6_event_t& evt) override;
 };
 
-template<>
+template <>
+inline auto& NetStat::connections<ipv4_tuple_t>() const {
+	return aggr_;
+}
+template <>
+inline auto& NetStat::connections<ipv6_tuple_t>() const {
+	return aggr6_;
+}
+template <>
 inline auto& NetStat::connections<ipv4_tuple_t>() {
 	return aggr_;
 }
-template<>
+template <>
 inline auto& NetStat::connections<ipv6_tuple_t>() {
 	return aggr6_;
 }
-
-template<>
+template <>
 inline auto& NetStat::listenPorts<ipv4_tuple_t>() {
 	return listen_;
 }
-template<>
+template <>
 inline auto& NetStat::listenPorts<ipv6_tuple_t>() {
 	return listen6_;
 }
 
+template <class IPTYPE>
+constexpr uint64_t addAvgHeaderSize(uint64_t pkts, bool count) {
+	return 0;
+}
+template <>
+constexpr uint64_t addAvgHeaderSize<ipv4_tuple_t>(uint64_t pkts, bool count) {
+	return count ? 66 * pkts : 0;
+}
+
+template <>
+constexpr uint64_t addAvgHeaderSize<ipv6_tuple_t>(uint64_t pkts, bool count) {
+	return count ? 77 * pkts : 0;
+}
 } // namespace netstat

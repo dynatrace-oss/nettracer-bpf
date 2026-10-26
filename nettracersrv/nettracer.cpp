@@ -20,8 +20,9 @@
 
 #include "bpf_debug_counters.h"
 #include "bpf_events.h"
-#include "configuration.h"
 #include "config_watcher.h"
+#include "configuration.h"
+#include "connectivity_stats.h"
 #include "event_mode.h"
 #include "netstat.h"
 #include "offsetguess.h"
@@ -157,14 +158,31 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		return ReturnCodes::GenericError;
 	}
 	bpf::BPFMapsWrapper mapsWrapper;
-
-	netstat::NetStat netst(
-			exitCtrl, config.deltaMetricsEnabled(), config.addHeadersToMetrics(), config.noninteractiveEnabled(), config.filterLoopback());
+	std::unique_ptr<netstat::IStatsCollector> netst;
+	if (ebpf->needs_offset_guessing() && config.connectivityEnabled()) {
+		LOG_WARN("Connectivity works only when BTF is enabled and supported by kernel. Disabling");
+		config.disableConnectivity();
+	}
+	if (config.connectivityEnabled()) {
+		netst = std::make_unique<netstat::ConnectivityStats>(
+				exitCtrl,
+				config.deltaMetricsEnabled(),
+				config.addHeadersToMetrics(),
+				config.noninteractiveEnabled(),
+				config.filterLoopback());
+	} else {
+		netst = std::make_unique<netstat::NetStat>(
+				exitCtrl,
+				config.deltaMetricsEnabled(),
+				config.addHeadersToMetrics(),
+				config.noninteractiveEnabled(),
+				config.filterLoopback());
+	}
 
 	try {
 		uint32_t nn_entries = config.getMapsSize();
 		LOG_INFO("map_size: {}", nn_entries);
-		netst.set_max_map_size(nn_entries);
+		netst->set_max_map_size(nn_entries);
 		if (!ebpf->load_bpf(config.bpfProgram(), nn_entries, *kernelVersion, config.connectivityEnabled())) {
 			return ReturnCodes::GenericError;
 		}
@@ -176,18 +194,6 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		return ReturnCodes::GenericError;
 	}
 	LOG_INFO("BPF program loaded");
-
-	bpf::bpf_fds ipv4_fds{getIPv4Fds(*ebpf)};
-	if (ipv4_fds.isInvalid()) {
-		LOG_ERROR("invalid fds for ipv4 maps");
-		return ReturnCodes::GenericError;
-	}
-
-	bpf::bpf_fds ipv6_fds{getIPv6Fds(*ebpf)};
-	if (ipv6_fds.isInvalid()) {
-		LOG_ERROR("invalid fds for ipv6 maps");
-		return ReturnCodes::GenericError;
-	}
 
 	if (config.testRun()) {
 		LOG_INFO("All checks passed, stopping NetTracer");
@@ -210,22 +216,22 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		LOG_INFO(fmt::format("Offset guessing finished: ipv6:{}", monitorIPv6));
 	}
 
-	netst.init();
+	netst->init(*ebpf);
 	bpf_events bevents(cw, ebpf->needs_offset_guessing());
-	bevents.set_kbhit_observer(std::bind(&netstat::NetStat::set_kbhit, &netst));
+	bevents.set_kbhit_observer(std::bind(&netstat::IStatsCollector::set_kbhit, netst.get()));
 
 	std::function<void(const tcp_ipv4_event_t&)> ipv4_event_update;
 	std::function<void(const tcp_ipv6_event_t&)> ipv6_event_update;
 	std::function<void(std::promise<bool>&&)> map_reading;
 
 	if (eventsOnly) {
-		ipv4_event_update = [&](const tcp_ipv4_event_t& evt) { netst.event<ipv4_tuple_t>(evt); };
+		ipv4_event_update = [&netst](const tcp_ipv4_event_t& evt) { netst->eventIpv4(evt); };
 		if (monitorIPv6) {
-			ipv6_event_update = [&](const tcp_ipv6_event_t& evt) { netst.event<ipv6_tuple_t>(evt); };
+			ipv6_event_update = [&netst](const tcp_ipv6_event_t& evt) { netst->eventIpv6(evt); };
 		}
-		bevents.set_config_change_observer(std::bind(&netstat::NetStat::on_config_change, &netst));
-		map_reading = [&](std::promise<bool>&& promise) {
-			auto ret = netst.map_loop(ipv4_fds, ipv6_fds);
+		bevents.set_config_change_observer(std::bind(&netstat::IStatsCollector::on_config_change, netst.get()));
+		map_reading = [&netst](std::promise<bool>&& promise) {
+			auto ret = netst->map_loop();
 			promise.set_value(ret);
 		};
 	} else {
@@ -234,16 +240,19 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 		if (monitorIPv6) {
 			ipv6_event_update = [](const tcp_ipv6_event_t& evt) { processEvent(evt); };
 		}
-		map_reading = [&](std::promise<bool>&& promise) {
+		map_reading = [&ebpf, &cw, &mapsWrapper, monitorIPv6](std::promise<bool>&& promise) {
+			auto fdsIPv4 = getIPv4Fds(*ebpf);
+			auto fdsIPv6 = getIPv6Fds(*ebpf);
+
 			while (exitCtrl.running) {
 				cw.on_pollin();
 				if (cw.is_config_changed()) {
 					break;
 				}
 
-				ignoreConnectionsFromMaps<ipv4_tuple_t>(ipv4_fds, mapsWrapper);
+				ignoreConnectionsFromMaps<ipv4_tuple_t>(fdsIPv4, mapsWrapper);
 				if (monitorIPv6) {
-					ignoreConnectionsFromMaps<ipv6_tuple_t>(ipv6_fds, mapsWrapper);
+					ignoreConnectionsFromMaps<ipv6_tuple_t>(fdsIPv6, mapsWrapper);
 				}
 
 				std::unique_lock<std::mutex> lk{exitCtrl.m};

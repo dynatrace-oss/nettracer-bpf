@@ -3,6 +3,7 @@ set(SOURCES
 	bpf_debug_counters.cpp
 	configuration.cpp
 	config_watcher.cpp
+	connectivity_stats.cpp
 	event_mode.cpp
 	inotify_watcher.cpp
 	localsock.cpp
@@ -20,6 +21,7 @@ set(HEADERS
 	bpf_debug_counters.h
 	configuration.h
 	config_watcher.h
+	connectivity_stats.h
 	event_mode.h
 	inotify_watcher.h
 	localsock.h
@@ -28,6 +30,7 @@ set(HEADERS
 	proc_tcp.h
 	system_calls.h
 	system_utils.h
+	stats.h
 	tuple_utils.h
 	netstat.h
 )
