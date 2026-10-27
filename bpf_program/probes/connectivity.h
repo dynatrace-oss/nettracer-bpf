@@ -72,15 +72,9 @@ int BPF_KPROBE(handle_syn, struct sock* sk, struct sk_buff* skb) {
 		return 0;
 	}
 
-	struct net* net_ptr = NULL;
-	uint32_t netns = 0;
-	bpf_core_read(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
-	if (net_ptr) {
-		bpf_core_read(&netns, sizeof(netns), &net_ptr->ns.inum);
-	}
-
-	u32 syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
-	u32 max_backlog = BPF_CORE_READ(sk, sk_max_ack_backlog);
+	uint32_t netns = BPF_CORE_READ(sk, __sk_common.skc_net.net, ns.inum);
+	uint32_t syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
+	uint32_t max_backlog = BPF_CORE_READ(sk, sk_max_ack_backlog);
 	uint32_t cpu = bpf_get_smp_processor_id();
 
 	evt.cpu = cpu;
@@ -103,14 +97,9 @@ int BPF_KPROBE(handle_syn6, struct sock* sk, struct sk_buff* skb) {
 		return 0;
 	}
 
-	struct net* net_ptr = NULL;
-	uint32_t netns = 0;
-	bpf_core_read(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
-	if (net_ptr) {
-		bpf_core_read(&netns, sizeof(netns), &net_ptr->ns.inum);
-	}
-	u32 syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
-	u32 max_backlog = BPF_CORE_READ(sk, sk_max_ack_backlog);
+	uint32_t netns = BPF_CORE_READ(sk, __sk_common.skc_net.net, ns.inum);
+	uint32_t syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
+	uint32_t max_backlog = BPF_CORE_READ(sk, sk_max_ack_backlog);
 	uint32_t cpu = bpf_get_smp_processor_id();
 
 	evt.cpu = cpu;
@@ -137,14 +126,7 @@ int BPF_KPROBE(handle_reset, struct sock* sk, struct sk_buff* skb) {
 		return 0;
 	}
 
-	struct net_device* dev = BPF_CORE_READ(skb, dev);
-	if (dev) {
-		struct net* net_ptr = BPF_CORE_READ(dev, nd_net.net);
-		if (net_ptr) {
-			bpf_core_read(&evt.netns, sizeof(evt.netns), &net_ptr->ns.inum);
-		}
-	}
-
+	evt.netns = BPF_CORE_READ(skb, dev, nd_net.net, ns.inum);
 	uint32_t cpu = bpf_get_smp_processor_id();
 
 	evt.cpu = cpu;
@@ -165,13 +147,7 @@ int BPF_KPROBE(handle_reset6, struct sock* sk, struct sk_buff* skb) {
 		return 0;
 	}
 
-	struct net_device* dev = BPF_CORE_READ(skb, dev);
-	if (dev) {
-		struct net* net_ptr = BPF_CORE_READ(dev, nd_net.net);
-		if (net_ptr)
-			bpf_core_read(&evt.netns, sizeof(evt.netns), &net_ptr->ns.inum);
-	}
-
+	evt.netns = BPF_CORE_READ(skb, dev, nd_net.net, ns.inum);
 	evt.cpu = bpf_get_smp_processor_id();
 	if (bpf_perf_event_output(ctx, &tcp_event_ipv6, evt.cpu, &evt, sizeof(evt)) < 0) {
 		INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_attempt_failures);
@@ -185,12 +161,7 @@ int BPF_KPROBE(handle_accept_queue_drop, struct sock* sk, struct request_sock* r
 
 	uint64_t pid = bpf_get_current_pid_tgid();
 	u16 family = BPF_CORE_READ(sk, __sk_common.skc_family);
-	struct net* net_ptr = NULL;
-	uint32_t netns = 0;
-	bpf_core_read(&net_ptr, sizeof(net_ptr), &sk->__sk_common.skc_net.net);
-	if (net_ptr) {
-		bpf_core_read(&netns, sizeof(netns), &net_ptr->ns.inum);
-	}
+	uint32_t netns = BPF_CORE_READ(sk, __sk_common.skc_net.net, ns.inum);
 
 	if (family == AF_INET) {
 		struct tcp_ipv4_event_t evt = {.type = TCP_EVENT_TYPE_DROP, .timestamp = bpf_ktime_get_ns()};
