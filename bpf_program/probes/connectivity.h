@@ -15,6 +15,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
+#pragma once
 #include "maps.h"
 #include "metrics_utilities.h"
 #include "print.h"
@@ -25,8 +26,8 @@
 #define AF_INET 2
 #define AF_INET6 10
 
-__attribute__((always_inline)) static int read_socket_data(struct sk_buff* skb, struct tcp_ipv4_event_t* evt) {
-	u16 network_header = BPF_CORE_READ(skb, network_header);
+__attribute__((always_inline)) static int read_packet_header_rev(struct sk_buff* skb, struct tcp_ipv4_event_t* evt) {
+	uint16_t network_header = BPF_CORE_READ(skb, network_header);
 	unsigned char* head = BPF_CORE_READ(skb, head);
 
 	struct iphdr iph;
@@ -43,8 +44,26 @@ __attribute__((always_inline)) static int read_socket_data(struct sk_buff* skb, 
 	return 1;
 }
 
-__attribute__((always_inline)) static int read_socket_data6(struct sk_buff* skb, struct tcp_ipv6_event_t* evt) {
-	u16 network_header = BPF_CORE_READ(skb, network_header);
+__attribute__((always_inline)) static int read_packet_header(struct sk_buff* skb, struct tcp_ipv4_event_t* evt) {
+	uint16_t network_header = BPF_CORE_READ(skb, network_header);
+	unsigned char* head = BPF_CORE_READ(skb, head);
+
+	struct iphdr iph;
+	bpf_probe_read_kernel(&iph, sizeof(iph), head + network_header);
+	if (iph.ihl < 5)
+		return 0;
+
+	struct tcphdr tcph;
+	bpf_probe_read_kernel(&tcph, sizeof(tcph), head + network_header + iph.ihl * 4);
+	evt->daddr = iph.daddr;
+	evt->dport = bpf_ntohs(tcph.dest);
+	evt->saddr = iph.saddr;
+	evt->sport = bpf_ntohs(tcph.source);
+	return 1;
+}
+
+__attribute__((always_inline)) static int read_packet_header6_rev(struct sk_buff* skb, struct tcp_ipv6_event_t* evt) {
+	uint16_t network_header = BPF_CORE_READ(skb, network_header);
 	unsigned char* head = BPF_CORE_READ(skb, head);
 
 	struct ipv6hdr ip6h;
@@ -65,10 +84,32 @@ __attribute__((always_inline)) static int read_socket_data6(struct sk_buff* skb,
 	return 1;
 }
 
+__attribute__((always_inline)) static int read_packet_header6(struct sk_buff* skb, struct tcp_ipv6_event_t* evt) {
+	uint16_t network_header = BPF_CORE_READ(skb, network_header);
+	unsigned char* head = BPF_CORE_READ(skb, head);
+
+	struct ipv6hdr ip6h;
+	bpf_probe_read_kernel(&ip6h, sizeof(ip6h), head + network_header);
+
+	// IPv6 is const size
+	if (ip6h.nexthdr != IPPROTO_TCP)
+		return 0;
+
+	struct tcphdr tcph;
+	bpf_probe_read_kernel(&tcph, sizeof(tcph), head + network_header + sizeof(struct ipv6hdr));
+	__builtin_memcpy(&evt->saddr_h, &ip6h.saddr.in6_u.u6_addr8[0], sizeof(__u64));
+	__builtin_memcpy(&evt->saddr_l, &ip6h.saddr.in6_u.u6_addr8[8], sizeof(__u64));
+	__builtin_memcpy(&evt->daddr_h, &ip6h.daddr.in6_u.u6_addr8[0], sizeof(__u64));
+	__builtin_memcpy(&evt->daddr_l, &ip6h.daddr.in6_u.u6_addr8[8], sizeof(__u64));
+	evt->dport = bpf_ntohs(tcph.dest);
+	evt->sport = bpf_ntohs(tcph.source);
+	return 1;
+}
+
 SEC("kprobe/tcp_v4_conn_request")
 int BPF_KPROBE(handle_syn, struct sock* sk, struct sk_buff* skb) {
 	struct tcp_ipv4_event_t evt = {.type = TCP_EVENT_TYPE_SYN_ATTEMPT, .timestamp = bpf_ktime_get_ns()};
-	if (!read_socket_data(skb, &evt)) {
+	if (!read_packet_header_rev(skb, &evt)) {
 		return 0;
 	}
 
@@ -95,7 +136,7 @@ int BPF_KPROBE(handle_syn, struct sock* sk, struct sk_buff* skb) {
 SEC("kprobe/tcp_v6_conn_request")
 int BPF_KPROBE(handle_syn6, struct sock* sk, struct sk_buff* skb) {
 	struct tcp_ipv6_event_t evt = {.type = TCP_EVENT_TYPE_SYN_ATTEMPT, .timestamp = bpf_ktime_get_ns()};
-	if (!read_socket_data6(skb, &evt)) {
+	if (!read_packet_header6_rev(skb, &evt)) {
 		return 0;
 	}
 
@@ -126,7 +167,7 @@ int BPF_KPROBE(handle_reset, struct sock* sk, struct sk_buff* skb) {
 		return 0;
 	}
 	struct tcp_ipv4_event_t evt = {.type = TCP_EVENT_TYPE_RST, .timestamp = bpf_ktime_get_ns()};
-	if (!read_socket_data(skb, &evt)) {
+	if (!read_packet_header(skb, &evt)) {
 		return 0;
 	}
 
@@ -147,7 +188,7 @@ int BPF_KPROBE(handle_reset6, struct sock* sk, struct sk_buff* skb) {
 		return 0;
 
 	struct tcp_ipv6_event_t evt = {.type = TCP_EVENT_TYPE_RST, .timestamp = bpf_ktime_get_ns()};
-	if (!read_socket_data6(skb, &evt)) {
+	if (!read_packet_header6(skb, &evt)) {
 		return 0;
 	}
 
@@ -164,7 +205,7 @@ SEC("kprobe/inet_csk_reqsk_queue_drop")
 int BPF_KPROBE(handle_accept_queue_drop, struct sock* sk, struct request_sock* req) {
 
 	uint64_t pid = bpf_get_current_pid_tgid();
-	u16 family = BPF_CORE_READ(sk, __sk_common.skc_family);
+	uint16_t family = BPF_CORE_READ(sk, __sk_common.skc_family);
 	uint32_t netns = BPF_CORE_READ(sk, __sk_common.skc_net.net, ns.inum);
 
 	if (family == AF_INET) {
