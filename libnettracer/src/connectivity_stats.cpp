@@ -102,9 +102,9 @@ void ConnectivityStats::event(const EventIPTYPE& evt) {
 	if(NetStat::event<IPTYPE>(evt)){
 		return;
 	}
-	auto key = createServerKey(eventToTuple(evt), evt.pid);
+	auto keyServ = createServerKey(eventToTuple(evt), evt.pid);
 	std::unique_lock lock(mx_servers);
-	auto& serv = servers<IPTYPE>()[key];
+	auto& serv = servers<IPTYPE>()[keyServ];
 	serv.update_time = getCurrentTimeFromSteadyClock();
 
 	if (evt.type == TCP_EVENT_TYPE_SYN_ATTEMPT) {
@@ -117,7 +117,7 @@ void ConnectivityStats::event(const EventIPTYPE& evt) {
 		if (it == conf.end()) {
 			if (mapsWrapper->lookupElement(fd, &key, &val)) {
 				conf[key] = val.syn_queue_size;
-				LOG_INFO("Namespace {} max_syn_queuelen: {}", evt.netns, val.syn_queue_size);
+				LOG_INFO("Namespace {:x} sport: {} max_syn_queuelen: {}", evt.netns, evt.sport, val.syn_queue_size);
 			}
 		} else {
 			val.syn_queue_size = it->second;
