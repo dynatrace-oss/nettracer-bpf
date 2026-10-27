@@ -15,23 +15,62 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
+#include "maps.h"
 #include "metrics_utilities.h"
 #include "print.h"
 #include "tuples_utilities.h"
-#include "maps.h"
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #define AF_INET 2
 #define AF_INET6 10
 
+__attribute__((always_inline)) static int read_socket_data(struct sk_buff* skb, struct tcp_ipv4_event_t* evt) {
+	u16 network_header = BPF_CORE_READ(skb, network_header);
+	unsigned char* head = BPF_CORE_READ(skb, head);
+
+	struct iphdr iph;
+	bpf_probe_read_kernel(&iph, sizeof(iph), head + network_header);
+	if (iph.ihl < 5)
+		return 0;
+
+	struct tcphdr tcph;
+	bpf_probe_read_kernel(&tcph, sizeof(tcph), head + network_header + iph.ihl * 4);
+	evt->daddr = iph.saddr;
+	evt->dport = bpf_ntohs(tcph.source);
+	evt->saddr = iph.daddr;
+	evt->sport = bpf_ntohs(tcph.dest);
+	return 1;
+}
+
+__attribute__((always_inline)) static int read_socket_data6(struct sk_buff* skb, struct tcp_ipv6_event_t* evt) {
+	u16 network_header = BPF_CORE_READ(skb, network_header);
+	unsigned char* head = BPF_CORE_READ(skb, head);
+
+	struct ipv6hdr ip6h;
+	bpf_probe_read_kernel(&ip6h, sizeof(ip6h), head + network_header);
+
+	// IPv6 is const size
+	if (ip6h.nexthdr != IPPROTO_TCP)
+		return 0;
+
+	struct tcphdr tcph;
+	bpf_probe_read_kernel(&tcph, sizeof(tcph), head + network_header + sizeof(struct ipv6hdr));
+	__builtin_memcpy(&evt->daddr_h, &ip6h.saddr.in6_u.u6_addr8[0], sizeof(__u64));
+	__builtin_memcpy(&evt->daddr_l, &ip6h.saddr.in6_u.u6_addr8[8], sizeof(__u64));
+	__builtin_memcpy(&evt->saddr_h, &ip6h.daddr.in6_u.u6_addr8[0], sizeof(__u64));
+	__builtin_memcpy(&evt->saddr_l, &ip6h.daddr.in6_u.u6_addr8[8], sizeof(__u64));
+	evt->dport = bpf_ntohs(tcph.source);
+	evt->sport = bpf_ntohs(tcph.dest);
+	return 1;
+}
+
 SEC("kprobe/tcp_v4_conn_request")
-int handle_syn(struct pt_regs* ctx) {
-	struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
+int BPF_KPROBE(handle_syn, struct sock* sk, struct sk_buff* skb) {
 	struct tcp_ipv4_event_t evt = {.type = TCP_EVENT_TYPE_SYN_ATTEMPT, .timestamp = bpf_ktime_get_ns()};
-	// local port
-	evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
-	evt.saddr = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
+	if (!read_socket_data(skb, &evt)) {
+		return 0;
+	}
 
 	struct net* net_ptr = NULL;
 	uint32_t netns = 0;
@@ -58,11 +97,11 @@ int handle_syn(struct pt_regs* ctx) {
 }
 
 SEC("kprobe/tcp_v6_conn_request")
-int handle_syn6(struct pt_regs* ctx) {
-	struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
+int BPF_KPROBE(handle_syn6, struct sock* sk, struct sk_buff* skb) {
 	struct tcp_ipv6_event_t evt = {.type = TCP_EVENT_TYPE_SYN_ATTEMPT, .timestamp = bpf_ktime_get_ns()};
-	// local port
-	evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
+	if (!read_socket_data6(skb, &evt)) {
+		return 0;
+	}
 
 	struct net* net_ptr = NULL;
 	uint32_t netns = 0;
@@ -94,21 +133,9 @@ int BPF_KPROBE(handle_reset, struct sock* sk, struct sk_buff* skb) {
 		return 0;
 	}
 	struct tcp_ipv4_event_t evt = {.type = TCP_EVENT_TYPE_RST, .timestamp = bpf_ktime_get_ns()};
-	// local port
-	u16 network_header = BPF_CORE_READ(skb, network_header);
-	unsigned char* head = BPF_CORE_READ(skb, head);
-
-	struct iphdr iph;
-	bpf_probe_read_kernel(&iph, sizeof(iph), head + network_header);
-	if (iph.ihl < 5)
+	if (!read_socket_data(skb, &evt)) {
 		return 0;
-
-	struct tcphdr tcph;
-	bpf_probe_read_kernel(&tcph, sizeof(tcph), head + network_header + iph.ihl * 4);
-	evt.saddr = iph.saddr;
-	evt.sport = tcph.source;
-	evt.daddr = bpf_ntohs(iph.daddr); // destination is a server
-	evt.dport = bpf_ntohs(tcph.dest);
+	}
 
 	struct net_device* dev = BPF_CORE_READ(skb, dev);
 	if (dev) {
@@ -134,25 +161,9 @@ int BPF_KPROBE(handle_reset6, struct sock* sk, struct sk_buff* skb) {
 		return 0;
 
 	struct tcp_ipv6_event_t evt = {.type = TCP_EVENT_TYPE_RST, .timestamp = bpf_ktime_get_ns()};
-
-	u16 network_header = BPF_CORE_READ(skb, network_header);
-	unsigned char* head = BPF_CORE_READ(skb, head);
-
-	struct ipv6hdr ip6h;
-	bpf_probe_read_kernel(&ip6h, sizeof(ip6h), head + network_header);
-
-	// IPv6 is const size
-	if (ip6h.nexthdr != IPPROTO_TCP)
+	if (!read_socket_data6(skb, &evt)) {
 		return 0;
-
-	struct tcphdr tcph;
-	bpf_probe_read_kernel(&tcph, sizeof(tcph), head + network_header + sizeof(struct ipv6hdr));
-	__builtin_memcpy(&evt.saddr_h, &ip6h.saddr.in6_u.u6_addr8[0], sizeof(__u64));
-	__builtin_memcpy(&evt.saddr_l, &ip6h.saddr.in6_u.u6_addr8[8], sizeof(__u64));
-	__builtin_memcpy(&evt.daddr_h, &ip6h.daddr.in6_u.u6_addr8[0], sizeof(__u64));
-	__builtin_memcpy(&evt.daddr_l, &ip6h.daddr.in6_u.u6_addr8[8], sizeof(__u64));
-	evt.sport = bpf_ntohs(tcph.source);
-	evt.dport = bpf_ntohs(tcph.dest);
+	}
 
 	struct net_device* dev = BPF_CORE_READ(skb, dev);
 	if (dev) {
