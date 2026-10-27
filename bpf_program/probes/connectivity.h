@@ -80,13 +80,14 @@ int BPF_KPROBE(handle_syn, struct sock* sk, struct sk_buff* skb) {
 	evt.cpu = cpu;
 	evt.synqueuelen = syn_qlen;
 	evt.netns = netns;
-	if (bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt)) < 0) {
-		INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_attempt_failures);
-	}
 
 	struct tcp_params_key_t key = {.netns = netns, .sport = evt.sport};
 	struct tcp_params_t val = {.syn_queue_size = max_backlog};
 	bpf_map_update_elem(&tcp_params, &key, &val, BPF_NOEXIST);
+
+	if (bpf_perf_event_output(ctx, &tcp_event_ipv4, cpu, &evt, sizeof(evt)) < 0) {
+		INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_attempt_failures);
+	}
 
 	return 0;
 }
@@ -106,13 +107,14 @@ int BPF_KPROBE(handle_syn6, struct sock* sk, struct sk_buff* skb) {
 	evt.cpu = cpu;
 	evt.synqueuelen = syn_qlen;
 	evt.netns = netns;
-	if (bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt)) < 0) {
-		INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_attempt_failures);
-	}
 
 	struct tcp_params_key_t key = {.netns = netns, .sport = evt.sport};
 	struct tcp_params_t val = {.syn_queue_size = max_backlog};
 	bpf_map_update_elem(&tcp6_params, &key, &val, BPF_NOEXIST);
+
+	if (bpf_perf_event_output(ctx, &tcp_event_ipv6, cpu, &evt, sizeof(evt)) < 0) {
+		INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_attempt_failures);
+	}
 
 	return 0;
 }
