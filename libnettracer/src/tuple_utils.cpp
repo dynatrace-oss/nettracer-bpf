@@ -75,7 +75,7 @@ std::string to_string(const tcp_ipv4_event_t& tuple) {
 	std::string etype = eventTypeToName[tuple.type];
 
 	auto desc = fmt::format(
-			"type: {} {}:{:d} {} {}:{:d} NS:{:d} PID:{:d}",
+			"type: {} {}:{:d} {} {}:{:d} NS:{:x} PID:{:d}",
 			etype,
 			ipv4_to_string(tuple.saddr),
 			tuple.sport,
@@ -99,7 +99,7 @@ std::string to_string(const tcp_ipv6_event_t& tuple) {
 	std::string etype = eventTypeToName[tuple.type];
 
 	auto desc = fmt::format(
-			"type: {} {}:{:d} {} {}:{:d} NS:{:d} PID:{:d}",
+			"type: {} {}:{:d} {} {}:{:d} NS:{:x} PID:{:d}",
 			etype,
 			ipv6_to_string(tuple.saddr_h, tuple.saddr_l),
 			tuple.sport,
