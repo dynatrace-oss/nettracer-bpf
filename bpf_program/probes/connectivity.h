@@ -172,7 +172,7 @@ int BPF_KPROBE(handle_accept_queue_drop, struct sock* sk, struct request_sock* r
 		evt.saddr = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
 		evt.daddr = BPF_CORE_READ(req, __req_common.skc_daddr);
 		evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
-		evt.dport = BPF_CORE_READ(req, __req_common.skc_dport);
+		evt.dport = bpf_ntohs(BPF_CORE_READ(req, __req_common.skc_dport));
 		evt.netns = netns;
 		evt.pid = pid >> 32;
 		evt.cpu = bpf_get_smp_processor_id();
@@ -182,7 +182,7 @@ int BPF_KPROBE(handle_accept_queue_drop, struct sock* sk, struct request_sock* r
 	} else if (family == AF_INET6) {
 		struct tcp_ipv6_event_t evt = {.type = TCP_EVENT_TYPE_DROP, .timestamp = bpf_ktime_get_ns()};
 		evt.sport = BPF_CORE_READ(sk, __sk_common.skc_num);
-		evt.dport = BPF_CORE_READ(req, __req_common.skc_dport);
+		evt.dport = bpf_ntohs(BPF_CORE_READ(req, __req_common.skc_dport));
 		struct inet_sock* inet = (struct inet_sock*)sk;
 		struct ipv6_pinfo* np;
 		struct in6_addr saddr, daddr;
