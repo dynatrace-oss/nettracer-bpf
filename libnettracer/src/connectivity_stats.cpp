@@ -87,7 +87,7 @@ void ConnectivityStats::aggregate() {
 }
 
 template <typename IPTYPE>
-std::unordered_map<uint32_t, uint32_t>& ConnectivityStats::getTcpConf(int& fd) {
+std::unordered_map<tcp_params_key_t, uint32_t>& ConnectivityStats::getTcpConf(int& fd) {
 	if constexpr (std::is_same_v<IPTYPE, ipv4_tuple_t>) {
 		fd = tcp_params_fd;
 		return syn_backlog_conf;
@@ -110,12 +110,13 @@ void ConnectivityStats::event(const EventIPTYPE& evt) {
 	if (evt.type == TCP_EVENT_TYPE_SYN_ATTEMPT) {
 		serv.connection_attempts++;
 		tcp_params_t val{};
-        int fd;
+		tcp_params_key_t key{.netns = evt.netns, .sport = evt.sport};
+		int fd;
 		auto& conf = getTcpConf<IPTYPE>(fd);
-		auto it = conf.find(evt.netns);
+		auto it = conf.find(key);
 		if (it == conf.end()) {
-			if (mapsWrapper->lookupElement(fd, &evt.netns, &val)) {
-				conf[evt.netns] = val.syn_queue_size;
+			if (mapsWrapper->lookupElement(fd, &key, &val)) {
+				conf[key] = val.syn_queue_size;
 				LOG_INFO("Namespace {} max_syn_queuelen: {}", evt.netns, val.syn_queue_size);
 			}
 		} else {

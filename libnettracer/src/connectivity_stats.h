@@ -18,6 +18,20 @@
 #include <chrono>
 #include <functional>
 
+template <>
+struct std::hash<tcp_params_key_t> {
+	std::size_t operator()(const tcp_params_key_t& t) const noexcept {
+		std::size_t h = 0;
+		boost::hash_combine(h, t.sport);
+		boost::hash_combine(h, t.netns);
+		return h;
+	}
+};
+
+inline bool operator==(const tcp_params_key_t& a, const tcp_params_key_t& b) {
+	return a.netns == b.netns && a.sport == b.sport;
+}
+
 namespace netstat {
 struct server_ipv4_tuple_t {
 	uint32_t saddr;
@@ -114,21 +128,22 @@ struct ServerTupleOf<ipv6_tuple_t> {
 template <typename T>
 using ServerTuple_t = typename ServerTupleOf<T>::type;
 
+
 class ConnectivityStats : public NetStat {
 	ServersIPv4 servers_;
 	ServersIPv6 servers6_;
 	mutable std::mutex mx_servers;
 	int tcp_params_fd{-1};
 	int tcp6_params_fd{-1};
-	std::unordered_map<uint32_t, uint32_t> syn_backlog_conf;
-	std::unordered_map<uint32_t, uint32_t> syn_backlog_conf6;
+	std::unordered_map<tcp_params_key_t, uint32_t> syn_backlog_conf;
+	std::unordered_map<tcp_params_key_t, uint32_t> syn_backlog_conf6;
 
 	template <typename IPTYPE, typename EventIPTYPE>
 	void event(const EventIPTYPE& evt);
 	template <typename IPTYPE>
 	void aggregateImpl();
 	template <typename IPTYPE>
-	std::unordered_map<uint32_t, uint32_t>& getTcpConf(int& fd);
+	std::unordered_map<tcp_params_key_t, uint32_t>& getTcpConf(int& fd);
 	template <typename IPTYPE>
 	void print(const std::unordered_map<ServerTuple_t<IPTYPE>, ServerStats>& aggr) const;
 

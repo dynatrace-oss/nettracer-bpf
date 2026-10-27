@@ -84,8 +84,9 @@ int BPF_KPROBE(handle_syn, struct sock* sk, struct sk_buff* skb) {
 		INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_attempt_failures);
 	}
 
+	struct tcp_params_key_t key = {.netns = netns, .sport = evt.sport};
 	struct tcp_params_t val = {.syn_queue_size = max_backlog};
-	bpf_map_update_elem(&tcp_params, &netns, &val, BPF_NOEXIST);
+	bpf_map_update_elem(&tcp_params, &key, &val, BPF_NOEXIST);
 
 	return 0;
 }
@@ -109,8 +110,9 @@ int BPF_KPROBE(handle_syn6, struct sock* sk, struct sk_buff* skb) {
 		INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_attempt_failures);
 	}
 
+	struct tcp_params_key_t key = {.netns = netns, .sport = evt.sport};
 	struct tcp_params_t val = {.syn_queue_size = max_backlog};
-	bpf_map_update_elem(&tcp6_params, &netns, &val, BPF_NOEXIST);
+	bpf_map_update_elem(&tcp6_params, &key, &val, BPF_NOEXIST);
 
 	return 0;
 }

@@ -131,14 +131,14 @@ struct {
 
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
-	__type(key, __u32);
+	__type(key, struct tcp_params_key_t);
 	__type(value, struct tcp_params_t);
-	__uint(max_entries, MAX_NAMESPACES);
+	__uint(max_entries, MAP_MAX_ENTRIES);
 } tcp_params SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
-	__type(key, __u32);
+	__type(key, struct tcp_params_key_t);
 	__type(value, struct tcp_params_t);
-	__uint(max_entries, MAX_NAMESPACES);
+	__uint(max_entries, MAP_MAX_ENTRIES);
 } tcp6_params SEC(".maps");
