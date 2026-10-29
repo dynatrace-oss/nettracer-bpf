@@ -23,8 +23,10 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+
 #define AF_INET 2
 #define AF_INET6 10
+#define IPV4_MIN_IHL 5 //minimal ipv4 heade length
 
 __attribute__((always_inline)) static int read_packet_header_rev(struct sk_buff* skb, struct tcp_ipv4_event_t* evt) {
 	uint16_t network_header = BPF_CORE_READ(skb, network_header);
@@ -32,7 +34,7 @@ __attribute__((always_inline)) static int read_packet_header_rev(struct sk_buff*
 
 	struct iphdr iph;
 	bpf_probe_read_kernel(&iph, sizeof(iph), head + network_header);
-	if (iph.ihl < 5)
+	if (iph.ihl < IPV4_MIN_IHL)
 		return 0;
 
 	struct tcphdr tcph;
@@ -50,7 +52,7 @@ __attribute__((always_inline)) static int read_packet_header(struct sk_buff* skb
 
 	struct iphdr iph;
 	bpf_probe_read_kernel(&iph, sizeof(iph), head + network_header);
-	if (iph.ihl < 5)
+	if (iph.ihl < IPV4_MIN_IHL)
 		return 0;
 
 	struct tcphdr tcph;
