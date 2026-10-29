@@ -32,7 +32,7 @@ constexpr std::array<const char*, 6> eventTypeToName = {"connect", "accept", "cl
 std::string ipv6_to_string(uint64_t h, uint64_t l) {
 	uint64_t addr[] = {h, l};
 	char buff[48];
-	return std::string(inet_ntop(AF_INET6, &addr, buff, sizeof(buff)));
+	return "[" + std::string(inet_ntop(AF_INET6, &addr, buff, sizeof(buff))) + "]";
 }
 
 std::string ipv4_to_string(uint32_t ip) {
