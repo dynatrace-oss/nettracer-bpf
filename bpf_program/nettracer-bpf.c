@@ -12,6 +12,7 @@
 #include "legacy/other.h"
 #else
 #include "maps.h"
+#include "probes/connectivity.h"
 #endif
 #include "probes/connections.h"
 #include "probes/metrics.h"

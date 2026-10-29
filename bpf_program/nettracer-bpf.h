@@ -184,9 +184,14 @@ struct bpf_debug_counters_t {
 	uint64_t map_sends_update_failures;
 };
 
-#define MAX_NAMESPACES 128
 struct tcp_params_t {
 	uint32_t syn_queue_size;
+};
+
+struct tcp_params_key_t {
+	uint32_t netns;
+	uint16_t sport;
+	uint16_t pad;
 };
 
 // Helper to safely increment a field of bpf_debug_counters_t from BPF code.
