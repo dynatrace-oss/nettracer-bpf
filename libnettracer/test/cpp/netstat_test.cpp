@@ -225,7 +225,7 @@ TEST_F(NetStatTest, resolveDirectionForServer) {
 	auto sockData = aggrs.begin();
 	EXPECT_EQ(sockData->second.state.Direction, 0);
 	EXPECT_EQ(sockData->second.state.Established, 0);
-	netstat->resolveOldConnections<ipv4_tuple_t>();
+	netstat->resolveOldConnections();
 	EXPECT_EQ(sockData->second.state.Direction, 1);
 	EXPECT_EQ(sockData->second.state.Established, 1);
 }
@@ -247,7 +247,7 @@ TEST_F(NetStatTest, resolveDirectionForClient) {
 	auto sockData = aggrs.begin();
 	EXPECT_EQ(sockData->second.state.Direction, 0);
 	EXPECT_EQ(sockData->second.state.Established, 0);
-	netstat->resolveOldConnections<ipv4_tuple_t>();
+	netstat->resolveOldConnections();
 	EXPECT_EQ(sockData->second.state.Direction, 0);
 	EXPECT_EQ(sockData->second.state.Established, 1);
 }

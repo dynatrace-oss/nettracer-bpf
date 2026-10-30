@@ -1,18 +1,18 @@
 /*
-* Copyright 2025 Dynatrace LLC
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License cat
-*
-* https://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2025 Dynatrace LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include "netstat.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
@@ -28,7 +28,6 @@ namespace netstat {
 
 constexpr auto INACTIVE_TIMEOUT = minutes(1);
 constexpr unsigned INTERVAL_DIVIDER = 10;
-
 
 static int getWindowWidth() {
 	winsize sz{};
@@ -60,11 +59,11 @@ void NetStat::process_bpf_map(int fd, F func) {
 	}
 }
 
-template<typename IPTYPE>
+template <typename IPTYPE>
 void NetStat::update(const bpf::bpf_fds& fds) {
 	process_bpf_map<IPTYPE, pid_comm_t>(fds.pid_fd, [&](auto& el, const auto& val) {
 		uint32_t pid = static_cast<uint32_t>(val.pid >> 32);
-		if(el.pid == 0){
+		if (el.pid == 0) {
 			el.pid = pid;
 		}
 		return false;
@@ -78,8 +77,8 @@ void NetStat::update(const bpf::bpf_fds& fds) {
 	});
 
 	process_bpf_map<IPTYPE, tcp_stats_t>(fds.tcp_stats_fd, [&](auto& el, const auto& val) {
-		bool changed = (el.curr.pkts_retrans != val.retransmissions) || (el.curr.pkts_sent != val.segs_out) || (el.curr.pkts_received != val.segs_in) ||
-					   (el.curr.rtt != val.rtt) || (el.curr.rtt_var != val.rtt_var);
+		bool changed = (el.curr.pkts_retrans != val.retransmissions) || (el.curr.pkts_sent != val.segs_out) ||
+					   (el.curr.pkts_received != val.segs_in) || (el.curr.rtt != val.rtt) || (el.curr.rtt_var != val.rtt_var);
 
 		if ((el.curr.pkts_sent > 0 && val.segs_out < el.curr.pkts_sent) ||
 			(el.prev.pkts_sent > 0 && (val.segs_out - el.prev.pkts_sent) > (el.curr.bytes_sent - el.prev.bytes_sent + 4))) {
@@ -114,7 +113,7 @@ struct TimeGuard {
 	unsigned long counter{};
 	unsigned ticks_per_wait_time;
 
-	TimeGuard(unsigned time){
+	TimeGuard(unsigned time) {
 		counter = ticks_per_wait_time = time * INTERVAL_DIVIDER;
 	}
 
@@ -163,8 +162,7 @@ bool NetStat::map_loop() {
 		clean_bpf<ipv6_tuple_t>(fdsIPv6);
 
 		if (kbhit || outputCtr.time_elapsed()) {
-			resolveOldConnections<ipv4_tuple_t>();
-			resolveOldConnections<ipv6_tuple_t>();
+			resolveOldConnections();
 			aggregate();
 			const auto [passive, active, established] = countTcpSessions();
 			const auto tcpSessionsStr =
@@ -194,7 +192,7 @@ bool NetStat::map_loop() {
 	return exitCtrl.running;
 }
 
-template<typename IPTYPE>
+template <typename IPTYPE>
 void NetStat::clean_bpf(const bpf::bpf_fds& fds) {
 	auto now = getCurrentTimeFromSteadyClock();
 	std::unique_lock lock(mx_aggr);
@@ -420,7 +418,7 @@ void NetStat::readListenPorts() {
 }
 
 template <typename IPTYPE>
-void NetStat::resolveOldConnections() {
+void NetStat::resolveOldConnectionsImpl() {
 	auto& listenports{listenPorts<IPTYPE>()};
 	auto& aggr{connections<IPTYPE>()};
 
@@ -452,6 +450,11 @@ void NetStat::resolveOldConnections() {
 		}
 		data.state.Established = 1;
 	}
+}
+
+void NetStat::resolveOldConnections() {
+	resolveOldConnectionsImpl<ipv4_tuple_t>();
+	resolveOldConnectionsImpl<ipv6_tuple_t>();
 }
 
 void NetStat::init(bpf::Ibpf& ebpf) {
@@ -496,7 +499,7 @@ NetStat::~NetStat() {
 }
 
 void netstat::NetStat::set_max_map_size(uint32_t size) {
-    max_map_size = size;
+	max_map_size = size;
 }
 
 void NetStat::set_kbhit() {
@@ -534,8 +537,6 @@ std::unordered_map<IPTYPE, Connection> NetStat::filterServerAggrs() {
 
 template void NetStat::update<ipv4_tuple_t>(const bpf::bpf_fds&);
 template void NetStat::update<ipv6_tuple_t>(const bpf::bpf_fds&);
-template void NetStat::resolveOldConnections<ipv4_tuple_t>();
-template void NetStat::resolveOldConnections<ipv6_tuple_t>();
 template void NetStat::set_prev_metrics<ipv4_tuple_t>();
 template void NetStat::set_prev_metrics<ipv6_tuple_t>();
 template void NetStat::clean_closed<ipv4_tuple_t>(std::optional<ConnKind>);
