@@ -38,7 +38,6 @@ struct server_ipv4_tuple_t {
 	uint32_t daddr;
 	uint16_t sport;
 	uint32_t netns;
-	uint32_t pid;
 	bool operator==(const server_ipv4_tuple_t&) const = default;
 	ipv4_tuple_t get_tuple() const {
 		return ipv4_tuple_t{saddr, daddr, sport, 0, netns};
@@ -52,7 +51,6 @@ struct server_ipv6_tuple_t {
 	uint64_t daddr_l;
 	uint16_t sport;
 	uint32_t netns;
-	uint32_t pid;
 	bool operator==(const server_ipv6_tuple_t&) const = default;
 	ipv6_tuple_t get_tuple() const {
 		return ipv6_tuple_t{saddr_h, saddr_l, daddr_h, daddr_l, sport, 0, netns};
@@ -67,7 +65,7 @@ struct std::hash<netstat::server_ipv4_tuple_t> {
 		boost::hash_combine(h, t.saddr);
 		boost::hash_combine(h, t.daddr);
 		boost::hash_combine(h, t.sport);
-		boost::hash_combine(h, t.pid);
+		boost::hash_combine(h, t.netns);
 		return h;
 	}
 };
@@ -81,7 +79,7 @@ struct std::hash<netstat::server_ipv6_tuple_t> {
 		boost::hash_combine(h, t.daddr_h);
 		boost::hash_combine(h, t.daddr_l);
 		boost::hash_combine(h, t.sport);
-		boost::hash_combine(h, t.pid);
+		boost::hash_combine(h, t.netns);
 		return h;
 	}
 };
@@ -89,6 +87,7 @@ struct std::hash<netstat::server_ipv6_tuple_t> {
 namespace netstat {
 struct ServerStats : public Stats {
 	std::chrono::steady_clock::time_point update_time;
+	uint32_t pid = 0;
 	uint32_t connection_attempts = 0;
 	uint32_t connection_resets = 0;
 	uint32_t connection_timeouts = 0;
@@ -106,11 +105,11 @@ struct ServerStats : public Stats {
 
 using ServersIPv4 = std::unordered_map<server_ipv4_tuple_t, ServerStats>;
 using ServersIPv6 = std::unordered_map<server_ipv6_tuple_t, ServerStats>;
-inline server_ipv4_tuple_t createServerKey(const ipv4_tuple_t& key, uint32_t pid) {
-	return server_ipv4_tuple_t{key.saddr, key.daddr, key.sport, key.netns, pid};
+inline server_ipv4_tuple_t createServerKey(const ipv4_tuple_t& key) {
+	return server_ipv4_tuple_t{key.saddr, key.daddr, key.sport, key.netns};
 }
-inline server_ipv6_tuple_t createServerKey(const ipv6_tuple_t& key, uint32_t pid) {
-	return server_ipv6_tuple_t{key.saddr_h, key.saddr_l, key.daddr_h, key.daddr_l, key.sport, key.netns, pid};
+inline server_ipv6_tuple_t createServerKey(const ipv6_tuple_t& key) {
+	return server_ipv6_tuple_t{key.saddr_h, key.saddr_l, key.daddr_h, key.daddr_l, key.sport, key.netns};
 }
 
 template <typename T>
@@ -128,13 +127,13 @@ struct ServerTupleOf<ipv6_tuple_t> {
 template <typename T>
 using ServerTuple_t = typename ServerTupleOf<T>::type;
 
-
 class ConnectivityStats : public NetStat {
 	ServersIPv4 servers_;
 	ServersIPv6 servers6_;
 	mutable std::mutex mx_servers;
 	int tcp_params_fd{-1};
 	int tcp6_params_fd{-1};
+	bool ipv6acceptsipv4{true};
 	std::unordered_map<tcp_params_key_t, uint32_t> syn_backlog_conf;
 	std::unordered_map<tcp_params_key_t, uint32_t> syn_backlog_conf6;
 
@@ -146,6 +145,8 @@ class ConnectivityStats : public NetStat {
 	std::unordered_map<tcp_params_key_t, uint32_t>& getTcpConf(int& fd);
 	template <typename IPTYPE>
 	void print(const std::unordered_map<ServerTuple_t<IPTYPE>, ServerStats>& aggr) const;
+	void resolveOldConnectionsImpl();
+	void resolveOldConnectionsImpl6();
 
 public:
 	using NetStat::NetStat;
@@ -158,6 +159,11 @@ protected:
 	void print_human_readable() override;
 	void print_to_pipe() override;
 	void aggregate() override;
+	void resolveOldConnections() override;
+	void disableIpv6acceptsipv4() {
+		ipv6acceptsipv4 = false;
+	}
+
 	template <typename IPTYPE>
 	inline auto& servers();
 	template <typename IPTYPE>

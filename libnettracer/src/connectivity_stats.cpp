@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include <algorithm>
+#include <fstream>
 #include "connectivity_stats.h"
 #include "bpf_generic/src/bpf_interface.h"
 #include "system_utils.h"
@@ -25,7 +26,7 @@ void print_human_readable(const std::unordered_map<ServerTuple_t<IPTYPE>, Server
 
 	for (auto& [tup, stats] : aggr) {
 		os << std::setw(ADDRESS_FIELD_WIDTH) << to_string(tup.get_tuple(), ConnectionDirection::Incoming);
-		os << std::setw(field_width) << tup.pid << std::setw(field_width) << short_num(stats.bytes_sent) << std::setw(field_width)
+		os << std::setw(field_width) << stats.pid << std::setw(field_width) << short_num(stats.bytes_sent) << std::setw(field_width)
 		   << short_num(stats.bytes_received) << std::setw(field_width) << stats.rtt << std::setw(field_width) << stats.connection_attempts
 		   << std::setw(field_width) << stats.connection_timeouts << std::setw(field_width) << stats.connection_resets << "\n";
 	}
@@ -75,9 +76,10 @@ void ConnectivityStats::aggregateImpl() {
 	auto aggr = filterServerAggrs<IPTYPE>();
 	std::unique_lock lock(mx_servers);
 	for (auto& [tup, stats] : aggr) {
-		auto skey = createServerKey(tup, stats.pid);
+		auto skey = createServerKey(tup);
 		auto& statsExt = servers<IPTYPE>()[skey];
 		statsExt.addStats(calc_delta(stats.curr, stats.prev, tup));
+		statsExt.pid = stats.pid;
 	}
 }
 
@@ -102,7 +104,7 @@ void ConnectivityStats::event(const EventIPTYPE& evt) {
 	if(NetStat::event<IPTYPE>(evt)){
 		return;
 	}
-	auto keyServ = createServerKey(eventToTuple(evt), evt.pid);
+	auto keyServ = createServerKey(eventToTuple(evt));
 	std::unique_lock lock(mx_servers);
 	auto& serv = servers<IPTYPE>()[keyServ];
 	serv.update_time = getCurrentTimeFromSteadyClock();
@@ -153,6 +155,11 @@ void ConnectivityStats::init(bpf::Ibpf& ebpf) {
 	if (tcp6_params_fd < 0) {
 		throw std::invalid_argument("invalid tcp6_params_fd");
 	}
+
+	int value = 0;
+	std::ifstream("/proc/sys/net/ipv6/bindv6only") >> value;
+	ipv6acceptsipv4 = (value == 0);
+	LOG_INFO("Ipv6 accepts Ipv4 {}", ipv6acceptsipv4);
 }
 
 template <typename IPTYPE>
@@ -168,7 +175,7 @@ void ConnectivityStats::print(const std::unordered_map<ServerTuple_t<IPTYPE>, Se
 
 		buf << std::right << std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
 		    << sock.get_tuple()
-			<< std::setw(12) << sock.pid
+			<< std::setw(12) << stat.pid
 			<< std::setw(12) << sock.netns
 			<< kind
 			<< std::setw(22) << delta.bytes_sent + addAvgHeaderSize<IPTYPE>(delta.pkts_sent, add_header_mode_)
@@ -185,6 +192,88 @@ void ConnectivityStats::print(const std::unordered_map<ServerTuple_t<IPTYPE>, Se
 		*os << buf.str() << std::endl;
 		LOG_TRACE(buf.str());
 	}
+}
+
+void ConnectivityStats::resolveOldConnectionsImpl() {
+	const auto& listenports{listenPorts<ipv4_tuple_t>()};
+	auto& serv{servers<ipv4_tuple_t>()};
+
+	for (auto& [sock, data] : serv) {
+
+		if (data.pid != 0) {
+			continue;
+		}
+		ipv4_tuple_t listenSock{};
+		listenSock.sport = sock.sport;
+		listenSock.netns = sock.netns;
+
+		auto [first, last] = listenports.equal_range(listenSock);
+		if (first != last) {
+			data.pid = (std::min_element(first, last, [](const auto& a, const auto& b) { return a.second <= b.second; }))->second;
+			continue;
+		}
+		listenSock.saddr = sock.saddr;
+		auto [first2, last2] = listenports.equal_range(listenSock);
+		if (first2 != last2) {
+			data.pid = (std::min_element(first2, last2, [](const auto& a, const auto& b) { return a.second <= b.second; }))->second;
+		}
+	}
+
+	if (!ipv6acceptsipv4) {
+		return;
+	}
+
+	const auto& listenports6{listenPorts<ipv6_tuple_t>()};
+	for (auto& [sock, data] : serv) {
+
+		if (data.pid != 0) {
+			continue;
+		}
+		ipv6_tuple_t listenSock{};
+		listenSock.sport = sock.sport;
+		listenSock.netns = sock.netns;
+		auto [first, last] = listenports6.equal_range(listenSock);
+		if (first != last) {
+			data.pid = (std::min_element(first, last, [](const auto& a, const auto& b) { return a.second <= b.second; }))->second;
+			continue;
+		}
+	}
+}
+
+void ConnectivityStats::resolveOldConnectionsImpl6() {
+
+	auto& listenports{listenPorts<ipv6_tuple_t>()};
+	auto& serv{servers<ipv6_tuple_t>()};
+
+	for (auto& [sock, data] : serv) {
+
+		if (data.pid != 0) {
+			continue;
+		}
+		ipv6_tuple_t listenSock{};
+		listenSock.sport = sock.sport;
+		listenSock.netns = sock.netns;
+
+		auto [first, last] = listenports.equal_range(listenSock);
+		if (first != last) {
+			data.pid = (std::min_element(first, last, [](const auto& a, const auto& b) { return a.second <= b.second; }))->second;
+			continue;
+		}
+
+		listenSock.saddr_l = sock.saddr_l;
+		listenSock.saddr_h = sock.saddr_h;
+
+		auto [first2, last2] = listenports.equal_range(listenSock);
+		if (first2 != last2) {
+			data.pid = (std::min_element(first2, last2, [](const auto& a, const auto& b) { return a.second <= b.second; }))->second;
+		}
+	}
+}
+
+void ConnectivityStats::resolveOldConnections() {
+	NetStat::resolveOldConnections();
+	resolveOldConnectionsImpl();
+	resolveOldConnectionsImpl6();
 }
 
 } // namespace netstat
