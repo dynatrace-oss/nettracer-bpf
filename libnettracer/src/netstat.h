@@ -110,7 +110,8 @@ protected:
 	virtual steady_clock::time_point getCurrentTimeFromSteadyClock() const;
 
 	template <typename IPTYPE>
-	void resolveOldConnections();
+	void resolveOldConnectionsImpl();
+	virtual void resolveOldConnections();
 	template <typename IPTYPE>
 	void set_prev_metrics();
 	virtual void aggregate();

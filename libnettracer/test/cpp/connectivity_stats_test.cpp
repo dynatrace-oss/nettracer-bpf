@@ -40,7 +40,10 @@ public:
 	using ConnectivityStats::clean_closed;
 	using ConnectivityStats::clean_inactive;
 	using ConnectivityStats::connections;
-    using ConnectivityStats::print_to_pipe;
+	using ConnectivityStats::disableIpv6acceptsipv4;
+	using ConnectivityStats::listenPorts;
+	using ConnectivityStats::print_to_pipe;
+	using ConnectivityStats::resolveOldConnections;
 	using ConnectivityStats::servers;
 	using ConnectivityStats::update;
 };
@@ -55,6 +58,13 @@ protected:
 		sock.dport = 4343;
 		sock.saddr = 0x1111;
 		sock.daddr = 0x6611;
+		sock6.netns = 0xf00002;
+		sock6.sport = 33;
+		sock6.dport = 4346;
+		sock6.saddr_h = 0x1111;
+		sock6.saddr_l = 0x2222;
+		sock6.daddr_h = 0x6611;
+		sock6.daddr_l = 0x6622;
 	}
 
 	void TearDown() override {
@@ -65,6 +75,7 @@ protected:
 	std::ostringstream os;
 	std::unique_ptr<TestConnectivityStats> netstat;
 	ipv4_tuple_t sock{};
+	ipv6_tuple_t sock6{};
 };
 
 TEST_F(ConnectivityStatsTest, printClients) {
@@ -161,4 +172,112 @@ TEST_F(ConnectivityStatsTest, connectivityEvent) {
 	ASSERT_EQ(netstat->servers<ipv4_tuple_t>().size(), 1u);
 	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.connection_attempts, 1u);
 	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.bytes_sent, 100u);
+}
+
+TEST_F(ConnectivityStatsTest,  resolvePidsFullSaddr) {
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(1);
+	tcp_ipv4_event_t evt{1, 1, TCP_EVENT_TYPE_SYN_ATTEMPT, 100, sock.saddr, sock.daddr, sock.sport, sock.dport, sock.netns, 100};
+	auto& lports = netstat->listenPorts<ipv4_tuple_t>();
+	sock.dport = 0;
+	sock.daddr = 0;
+	const uint32_t pid = 22222;
+	lports.emplace(sock, pid);
+	netstat->eventIpv4(evt);
+	netstat->resolveOldConnections();
+	ASSERT_EQ(netstat->servers<ipv4_tuple_t>().size(), 1u);
+	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.pid, pid);
+}
+
+TEST_F(ConnectivityStatsTest, resolvePidsZeroSaddr) {
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(1);
+	tcp_ipv4_event_t evt{1, 1, TCP_EVENT_TYPE_SYN_ATTEMPT, 100, sock.saddr, sock.daddr, sock.sport, sock.dport, sock.netns, 100};
+	auto& lports = netstat->listenPorts<ipv4_tuple_t>();
+	sock.dport = 0;
+	sock.daddr = 0;
+	sock.saddr = 0;
+	const uint32_t pid = 22222;
+	lports.emplace(sock, pid);
+	netstat->eventIpv4(evt);
+	netstat->resolveOldConnections();
+	ASSERT_EQ(netstat->servers<ipv4_tuple_t>().size(), 1u);
+	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.pid, pid);
+}
+
+TEST_F(ConnectivityStatsTest, resolvePidsOtherNamespaceFails) {
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(1);
+	tcp_ipv4_event_t evt{1, 1, TCP_EVENT_TYPE_SYN_ATTEMPT, 100, sock.saddr, sock.daddr, sock.sport, sock.dport, sock.netns, 100};
+	auto& lports = netstat->listenPorts<ipv4_tuple_t>();
+	sock.dport = 0;
+	sock.daddr = 0;
+	sock.saddr = 0;
+	sock.netns = 1;
+	const uint32_t pid = 22222;
+	lports.emplace(sock, pid);
+	netstat->eventIpv4(evt);
+	netstat->resolveOldConnections();
+	ASSERT_EQ(netstat->servers<ipv4_tuple_t>().size(), 1u);
+	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.pid, 0);
+}
+
+TEST_F(ConnectivityStatsTest, resolveIpv4PidsZeroSaddrFromIpv6) {
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(1);
+	tcp_ipv4_event_t evt{1, 1, TCP_EVENT_TYPE_SYN_ATTEMPT, 100, sock.saddr, sock.daddr, sock.sport, sock.dport, sock.netns, 100};
+	auto& lports = netstat->listenPorts<ipv6_tuple_t>();
+	ipv6_tuple_t lsock{.sport = sock.sport, .netns = sock.netns};
+	const uint32_t pid = 22222;
+	lports.emplace(lsock, pid);
+	netstat->eventIpv4(evt);
+	netstat->resolveOldConnections();
+	ASSERT_EQ(netstat->servers<ipv4_tuple_t>().size(), 1u);
+	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.pid, pid);
+}
+
+TEST_F(ConnectivityStatsTest, resolveIpv4PidsZeroSaddrFromIpv6Disabled) {
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(1);
+	tcp_ipv4_event_t evt{1, 1, TCP_EVENT_TYPE_SYN_ATTEMPT, 100, sock.saddr, sock.daddr, sock.sport, sock.dport, sock.netns, 100};
+	auto& lports = netstat->listenPorts<ipv6_tuple_t>();
+	ipv6_tuple_t lsock{.sport = sock.sport, .netns = sock.netns};
+	const uint32_t pid = 22222;
+	lports.emplace(lsock, pid);
+	netstat->disableIpv6acceptsipv4();
+	netstat->eventIpv4(evt);
+	netstat->resolveOldConnections();
+	ASSERT_EQ(netstat->servers<ipv4_tuple_t>().size(), 1u);
+	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.pid, 0);
+}
+
+TEST_F(ConnectivityStatsTest, resolvedPidsNotOverwrittenInAggregate) {
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(2);
+	tcp_ipv4_event_t evt{1, 1, TCP_EVENT_TYPE_SYN_ATTEMPT, 100, sock.saddr, sock.daddr, sock.sport, sock.dport, sock.netns, 100};
+	auto& lports = netstat->listenPorts<ipv4_tuple_t>();
+	auto lsock = sock;
+	lsock.dport = 0;
+	lsock.daddr = 0;
+	const uint32_t pid = 22222;
+	lports.emplace(lsock, pid);
+	netstat->eventIpv4(evt);
+	netstat->resolveOldConnections();
+	ASSERT_EQ(netstat->servers<ipv4_tuple_t>().size(), 1u);
+	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.pid, pid);
+	netstat::Connection conn{0, 0, State{.Established = 1, .Direction = 1 }};
+	netstat->eventIpv4(evt);
+	std::unordered_map<ipv4_tuple_t, netstat::Connection>& aggr = netstat->connections<ipv4_tuple_t>();
+	aggr.emplace(sock, conn);
+	netstat->aggregate();
+	ASSERT_EQ(netstat->servers<ipv4_tuple_t>().size(), 1u);
+	EXPECT_EQ(netstat->servers<ipv4_tuple_t>().begin()->second.pid, pid);
+}
+
+TEST_F(ConnectivityStatsTest, resolvePidsFullSaddrIpv6) {
+	EXPECT_CALL(*netstat, getCurrentTimeFromSteadyClock).Times(1);
+	tcp_ipv6_event_t evt{1, 1, TCP_EVENT_TYPE_SYN_ATTEMPT, 0, 100, sock6.saddr_h, sock6.saddr_l, sock6.daddr_h, sock6.daddr_l, sock6.sport, sock6.dport, sock6.netns};
+	auto& lports = netstat->listenPorts<ipv6_tuple_t>();
+	sock6.dport = 0;
+	sock6.daddr_h = sock6.daddr_l = 0;
+	const uint32_t pid = 22222;
+	lports.emplace(sock6, pid);
+	netstat->eventIpv6(evt);
+	netstat->resolveOldConnections();
+	ASSERT_EQ(netstat->servers<ipv6_tuple_t>().size(), 1u);
+	EXPECT_EQ(netstat->servers<ipv6_tuple_t>().begin()->second.pid, pid);
 }
