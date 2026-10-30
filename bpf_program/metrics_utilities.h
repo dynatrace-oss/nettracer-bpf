@@ -150,9 +150,32 @@ static bool isipv4ipv6(uint64_t addr_l, uint64_t addr_h) {
 
 __attribute__((always_inline))
 static bool filter_ipv6(const struct ipv6_tuple_t* key) {
-	if (isipv4ipv6(key->saddr_l, key->daddr_h)) {
+	// ::1
+#ifndef LEGACY_BPF
+	if (key->saddr_h == 0 && key->saddr_l == bpf_cpu_to_be64(1)) {
+		return true;
+	}
+#endif
+	// ::ffff:127.x.x.x (IPv4-mapped)
+	if (isipv4ipv6(key->saddr_l, key->saddr_h)) {
 		uint32_t ipv4 = (uint32_t)(key->saddr_l >> 32);
 		return filter_loopback(ipv4);
 	}
 	return false;
 }
+
+#ifndef LEGACY_BPF
+__attribute__((always_inline))
+static bool filter_loopback6(uint64_t addr_l, uint64_t addr_h) {
+	// ::1
+	if (addr_h == 0 && addr_l == bpf_cpu_to_be64(1)) {
+		return true;
+	}
+	// ::ffff:127.x.x.x (IPv4-mapped)
+	if (isipv4ipv6(addr_l, addr_h)) {
+		uint32_t ipv4 = (uint32_t)(addr_l >> 32);
+		return filter_loopback(ipv4);
+	}
+	return false;
+}
+#endif

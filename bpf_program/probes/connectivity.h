@@ -114,6 +114,9 @@ int BPF_KPROBE(handle_syn, struct sock* sk, struct sk_buff* skb) {
 	if (!read_packet_header_rev(skb, &evt)) {
 		return 0;
 	}
+	if (filter_loopback(evt.saddr)) {
+		return 0;
+	}
 
 	uint32_t netns = BPF_CORE_READ(sk, __sk_common.skc_net.net, ns.inum);
 	uint32_t syn_qlen = BPF_CORE_READ(sk, sk_ack_backlog);
@@ -139,6 +142,9 @@ SEC("kprobe/tcp_v6_conn_request")
 int BPF_KPROBE(handle_syn6, struct sock* sk, struct sk_buff* skb) {
 	struct tcp_ipv6_event_t evt = {.type = TCP_EVENT_TYPE_SYN_ATTEMPT, .timestamp = bpf_ktime_get_ns()};
 	if (!read_packet_header6_rev(skb, &evt)) {
+		return 0;
+	}
+	if (filter_loopback6(evt.saddr_l, evt.saddr_h)) {
 		return 0;
 	}
 
@@ -172,6 +178,9 @@ int BPF_KPROBE(handle_reset, struct sock* sk, struct sk_buff* skb) {
 	if (!read_packet_header(skb, &evt)) {
 		return 0;
 	}
+	if (filter_loopback(evt.saddr)) {
+		return 0;
+	}
 
 	evt.netns = BPF_CORE_READ(skb, dev, nd_net.net, ns.inum);
 	uint32_t cpu = bpf_get_smp_processor_id();
@@ -191,6 +200,9 @@ int BPF_KPROBE(handle_reset6, struct sock* sk, struct sk_buff* skb) {
 
 	struct tcp_ipv6_event_t evt = {.type = TCP_EVENT_TYPE_RST, .timestamp = bpf_ktime_get_ns()};
 	if (!read_packet_header6(skb, &evt)) {
+		return 0;
+	}
+	if (filter_loopback6(evt.saddr_l, evt.saddr_h)) {
 		return 0;
 	}
 
@@ -219,6 +231,9 @@ int BPF_KPROBE(handle_accept_queue_drop, struct sock* sk, struct request_sock* r
 		evt.netns = netns;
 		evt.pid = pid >> 32;
 		evt.cpu = bpf_get_smp_processor_id();
+		if (filter_loopback(evt.saddr)) {
+			return 0;
+		}
 		if (bpf_perf_event_output(ctx, &tcp_event_ipv4, evt.cpu, &evt, sizeof(evt)) < 0) {
 			INC_DEBUG_COUNTER(perf_output_ipv4_on_connect_attempt_failures);
 		}
@@ -238,8 +253,10 @@ int BPF_KPROBE(handle_accept_queue_drop, struct sock* sk, struct request_sock* r
 		evt.daddr_l = *(__u64*)&daddr.in6_u.u6_addr8[8];
 		evt.netns = netns;
 		evt.pid = pid >> 32;
-
 		evt.cpu = bpf_get_smp_processor_id();
+		if (filter_loopback6(evt.saddr_l, evt.saddr_h)) {
+			return 0;
+		}
 		if (bpf_perf_event_output(ctx, &tcp_event_ipv6, evt.cpu, &evt, sizeof(evt)) < 0) {
 			INC_DEBUG_COUNTER(perf_output_ipv6_on_connect_attempt_failures);
 		}
