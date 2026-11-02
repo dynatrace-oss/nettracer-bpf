@@ -163,6 +163,7 @@ protected:
 	void disableIpv6acceptsipv4() {
 		ipv6acceptsipv4 = false;
 	}
+	void printServerHeader();
 
 	template <typename IPTYPE>
 	inline auto& servers();

@@ -32,15 +32,15 @@ void print_human_readable(const std::unordered_map<ServerTuple_t<IPTYPE>, Server
 	}
 }
 
-static void printHeader(int field_width, std::ostream& os) {
-	os << std::left << std::setw(ADDRESS_FIELD_WIDTH) << "local address <-> remote address" << std::setw(field_width) << "pid"
+void ConnectivityStats::printServerHeader() {
+	*os << std::left << std::setw(ADDRESS_FIELD_WIDTH) << "local address <-> remote address" << std::setw(field_width) << "pid"
 	   << std::setw(field_width) << "bytes sent" << std::setw(field_width) << "bytes received " << std::setw(field_width) << "rtt"
 	   << std::setw(field_width) << "conn_attempts" << std::setw(field_width) << "conn_timeouts"
 	   << std::setw(field_width) << "conn_resets" << "\n";
 }
 
 void ConnectivityStats::print_human_readable() {
-	printHeader(field_width, *os);
+	printHeader();
 	NetStat::print_human_readable(ConnKind::Client);
 	ServersIPv4 s4;
 	ServersIPv6 s6;
@@ -48,6 +48,9 @@ void ConnectivityStats::print_human_readable() {
 		std::unique_lock l(mx_servers);
 		s4.swap(servers_);
 		s6.swap(servers6_);
+	}
+	if (!s4.empty() || !s6.empty()) {
+		printServerHeader();
 	}
 	print_human_readable<ipv4_tuple_t>(s4, field_width, *os);
 	print_human_readable<ipv6_tuple_t>(s6, field_width, *os);

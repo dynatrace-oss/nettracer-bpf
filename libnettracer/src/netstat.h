@@ -73,6 +73,7 @@ protected:
 	bool interactive;
 	bool filter_loopback;
 
+	void printHeader();
 	template <typename IPTYPE>
 	inline auto& connections() const;
 	template <typename IPTYPE>

@@ -361,8 +361,8 @@ void NetStat::print_to_pipe() {
 	set_prev_metrics<ipv6_tuple_t>();
 }
 
-static void printHeader(int field_width, std::ostream& os) {
-	os << std::left << std::setw(ADDRESS_FIELD_WIDTH) << "local address <-> remote address" << std::setw(field_width) << "pid"
+void NetStat::printHeader() {
+	*os << std::left << std::setw(ADDRESS_FIELD_WIDTH) << "local address <-> remote address" << std::setw(field_width) << "pid"
 	   << std::setw(field_width) << "bytes sent" << std::setw(field_width) << "bytes received " << std::setw(field_width) << "rtt"
 	   << std::setw(field_width) << "rtt_var" << "\n";
 }
@@ -396,7 +396,7 @@ void NetStat::print_human_readable(ConnKind direction) {
 }
 
 void NetStat::print_human_readable() {
-	printHeader(field_width, *os);
+	printHeader();
 	print_human_readable(ConnKind::Client);
 	print_human_readable(ConnKind::Server);
 	set_prev_metrics<ipv4_tuple_t>();
