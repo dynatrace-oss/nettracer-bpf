@@ -73,6 +73,7 @@ protected:
 	bool interactive;
 	bool filter_loopback;
 
+	void printHeader();
 	template <typename IPTYPE>
 	inline auto& connections() const;
 	template <typename IPTYPE>
@@ -110,7 +111,8 @@ protected:
 	virtual steady_clock::time_point getCurrentTimeFromSteadyClock() const;
 
 	template <typename IPTYPE>
-	void resolveOldConnections();
+	void resolveOldConnectionsImpl();
+	virtual void resolveOldConnections();
 	template <typename IPTYPE>
 	void set_prev_metrics();
 	virtual void aggregate();
