@@ -33,7 +33,6 @@ po::options_description Configuration::getOptionsDescription() {
 			("noninteractive,r", "Hex output")
 			("with_loopback,f", "With loopback")
 			("bpf,b", po::value<std::string>()->default_value("auto"), "BTF or classic")
-			("program,p", po::value<std::string>()->default_value("nettracer-bpf.o"), "BPF program path")
 			("header,s", "Add average header size to traffic")
 			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
 			("args_file", po::value<std::filesystem::path>(), "Arguments file")
