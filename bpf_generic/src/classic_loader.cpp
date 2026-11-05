@@ -241,7 +241,7 @@ void ClassicLoader::set_maps_max_entries(uint32_t map_max_entries) {
 	}
 }
 
-bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, uint32_t kernVersion, bool enableConnectivity) {
+bool ClassicLoader::load_bpf(uint32_t map_max_entries, uint32_t kernVersion, bool enableConnectivity) {
 
 	LOG_INFO("Loading Classic BPF");
 	if (enableConnectivity) {
@@ -249,7 +249,7 @@ bool ClassicLoader::load_bpf(const std::string& path, uint32_t map_max_entries, 
 	}
 
 #ifdef SKIP_OFFSETGUESSING
-	SectionLoader sectionloader(path);
+	SectionLoader sectionloader("");
 #else
 	SectionLoader sectionloader(&nettracer_bpf_o[0], nettracer_bpf_o_len);
 #endif

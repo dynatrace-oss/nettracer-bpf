@@ -80,9 +80,6 @@ public:
 	void disableConnectivity() {
 		connectivity = false;
 	}
-	std::string bpfProgram() const {
-		return variablesMap["program"].as<std::string>();
-	}
 	std::string bpfType() const {
 		return variablesMap["bpf"].as<std::string>();
 	}

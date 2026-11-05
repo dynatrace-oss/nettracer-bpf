@@ -32,7 +32,7 @@ BTFLoader::BTFLoader() {
 	}
 }
 
-bool BTFLoader::load_bpf(const std::string& path, uint32_t max_entries, uint32_t kernVersion, bool enableConnectivity) {
+bool BTFLoader::load_bpf(uint32_t max_entries, uint32_t kernVersion, bool enableConnectivity) {
 	LOG_TRACE("Opening BPF object.");
 	skel = nettracer_bpf_core__open_opts(&openOpts);
 	if (skel == nullptr) {
