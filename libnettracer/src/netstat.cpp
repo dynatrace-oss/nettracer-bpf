@@ -263,11 +263,13 @@ bool NetStat::event(const EventIPTYPE& evt) {
 		el.start = time;
 		el.state.Established = 1;
 		el.state.Direction = 0;
+		el.state.Closed = 0;
 		break;
 	case TCP_EVENT_TYPE_ACCEPT:
 		el.start = time;
 		el.state.Established = 1;
 		el.state.Direction = 1;
+		el.state.Closed = 0;
 		break;
 	case TCP_EVENT_TYPE_CLOSE:
 		el.end = time;
