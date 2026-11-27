@@ -35,6 +35,7 @@ struct Stats {
 	uint64_t pkts_retrans = 0;
 	uint32_t rtt = 0;
 	uint32_t rtt_var = 0;
+	uint64_t throughput = 0;
 };
 
 template <typename IPTYPE>
@@ -67,6 +68,7 @@ Stats calc_delta(Stats curr, Stats prev, const IPTYPE& key) {
 	}
 	result.rtt = curr.rtt;
 	result.rtt_var = curr.rtt_var;
+	result.throughput = curr.throughput;
 	return result;
 }
 

@@ -38,6 +38,7 @@ class Configuration {
 	bool disableEvents{false};
 	bool testrun{false};
 	bool deltaMode{false};
+	bool throughput{false};
 	po::options_description getOptionsDescription();
 	po::variables_map parseArgsFile(const std::filesystem::path& argsFilePath);
 	bool setUpLogging() const;
@@ -80,8 +81,14 @@ public:
 	void disableConnectivity() {
 		connectivity = false;
 	}
+	void disableThroughput() {
+		throughput = false;
+	}
 	std::string bpfType() const {
 		return variablesMap["bpf"].as<std::string>();
+	}
+	bool throughputEnabled() const {
+		return throughput;
 	}
 };
 }

@@ -76,7 +76,7 @@ std::ostream& operator<<(std::ostream& os, const ipv4_tuple_t& tup);
 std::ostream& operator<<(std::ostream& os, const ipv6_tuple_t& tup);
 
 uint64_t swap_uint32_t(uint64_t addrpart);
-std::string short_num(uint64_t num);
+std::string short_num(uint64_t num, std::string_view = "");
 
 inline std::string to_string(const ipv4_tuple_t& tuple) {
 	return to_string(tuple, ConnectionDirection::Unknown);

@@ -37,6 +37,7 @@ po::options_description Configuration::getOptionsDescription() {
 			("map_size,m", po::value<uint32_t>()->default_value(4096), "Number of entries in BPF maps")
 			("args_file", po::value<std::filesystem::path>(), "Arguments file")
 			("test",  po::bool_switch(&testrun), "Check if NetTracer can start properly, then exit")
+			("throughput", po::bool_switch(&throughput), "Report estimated per-connection throughput (bytes/s)")
 			("version,v", "Print version")
 			("help,h", "Print this help screen");
 	return desc;

@@ -16,6 +16,7 @@
 #include "netstat.h"
 #include "bpf_generic/src/bpf_wrapper.h"
 #include "bpf_generic/src/log.h"
+#include "configuration.h"
 #include "proc_tcp.h"
 #include "system_utils.h"
 #include <iomanip>
@@ -105,6 +106,8 @@ void NetStat::update(const bpf::bpf_fds& fds) {
 		el.curr.pkts_retrans = val.retransmissions;
 		el.curr.rtt = val.rtt;
 		el.curr.rtt_var = val.rtt_var;
+		el.curr.throughput = val.throughput;
+
 		return changed;
 	});
 }
@@ -307,6 +310,7 @@ void NetStat::set_prev_metrics() {
 		stats.prev.pkts_received = stats.curr.pkts_received;
 		stats.prev.rtt = stats.curr.rtt;
 		stats.prev.rtt_var = stats.curr.rtt_var;
+		stats.prev.throughput = stats.curr.throughput;
 	}
 }
 
@@ -326,7 +330,7 @@ void NetStat::print(std::optional<ConnKind> kind) {
 
 		buf.str("");
 		auto wall_now = getCurrentTimeFromSystemClock();
-		Stats delta = incremental ? calc_delta(it->second.curr, it->second.prev, it->first) : it->second.curr;
+		Stats delta = cfg.deltaMetricsEnabled() ? calc_delta(it->second.curr, it->second.prev, it->first) : it->second.curr;
 
 		buf << std::right
 			<< std::setw(12) << duration_cast<seconds>(wall_now.time_since_epoch()).count()
@@ -334,13 +338,17 @@ void NetStat::print(std::optional<ConnKind> kind) {
 			<< std::setw(12) << it->second.pid
 			<< std::setw(12) << it->first.netns
 			<< it->second.state
-			<< std::setw(22) << delta.bytes_sent + addAvgHeaderSize<IPTYPE>( delta.pkts_sent, add_header_mode_)
-			<< std::setw(22) << delta.bytes_received + addAvgHeaderSize<IPTYPE>( delta.pkts_received, add_header_mode_ )
+			<< std::setw(22) << delta.bytes_sent + addAvgHeaderSize<IPTYPE>( delta.pkts_sent, cfg.addHeadersToMetrics())
+			<< std::setw(22) << delta.bytes_received + addAvgHeaderSize<IPTYPE>( delta.pkts_received, cfg.addHeadersToMetrics() )
 		  	<< std::setw(22) << delta.pkts_sent
 			<< std::setw(22) << delta.pkts_received
 			<< std::setw(22) << delta.pkts_retrans
 			<< std::setw(12) << delta.rtt
 			<< std::setw(12) << delta.rtt_var;
+
+		if (cfg.throughputEnabled()) {
+			buf << std::setw(12) << delta.throughput;
+		}
 
 		if (it->second.state.Established) {
 			auto end = (it->second.end != system_clock::time_point{}) ? it->second.end : wall_now;
@@ -363,15 +371,19 @@ void NetStat::print_to_pipe() {
 	set_prev_metrics<ipv6_tuple_t>();
 }
 
-void NetStat::printHeader() {
-	*os << std::left << std::setw(ADDRESS_FIELD_WIDTH) << "local address <-> remote address" << std::setw(field_width) << "pid"
-	   << std::setw(field_width) << "bytes sent" << std::setw(field_width) << "bytes received " << std::setw(field_width) << "rtt"
-	   << std::setw(field_width) << "rtt_var" << "\n";
+std::ostream& NetStat::printHeader(std::ostream& os) {
+	os << std::left << std::setw(ADDRESS_FIELD_WIDTH) << "local address <-> remote address" << std::setw(MIN_FIELD_WIDTH) << "pid"
+	   << std::setw(field_width) << "bytes sent" << std::setw(field_width) << "bytes received " << std::setw(MIN_FIELD_WIDTH) << "rtt"
+	   << std::setw(MIN_FIELD_WIDTH) << "rtt_var";
+	if (cfg.throughputEnabled()) {
+		os << std::setw(field_width) << "throughput";
+	}
+	return os;
 }
 
 template <typename IPTYPE>
 void print_human_readable(
-		const std::unordered_map<IPTYPE, Connection>& aggr, ConnKind direction, int field_width, std::ostream& os, bool filter_loopback) {
+		const std::unordered_map<IPTYPE, Connection>& aggr, ConnKind direction, int field_width, std::ostream& os, bool filter_loopback, bool tput) {
 	ConnectionDirection dirconn = (direction == ConnKind::Server) ? ConnectionDirection::Incoming : ConnectionDirection::Outgoing;
 
 	for (auto& [tup, stats] : aggr) {
@@ -382,23 +394,27 @@ void print_human_readable(
 			continue;
 		}
 
-		os << std::setw(ADDRESS_FIELD_WIDTH) << to_string(tup, dirconn);
-		os << std::setw(field_width) << stats.pid << std::setw(field_width) << short_num(stats.curr.bytes_sent) << std::setw(field_width)
-		   << short_num(stats.curr.bytes_received) << std::setw(field_width) << stats.curr.rtt << std::setw(field_width)
-		   << stats.curr.rtt_var << "\n";
+		os << std::setw(ADDRESS_FIELD_WIDTH) << to_string(tup, dirconn) << std::setw(MIN_FIELD_WIDTH) << stats.pid << std::setw(field_width)
+		   << short_num(stats.curr.bytes_sent, "B") << std::setw(field_width) << short_num(stats.curr.bytes_received, "B")
+		   << std::setw(MIN_FIELD_WIDTH) << fmt::format("{} us", stats.curr.rtt) << std::setw(MIN_FIELD_WIDTH)
+		   << fmt::format("{} us", stats.curr.rtt_var);
+		if (tput) {
+			os << std::setw(field_width) << short_num(stats.curr.throughput, "B/s");
+		}
+		os << '\n';
 	}
 }
 
 void NetStat::print_human_readable(ConnKind direction) {
 	std::unique_lock lock(mx_aggr);
-	print_human_readable<ipv4_tuple_t>(aggr_, direction, field_width, *os, filter_loopback);
-	print_human_readable<ipv6_tuple_t>(aggr6_, direction, field_width, *os, filter_loopback);
+	print_human_readable<ipv4_tuple_t>(aggr_, direction, field_width, *os, cfg.filterLoopback(), cfg.throughputEnabled());
+	print_human_readable<ipv6_tuple_t>(aggr6_, direction, field_width, *os, cfg.filterLoopback(), cfg.throughputEnabled());
 	clean_closed<ipv4_tuple_t>(direction);
 	clean_closed<ipv6_tuple_t>(direction);
 }
 
 void NetStat::print_human_readable() {
-	printHeader();
+	printHeader(*os) << "\n";
 	print_human_readable(ConnKind::Client);
 	print_human_readable(ConnKind::Server);
 	set_prev_metrics<ipv4_tuple_t>();
@@ -415,8 +431,8 @@ void NetStat::readListenPorts(const tcpTable<IPTYPE>& tblisten) {
 }
 
 void NetStat::readListenPorts() {
-	readListenPorts<ipv4_tuple_t>(readTcpTable("/proc", filter_loopback));
-	readListenPorts<ipv6_tuple_t>(readTcpTable6("/proc", filter_loopback));
+	readListenPorts<ipv4_tuple_t>(readTcpTable("/proc", cfg.filterLoopback()));
+	readListenPorts<ipv6_tuple_t>(readTcpTable6("/proc", cfg.filterLoopback()));
 }
 
 template <typename IPTYPE>
@@ -492,14 +508,13 @@ steady_clock::time_point NetStat::getCurrentTimeFromSteadyClock() const {
 	return steady_clock::now();
 }
 
-NetStat::NetStat(config::ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback)
-		: exitCtrl(e), incremental(deltaMode), add_header_mode_(headerMode), os(&std::cout), filter_loopback(filterLoopback) {
-	interactive = ((isatty(STDIN_FILENO) == 1) && !nonInteractive);
+NetStat::NetStat(config::ExitCtrl& e, const config::Configuration& c) : cfg(c), exitCtrl(e), os(&std::cout) {
+	interactive = ((isatty(STDIN_FILENO) == 1) && !c.noninteractiveEnabled());
 	if (interactive) {
 		int window_width = getWindowWidth();
 		field_width = window_width / 10;
-		if (field_width < NUM_FIELD_WIDTH) {
-			field_width = NUM_FIELD_WIDTH;
+		if (field_width < MIN_FIELD_WIDTH) {
+			field_width = MIN_FIELD_WIDTH;
 		}
 	}
 }

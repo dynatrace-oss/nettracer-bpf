@@ -159,24 +159,15 @@ ReturnCodes startNetTracer(config_watcher& cw, config::Configuration& config) {
 	}
 	bpf::BPFMapsWrapper mapsWrapper;
 	std::unique_ptr<netstat::IStatsCollector> netst;
-	if (ebpf->needs_offset_guessing() && config.connectivityEnabled()) {
-		LOG_WARN("Connectivity works only when BTF is enabled and supported by kernel. Disabling");
+	if (ebpf->needs_offset_guessing() && (config.connectivityEnabled() || config.throughputEnabled())) {
+		LOG_WARN("Connectivity and Throughput works only when BTF is enabled and supported by kernel. Disabling");
 		config.disableConnectivity();
+		config.disableThroughput();
 	}
 	if (config.connectivityEnabled()) {
-		netst = std::make_unique<netstat::ConnectivityStats>(
-				exitCtrl,
-				config.deltaMetricsEnabled(),
-				config.addHeadersToMetrics(),
-				config.noninteractiveEnabled(),
-				config.filterLoopback());
+		netst = std::make_unique<netstat::ConnectivityStats>(exitCtrl, config);
 	} else {
-		netst = std::make_unique<netstat::NetStat>(
-				exitCtrl,
-				config.deltaMetricsEnabled(),
-				config.addHeadersToMetrics(),
-				config.noninteractiveEnabled(),
-				config.filterLoopback());
+		netst = std::make_unique<netstat::NetStat>(exitCtrl, config);
 	}
 
 	try {

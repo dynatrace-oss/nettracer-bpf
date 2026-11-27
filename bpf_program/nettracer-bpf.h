@@ -86,6 +86,7 @@ struct tcp_stats_t {
 	uint32_t segs_out;
 	uint32_t rtt;
 	uint32_t rtt_var;
+	uint64_t throughput;
 };
 
 enum conn_state {
