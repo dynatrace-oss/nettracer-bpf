@@ -24,8 +24,8 @@ class Ibpf;
 
 namespace netstat {
 
-constexpr int ADDRESS_FIELD_WIDTH = 57;
-constexpr int NUM_FIELD_WIDTH = 10;
+constexpr int ADDRESS_FIELD_WIDTH = 68;
+constexpr int MIN_FIELD_WIDTH = 10;
 
 class IStatsCollector {
 public:

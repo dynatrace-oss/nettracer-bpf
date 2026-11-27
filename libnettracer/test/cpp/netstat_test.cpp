@@ -28,8 +28,8 @@ using testing::Return;
 
 class TestNetStat : public NetStat {
 public:
-	explicit TestNetStat(config::ExitCtrl& e, bool inc, bpf::BPFMapsWrapper* mapsWrapper, std::ostream* os)
-		: NetStat(e, inc, false, false) {
+	explicit TestNetStat(config::ExitCtrl& e, bpf::BPFMapsWrapper* mapsWrapper, std::ostream* os, config::Configuration& c)
+		: NetStat(e, c) {
 		this->mapsWrapper = mapsWrapper;
 		this->os = os;
 	}
@@ -64,8 +64,8 @@ protected:
 		netstat.reset();
 	}
 
-	void setUpNetStat(bool incremental = false) {
-		netstat = std::make_unique<TestNetStat>(*exitCtrl, incremental, &mockMapsWrapper, os.get());
+	void setUpNetStat() {
+		netstat = std::make_unique<TestNetStat>(*exitCtrl, &mockMapsWrapper, os.get(), config);
 	}
 	
 	template<typename Tuple>
@@ -109,6 +109,7 @@ protected:
 		EXPECT_EQ(netstatTCPStats.rtt_var, bpfMapTCPStats.rtt_var);
 	}
 
+	config::Configuration config;
 	std::unique_ptr<config::ExitCtrl> exitCtrl;
 	std::unique_ptr<std::ostringstream> os;
 	std::unique_ptr<TestNetStat> netstat;

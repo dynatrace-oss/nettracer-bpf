@@ -22,25 +22,30 @@
 namespace netstat {
 
 template <typename IPTYPE>
-void print_human_readable(const std::unordered_map<ServerTuple_t<IPTYPE>, ServerStats>& aggr, int field_width, std::ostream& os) {
+void print_human_readable(const std::unordered_map<ServerTuple_t<IPTYPE>, ServerStats>& aggr, int field_width, std::ostream& os, bool tput) {
 
 	for (auto& [tup, stats] : aggr) {
 		os << std::setw(ADDRESS_FIELD_WIDTH) << to_string(tup.get_tuple(), ConnectionDirection::Incoming);
-		os << std::setw(field_width) << stats.pid << std::setw(field_width) << short_num(stats.bytes_sent) << std::setw(field_width)
-		   << short_num(stats.bytes_received) << std::setw(field_width) << stats.rtt << std::setw(field_width) << stats.connection_attempts
-		   << std::setw(field_width) << stats.connection_timeouts << std::setw(field_width) << stats.connection_resets << "\n";
+		os << std::setw(MIN_FIELD_WIDTH) << stats.pid << std::setw(field_width) << short_num(stats.bytes_sent, "B")
+		   << std::setw(field_width) << short_num(stats.bytes_received, "B") << std::setw(MIN_FIELD_WIDTH)
+		   << fmt::format("{} us", stats.rtt) << std::setw(MIN_FIELD_WIDTH) << fmt::format("{} us", stats.rtt_var);
+		if (tput) {
+			os << std::setw(field_width) << short_num(stats.throughput, "B/s ");
+		}
+		os << std::setw(field_width) << stats.connection_attempts << std::setw(field_width) << stats.connection_timeouts
+		   << std::setw(field_width) << stats.connection_resets << "\n";
 	}
 }
 
 void ConnectivityStats::printServerHeader() {
-	*os << std::left << std::setw(ADDRESS_FIELD_WIDTH) << "local address <-> remote address" << std::setw(field_width) << "pid"
-	   << std::setw(field_width) << "bytes sent" << std::setw(field_width) << "bytes received " << std::setw(field_width) << "rtt"
-	   << std::setw(field_width) << "conn_attempts" << std::setw(field_width) << "conn_timeouts"
-	   << std::setw(field_width) << "conn_resets" << "\n";
+	printHeader(*os) << std::setw(field_width) << "conn_attempts" << std::setw(field_width) << "conn_timeouts" << std::setw(field_width)
+					 << "conn_resets"
+					 << "\n";
 }
 
 void ConnectivityStats::print_human_readable() {
-	printHeader();
+
+	printServerHeader();
 	NetStat::print_human_readable(ConnKind::Client);
 	ServersIPv4 s4;
 	ServersIPv6 s6;
@@ -49,11 +54,8 @@ void ConnectivityStats::print_human_readable() {
 		s4.swap(servers_);
 		s6.swap(servers6_);
 	}
-	if (!s4.empty() || !s6.empty()) {
-		printServerHeader();
-	}
-	print_human_readable<ipv4_tuple_t>(s4, field_width, *os);
-	print_human_readable<ipv6_tuple_t>(s6, field_width, *os);
+	print_human_readable<ipv4_tuple_t>(s4, field_width, *os, cfg.throughputEnabled());
+	print_human_readable<ipv6_tuple_t>(s6, field_width, *os, cfg.throughputEnabled());
 	set_prev_metrics<ipv4_tuple_t>();
 	set_prev_metrics<ipv6_tuple_t>();
 }
@@ -183,14 +185,17 @@ void ConnectivityStats::print(const std::unordered_map<ServerTuple_t<IPTYPE>, Se
 			<< std::setw(12) << stat.pid
 			<< std::setw(12) << sock.netns
 			<< kind
-			<< std::setw(22) << delta.bytes_sent + addAvgHeaderSize<IPTYPE>(delta.pkts_sent, add_header_mode_)
-			<< std::setw(22) << delta.bytes_received + addAvgHeaderSize<IPTYPE>(delta.pkts_received, add_header_mode_)
+			<< std::setw(22) << delta.bytes_sent + addAvgHeaderSize<IPTYPE>(delta.pkts_sent, cfg.addHeadersToMetrics())
+			<< std::setw(22) << delta.bytes_received + addAvgHeaderSize<IPTYPE>(delta.pkts_received, cfg.addHeadersToMetrics())
 			<< std::setw(22) << delta.pkts_sent
 			<< std::setw(22) << delta.pkts_received
 			<< std::setw(22) << delta.pkts_retrans
 			<< std::setw(12) << delta.rtt
-			<< std::setw(12) << delta.rtt_var
-			<< std::setw(12) << delta.connection_attempts
+			<< std::setw(12) << delta.rtt_var;
+		if (cfg.throughputEnabled()) {
+			buf << std::setw(12) << delta.throughput;
+		}
+		buf	<< std::setw(12) << delta.connection_attempts
 			<< std::setw(12) << delta.connection_timeouts
 			<< std::setw(12) << delta.connection_resets;
 

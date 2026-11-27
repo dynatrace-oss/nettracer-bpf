@@ -29,6 +29,10 @@
 #include <unordered_map>
 #include <utility>
 
+namespace config {
+class Configuration;
+}
+
 namespace netstat {
 
 using namespace std::chrono;
@@ -61,19 +65,17 @@ class NetStat : public IStatsCollector {
 	IPv6ListenSock2Pid listen6_;
 	bool kbhit;
 	bool config_changed{false};
-
 protected:
 	int max_map_size{1024};
+	const config::Configuration& cfg;
 	config::ExitCtrl& exitCtrl;
-	bool incremental;
-	bool add_header_mode_ = false;
 	bpf::BPFMapsWrapper* mapsWrapper;
 	std::ostream* os;
 	int field_width;
 	bool interactive;
-	bool filter_loopback;
 
-	void printHeader();
+	std::ostream& printHeader(std::ostream& os);
+
 	template <typename IPTYPE>
 	inline auto& connections() const;
 	template <typename IPTYPE>
@@ -120,7 +122,7 @@ protected:
 	bool event(const EventIPTYPE& evt);
 
 public:
-	explicit NetStat(config::ExitCtrl& e, bool deltaMode, bool headerMode, bool nonInteractive, bool filterLoopback = true);
+	explicit NetStat(config::ExitCtrl& e, const config::Configuration& c);
 	virtual ~NetStat();
 	void set_kbhit() override;
 	void set_max_map_size(uint32_t size) override;

@@ -84,12 +84,24 @@ static void update_tcp_stats(void *tuple, enum protocol proto, struct guess_stat
 	}
 #else
 	struct tcp_sock *tp = (struct tcp_sock *)sk;
-	bpf_core_read(&stats->segs_in, sizeof(stats->segs_in), &tp->segs_in);
-	bpf_core_read(&stats->segs_out, sizeof(stats->segs_out), &tp->segs_out);
-	bpf_core_read(&rtt, sizeof(rtt), &tp->srtt_us);
-	bpf_core_read(&rtt_var, sizeof(rtt_var), &tp->mdev_us);
+	stats->segs_in = BPF_CORE_READ(tp, segs_in);
+	stats->segs_out = BPF_CORE_READ(tp, segs_out);
+	rtt = BPF_CORE_READ(tp, srtt_us);
+	rtt_var = BPF_CORE_READ(tp, mdev_us);
 	stats->rtt = rtt >> 3;
 	stats->rtt_var = rtt_var >> 2;
+	stats->throughput = 0;
+
+	if (bpf_core_field_exists(tp->rate_delivered) && bpf_core_field_exists(tp->rate_interval_us) && bpf_core_field_exists(tp->mss_cache)) {
+		__u32 rate_delivered = BPF_CORE_READ(tp, rate_delivered);
+		__u32 interval_us = BPF_CORE_READ(tp, rate_interval_us);
+		__u32 mss = BPF_CORE_READ(tp, mss_cache);
+
+		if (rate_delivered != 0 && interval_us != 0 && mss != 0) {
+			__u64 numerator = (__u64)rate_delivered * (__u64)mss * 1000000ULL;
+			stats->throughput = numerator / interval_us;
+		}
+	}
 #endif
 
 }

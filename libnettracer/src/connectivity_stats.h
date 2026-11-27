@@ -100,6 +100,7 @@ struct ServerStats : public Stats {
 		pkts_retrans += conn.pkts_retrans;
 		rtt = std::max(rtt, conn.rtt);
 		rtt_var = std::max(rtt_var, conn.rtt_var);
+		throughput = std::max(throughput, conn.throughput);
 	}
 };
 

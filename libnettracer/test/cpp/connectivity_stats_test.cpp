@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "bpf_maps_processing_testing.h"
+#include "configuration.h"
 #include "connectivity_stats.h"
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -26,8 +27,8 @@ using testing::Return;
 
 class TestConnectivityStats : public ConnectivityStats {
 public:
-	explicit TestConnectivityStats(config::ExitCtrl& e, bool inc, bpf::BPFMapsWrapper* mapsWrapper, std::ostream* os)
-			: ConnectivityStats(e, inc, false, false) {
+	explicit TestConnectivityStats(config::ExitCtrl& e, bpf::BPFMapsWrapper* mapsWrapper, std::ostream* os, config::Configuration& c)
+			: ConnectivityStats(e, c) {
 		this->mapsWrapper = mapsWrapper;
 		this->os = os;
 	}
@@ -52,7 +53,7 @@ class ConnectivityStatsTest : public BPFMapsProcessingTest {
 protected:
 	void SetUp() override {
 		exitCtrl = std::make_unique<config::ExitCtrl>();
-		netstat = std::make_unique<TestConnectivityStats>(*exitCtrl, true, &mockMapsWrapper, &os);
+		netstat = std::make_unique<TestConnectivityStats>(*exitCtrl, &mockMapsWrapper, &os, config);
 		sock.sport = 22;
 		sock.netns = 0xf00001;
 		sock.dport = 4343;
@@ -71,6 +72,7 @@ protected:
 		netstat.reset();
 	}
 
+	config::Configuration config;
 	std::unique_ptr<config::ExitCtrl> exitCtrl;
 	std::ostringstream os;
 	std::unique_ptr<TestConnectivityStats> netstat;

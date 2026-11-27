@@ -168,18 +168,18 @@ TEST(TupleConversionTests, testIPv6EventToTuple) {
 TEST(HumanReadableTests, printUint64) {
 	uint64_t var = 123;
 	std::string result = short_num(var);
-	EXPECT_EQ(result, "123");
+	EXPECT_EQ(result, "123 ");
 	var = 123456;
 	result = short_num(var);
-	EXPECT_EQ(result, "123.5K");
+	EXPECT_EQ(result, "123.5 K");
 	var = 123456789;
 	result = short_num(var);
-	EXPECT_EQ(result, "123.5M");
+	EXPECT_EQ(result, "123.5 M");
 	var = 123456789123;
 	result = short_num(var);
-	EXPECT_EQ(result, "123.5G");
+	EXPECT_EQ(result, "123.5 G");
 	var = 123456789123123;
-	result = short_num(var);
-	EXPECT_EQ(result, "123456.8G");
+	result = short_num(var, "B");
+	EXPECT_EQ(result, "123456.8 GB");
 }
 
